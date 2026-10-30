@@ -161,6 +161,7 @@ export async function clearOutbox(): Promise<void> {
   const { scope, items } = useOutbox.getState();
   cancelTimer();
   failures = 0;
+  settleUntil = 0;
   photosInMemory.clear();
   useOutbox.setState({ scope: null, loaded: false, items: [], live: [], sending: null });
   if (!scope) return;
@@ -217,6 +218,8 @@ let flushing = false;
 let failures = 0;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let flushNow: (() => Promise<void>) | null = null;
+// A gateway gave up on a request the server may still be finishing: nothing is checked or sent again before this.
+let settleUntil = 0;
 
 function cancelTimer() {
   clearTimeout(timer);
@@ -243,8 +246,8 @@ export function kickOutbox(when: 'now' | 'later', error?: unknown): void {
     void flushNow?.();
   } else if (!timer && !flushing) {
     failures = Math.max(failures, 1);
-    const settle = error instanceof ApiError && mayStillBeProcessing(error.status);
-    schedule(backoffDelay(failures, Math.random, settle ? SETTLE_DELAY : 0));
+    if (error instanceof ApiError && mayStillBeProcessing(error.status)) settleUntil = Date.now() + SETTLE_DELAY;
+    schedule(backoffDelay(failures));
   }
 }
 
@@ -295,6 +298,9 @@ export function useOutboxSync() {
 
     const flush = async () => {
       if (flushing) return;
+      // Whatever woke us (foreground, connectivity, a tap), give a slow server time to finish first.
+      const settling = settleUntil - Date.now();
+      if (settling > 0) return schedule(settling);
       flushing = true;
       cancelTimer();
       let sent = 0;
@@ -316,7 +322,8 @@ export function useOutboxSync() {
             const status = error instanceof ApiError ? error.status : -1;
             if (isRetryableStatus(status)) {
               failures += 1;
-              schedule(backoffDelay(failures, Math.random, mayStillBeProcessing(status) ? SETTLE_DELAY : 0));
+              if (mayStillBeProcessing(status)) settleUntil = Date.now() + SETTLE_DELAY;
+              schedule(backoffDelay(failures, Math.random, settleUntil - Date.now()));
               return;
             }
             // Refused for good: say why on the card, and go on with the next one.
