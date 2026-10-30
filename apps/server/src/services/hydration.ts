@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { dateRange, hydrationGoalMl, type DayHydration, type HydrationTrend, type Sex, type WaterEntry, type WaterSource } from '@symbiose/shared';
+import { dateRange, hydrationGoalMl, type DayHydration, type HydrationTrend, type Profile, type WaterEntry, type WaterSource } from '@symbiose/shared';
 import { and, eq, gte, lte } from 'drizzle-orm';
 
 import type { Db } from '../db';
@@ -40,23 +40,26 @@ export function waterBetween(db: Db, userId: string, from: string, to: string): 
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
+/** Whose goal: the sex sets the default, a goal chosen by hand replaces it. */
+type Drinker = Pick<Profile, 'sex' | 'waterGoalMl'>;
+
 /** The day's drinks against its goal, which grows a little with the day's workouts. */
-export function dayHydration(db: Db, userId: string, sex: Sex, date: string): DayHydration {
+export function dayHydration(db: Db, userId: string, who: Drinker, date: string): DayHydration {
   const entries = waterBetween(db, userId, date, date);
   return {
     totalMl: entries.reduce((sum, e) => sum + e.ml, 0),
-    goalMl: hydrationGoalMl(sex, workoutsKcal(workoutsBetween(db, userId, date, date))),
+    goalMl: hydrationGoalMl(who.sex, workoutsKcal(workoutsBetween(db, userId, date, date)), who.waterGoalMl ?? null),
     entries,
   };
 }
 
-export function hydrationTrend(db: Db, userId: string, sex: Sex, from: string, to: string): HydrationTrend {
+export function hydrationTrend(db: Db, userId: string, who: Drinker, from: string, to: string): HydrationTrend {
   const totals = new Map<string, number>();
   for (const entry of waterBetween(db, userId, from, to)) totals.set(entry.localDate, (totals.get(entry.localDate) ?? 0) + entry.ml);
   const kcal = new Map<string, number>();
   for (const workout of workoutsBetween(db, userId, from, to)) kcal.set(workout.localDate, (kcal.get(workout.localDate) ?? 0) + (workout.activeKcal ?? 0));
 
-  const days = dateRange(from, to).map((date) => ({ date, ml: totals.get(date) ?? 0, goalMl: hydrationGoalMl(sex, kcal.get(date) ?? 0) }));
+  const days = dateRange(from, to).map((date) => ({ date, ml: totals.get(date) ?? 0, goalMl: hydrationGoalMl(who.sex, kcal.get(date) ?? 0, who.waterGoalMl ?? null) }));
   const logged = days.filter((d) => d.ml > 0);
   return {
     days,

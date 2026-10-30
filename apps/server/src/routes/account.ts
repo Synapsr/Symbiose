@@ -71,6 +71,8 @@ export function meRoutes({ db, config, photos }: Deps) {
     const profile = { ...c.req.valid('json') };
     const stored = getUserRow(db, c.get('userId')).profile;
     for (const key of OPT_INS) if (profile[key] === undefined && stored?.[key] !== undefined) profile[key] = stored[key];
+    // Same for the drinks goal chosen by hand; null brings the default back.
+    if (profile.waterGoalMl === undefined && stored?.waterGoalMl !== undefined) profile.waterGoalMl = stored.waterGoalMl;
     const row = db
       .update(users)
       .set({ profile, name: profile.name })
