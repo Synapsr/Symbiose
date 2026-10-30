@@ -308,7 +308,7 @@ const fr = {
           'File hors ligne : un repas pris sans réseau n’est jamais perdu',
           'Dépense énergétique réelle, mesurée à partir de la tendance du poids',
           'Modules optionnels : sommeil, hydratation, humeur',
-          'Carnet de santé : transit, ressentis, symptômes, lus par ton coach',
+          'Carnet de santé : ressentis, symptômes, digestion, lus par ton coach',
         ],
       },
       {
@@ -678,7 +678,7 @@ const en: Dict = {
           'Offline queue: a meal taken without network is never lost',
           'Real energy expenditure, measured from your weight trend',
           'Optional modules: sleep, hydration, mood',
-          'Health journal: digestion, feelings, symptoms, read by your coach',
+          'Health journal: feelings, symptoms, digestion, read by your coach',
         ],
       },
       {

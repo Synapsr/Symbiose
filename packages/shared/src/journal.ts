@@ -6,7 +6,7 @@ import { LocalDateSchema, LocalDateTimeSchema } from './schemas';
 // ---------------------------------------------------------------- Health journal (« Carnet »)
 
 /** What a note is about. "other" is the free note, the default. */
-export const JournalKindSchema = z.enum(['transit', 'feeling', 'symptom', 'medication', 'other']);
+export const JournalKindSchema = z.enum(['feeling', 'symptom', 'medication', 'transit', 'other']);
 export type JournalKind = z.infer<typeof JournalKindSchema>;
 export const JOURNAL_KINDS = JournalKindSchema.options;
 

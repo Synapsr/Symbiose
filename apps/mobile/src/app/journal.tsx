@@ -41,7 +41,8 @@ export default function Journal() {
   const journal = useJournal({ from, to: today }, { keepPrevious: true });
   const all = journal.data ?? [];
   const entries = filter === 'all' ? all : all.filter((e) => e.kind === filter);
-  const transit = filter === 'all' || filter === 'transit' ? transitSummary(all, today) : null;
+  // The frequency card belongs to the Transit filter: the Carnet opens on the notes themselves.
+  const transit = filter === 'transit' ? transitSummary(all, today) : null;
   // Nothing can be older than the account.
   const hasOlder = from > toLocalDate(new Date(user.createdAt));
 
