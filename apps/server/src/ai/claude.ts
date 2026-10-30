@@ -66,10 +66,25 @@ const PlanOut = z.object({
   adjustForActivity: z.boolean(),
 });
 
-const CoachOut = z.object({
-  reply: z.string(),
-  planChange: z.object({ intentions: z.string(), rationale: z.string() }).nullable(),
-});
+const PlanChange = z.object({ intentions: z.string().min(1), rationale: z.string() });
+
+/** The coach streams prose; a plan change comes as a tool call after the reply. */
+const PLAN_CHANGE_TOOL: Anthropic.Beta.BetaTool = {
+  name: 'propose_plan_change',
+  description:
+    'Propose updated goals when the person asks to change their goals or states a new goal or constraint. The app shows the proposal and asks them to confirm.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      intentions: { type: 'string', description: 'Their full updated intentions, first person, merging the existing intentions with the change.' },
+      rationale: { type: 'string', description: 'One sentence explaining the change.' },
+    },
+    required: ['intentions', 'rationale'],
+    additionalProperties: false,
+  },
+  strict: true,
+  eager_input_streaming: true,
+};
 
 const CravingOut = z.object({ tip: z.string(), alternative: z.string() });
 
@@ -178,10 +193,39 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       return run({ system: GOAL_PLANNER, content: [{ type: 'text', text }], schema: PlanOut, effort: 'medium' });
     },
 
-    async coach(input) {
+    async coach(input, onText) {
       const history: Anthropic.Beta.BetaMessageParam[] = input.history.map((turn) => ({ role: turn.role, content: turn.content }));
       const text = `${contextBlock(input, { today: input.today, last7Days: input.week })}\n\n${input.message}`;
-      return run({ system: COACH, content: [{ type: 'text', text }], schema: CoachOut, effort: 'low', history });
+      try {
+        const stream = client.beta.messages.stream({
+          model,
+          max_tokens: 16000,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          system: [{ type: 'text', text: COACH, cache_control: { type: 'ephemeral' } }],
+          messages: [...history, { role: 'user', content: [{ type: 'text', text }] }],
+          tools: [PLAN_CHANGE_TOOL],
+          tool_choice: { type: 'auto' },
+          output_config: { effort: 'low' },
+        });
+        if (onText) stream.on('text', (delta) => onText(delta));
+        const message = await stream.finalMessage();
+        if (message.stop_reason === 'refusal') {
+          throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
+        }
+        const reply = message.content
+          .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+          .join('')
+          .trim();
+        // Eager tool input streaming skips server-side validation: validate here.
+        const call = message.content.find((block) => block.type === 'tool_use' && block.name === PLAN_CHANGE_TOOL.name);
+        const parsed = call?.type === 'tool_use' ? PlanChange.safeParse(call.input) : null;
+        const planChange = parsed?.success ? parsed.data : null;
+        if (!reply && !planChange) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
+        return { reply: reply || planChange!.rationale, planChange };
+      } catch (error) {
+        throw mapError(error);
+      }
     },
 
     async cravingTip(input) {

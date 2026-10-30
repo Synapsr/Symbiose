@@ -21,6 +21,7 @@ import type {
   UpdateMealInput,
   User,
 } from '@symbiose/shared';
+import { fetch as streamingFetch } from 'expo/fetch';
 
 export class ApiError extends Error {
   constructor(
@@ -116,6 +117,46 @@ export function createApi(baseUrl: string, token: string) {
     sendCoach: (text: string, localDate: string) =>
       call<{ user: CoachMessage; reply: CoachMessage }>('POST', '/api/coach/messages', { text, localDate }, AI_TIMEOUT),
     clearCoach: () => call<void>('DELETE', '/api/coach/messages'),
+
+    /** Coach reply as Server-Sent Events: `onDelta` receives the text as it is written. */
+    async streamCoach(text: string, localDate: string, onDelta: (text: string) => void): Promise<{ user: CoachMessage; reply: CoachMessage }> {
+      let res;
+      try {
+        res = await streamingFetch(`${baseUrl}/api/coach/messages/stream`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ text, localDate }),
+        });
+      } catch (error) {
+        throw new ApiError(0, 'network', error instanceof Error ? error.message : 'Network error');
+      }
+      if (!res.ok || !res.body) {
+        const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+        throw new ApiError(res.status, data?.error?.code ?? 'http_error', data?.error?.message ?? `HTTP ${res.status}`);
+      }
+      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+      let buffer = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (value) buffer += value;
+        // Events are separated by a blank line; each has `event:` and `data:` lines.
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const block = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
+          boundary = buffer.indexOf('\n\n');
+          const event = /^event: ?(.*)$/m.exec(block)?.[1];
+          const data = /^data: ?(.*)$/m.exec(block)?.[1];
+          if (!event || data === undefined) continue;
+          const payload = JSON.parse(data) as Record<string, unknown>;
+          if (event === 'delta') onDelta(String(payload.text ?? ''));
+          if (event === 'done') return payload as { user: CoachMessage; reply: CoachMessage };
+          if (event === 'error') throw new ApiError(424, String(payload.code ?? 'ai_error'), String(payload.message ?? 'Error'));
+        }
+        if (done) break;
+      }
+      throw new ApiError(0, 'stream_ended', 'The reply was interrupted');
+    },
   };
 }
 

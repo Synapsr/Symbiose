@@ -73,9 +73,12 @@ const fakeAi: Ai = {
       adjustForActivity: false,
     };
   },
-  async coach(input) {
+  async coach(input, onText) {
     calls.push(`coach:${input.history.length}`);
-    return { reply: `Tu as mangé ${input.today.totals.kcal} kcal.`, planChange: null };
+    const reply = `Tu as mangé ${input.today.totals.kcal} kcal.`;
+    for (const part of ['Tu as mangé ', `${input.today.totals.kcal} kcal.`]) onText?.(part);
+    const wantsChange = input.message.includes('objectifs');
+    return { reply, planChange: wantsChange ? { intentions: 'Moins de sucre et plus de fibres', rationale: 'Les fibres calment les envies.' } : null };
   },
   async cravingTip() {
     return { tip: "Bois un verre d'eau.", alternative: 'Une pomme' };
@@ -313,6 +316,31 @@ describe('Symbiose API', () => {
     expect(calls).toContain('coach:2');
     const history = await request<unknown[]>('GET', '/api/coach/messages');
     expect(history.body).toHaveLength(4);
+  });
+
+  it('streams coach replies as server-sent events', async () => {
+    const res = await app.request('/api/coach/messages/stream', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ text: 'Ajuste mes objectifs', localDate: today }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    const body = await res.text();
+    const events = body
+      .split('\n\n')
+      .filter(Boolean)
+      .map((block) => ({
+        event: /^event: (.*)$/m.exec(block)?.[1],
+        data: JSON.parse(/^data: (.*)$/m.exec(block)?.[1] ?? 'null') as Record<string, any>,
+      }));
+    const deltas = events.filter((e) => e.event === 'delta').map((e) => e.data.text).join('');
+    expect(deltas).toMatch(/^Tu as mangé \d+ kcal\.$/);
+    const done = events.find((e) => e.event === 'done')!;
+    expect(done.data.reply.content).toBe(deltas);
+    expect(done.data.reply.suggestion.intentions).toContain('fibres');
+    const history = await request<unknown[]>('GET', '/api/coach/messages');
+    expect(history.body).toHaveLength(6);
   });
 
   it('exports and deletes the account', async () => {

@@ -54,11 +54,16 @@ export function createMockAi(): Ai {
       return { ...plan, title: 'Moins de sucre, plus d’énergie', summary: 'On vise moins de 25 g de sucres ajoutés par jour, en s’attaquant aux réflexes de l’après-midi. Les calories restent au maintien.' };
     },
 
-    async coach(input) {
+    async coach(input, onText) {
       const kcal = Math.round(input.today.totals.kcal);
       const sugar = Math.round(input.today.totals.addedSugar);
+      const reply = `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`;
+      for (const word of reply.split(/(?<= )/)) {
+        onText?.(word);
+        await new Promise((r) => setTimeout(r, 40));
+      }
       return {
-        reply: `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`,
+        reply,
         planChange: /objectif|goal/i.test(input.message)
           ? { intentions: `${input.plan?.intentions ?? ''} Je veux aussi manger plus de fibres.`.trim(), rationale: 'Ajouter un repère fibres aide à la satiété et réduit les envies de sucre.' }
           : null,

@@ -98,7 +98,8 @@ export interface Ai {
   readonly model: string | null;
   analyzeMeal(input: MealAnalysisInput): Promise<MealAnalysis>;
   draftPlan(input: PlanDraftInput): Promise<PlanDraft>;
-  coach(input: CoachInput): Promise<CoachOutput>;
+  /** Streams the reply text through `onText` as it is written. */
+  coach(input: CoachInput, onText?: (delta: string) => void): Promise<CoachOutput>;
   cravingTip(input: CravingInput): Promise<CravingOutput>;
   review(input: ReviewInput): Promise<Review>;
 }
