@@ -1,5 +1,5 @@
-import { shortId, toLocalDate, type CreateMealInput, type Meal } from '@symbiose/shared';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { shortId, toLocalDate, type CreateMealInput, type DaySummary, type Meal } from '@symbiose/shared';
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
@@ -9,7 +9,9 @@ import { useI18n } from '@/i18n';
 import { ApiError } from './api';
 import { haptics } from './haptics';
 import { BP_SCOPES, health, HEALTH_SCOPES, inferWalkIntensity } from './health';
-import { useApi, useUser } from './session';
+import { dropEntry, isNetworkError, kickOutbox, openOutbox, releaseCapture, stashCapture, useOutbox, type OutboxEntry } from './outbox';
+import { uniqueEatenAt } from './outbox-logic';
+import { useApi, useSession, useUser } from './session';
 import { usePending, useSettings, useToast, type PendingMeal } from './stores';
 
 /** Today's local date, refreshed when the app returns to the foreground. */
@@ -51,24 +53,70 @@ export function useRefreshAfterMeal() {
   );
 }
 
+/** Every time already used that day, so a new capture gets its own (see `uniqueEatenAt`). */
+function takenTimes(queryClient: QueryClient, localDate: string): string[] {
+  return [
+    ...useOutbox.getState().items.map((i) => i.eatenAt),
+    ...usePending.getState().items.map((p) => p.input.eatenAt),
+    ...(queryClient.getQueryData<DaySummary>(['day', localDate])?.meals.map((m) => m.eatenAt) ?? []),
+  ];
+}
+
+/** A capture as the offline queue keeps it: everything but the photo bytes, which go to a file. */
+function captureEntry({ id, input, label, startedAt }: PendingMeal): OutboxEntry {
+  const { eatenAt, localDate, mealType, text, items, title, photoBase64 } = input;
+  const emoji = photoBase64 ? null : (items?.find((i) => i.emoji)?.emoji ?? (text ? '✍️' : '🍽️'));
+  return { id, kind: 'create', createdAt: startedAt, eatenAt, localDate, mealType, label, emoji, error: null, input: { text, items, title }, photo: Boolean(photoBase64) };
+}
+
 /**
  * Optimistic meal logging: the meal shows up immediately as "analyzing" on
- * the Today screen while the server and the AI do their work.
+ * the Today screen while the server and the AI do their work. Without
+ * network, it waits on the phone instead and leaves on its own later.
  */
 export function useMealLogger() {
   const api = useApi();
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const refresh = useRefreshAfterMeal();
   const upsert = usePending((s) => s.upsert);
   const remove = usePending((s) => s.remove);
   const showToast = useToast((s) => s.show);
   const healthEnabled = useSettings((s) => s.healthEnabled);
+  const { session, user } = useSession();
+  const serverUrl = session?.serverUrl;
+  const userId = user?.id;
+
+  // Kept on the phone before the first request, in this account's queue: closing the app mid-way can't lose it.
+  const keep = useCallback(
+    (entry: OutboxEntry, photoBase64?: string) => {
+      if (serverUrl && userId) openOutbox(serverUrl, userId);
+      void stashCapture(entry, photoBase64);
+    },
+    [serverUrl, userId],
+  );
+
+  // No network: nothing went wrong, the meal just waits for it.
+  const park = useCallback(
+    (id: string, error?: unknown) => {
+      remove(id);
+      releaseCapture(id);
+      haptics.tap();
+      showToast({ message: t('outbox.queued') });
+      kickOutbox('later', error);
+      return null;
+    },
+    [remove, showToast, t],
+  );
 
   const run = useCallback(
     async (entry: PendingMeal) => {
+      keep(captureEntry(entry), entry.input.photoBase64);
+      if (useOutbox.getState().online === false) return park(entry.id);
       upsert({ ...entry, status: 'analyzing', error: null });
       try {
         const meal = await api.createMeal(entry.input);
+        void dropEntry(entry.id);
         remove(entry.id);
         refresh(meal);
         haptics.success();
@@ -83,29 +131,76 @@ export function useMealLogger() {
         if (healthEnabled) void health.writeMeal(meal).catch(() => undefined);
         return meal;
       } catch (error) {
+        if (isNetworkError(error)) return park(entry.id, error);
+        // Validation and AI errors show on the card, as before.
+        void dropEntry(entry.id);
         haptics.warning();
         upsert({ ...entry, status: 'error', error: errorMessage(error, t('common.error'), t('common.offline')) });
         return null;
       }
     },
-    [api, healthEnabled, refresh, remove, showToast, t, upsert],
+    [api, healthEnabled, keep, park, refresh, remove, showToast, t, upsert],
   );
 
   const log = useCallback(
     (input: CreateMealInput, preview: { photoUri?: string | null; label: string }) =>
       run({
         id: shortId(),
-        input,
+        input: { ...input, eatenAt: uniqueEatenAt(input.eatenAt, takenTimes(queryClient, input.localDate)) },
         photoUri: preview.photoUri ?? null,
         label: preview.label,
         status: 'analyzing',
         error: null,
         startedAt: Date.now(),
       }),
-    [run],
+    [queryClient, run],
   );
 
-  return { log, retry: run, dismiss: remove };
+  /** "Same again": copies a meal to a new time, or queues the copy without network. Other errors are thrown. */
+  const relog = useCallback(
+    async (source: Meal, at: { eatenAt: string; localDate: string }) => {
+      const entry: OutboxEntry = {
+        id: shortId(),
+        kind: 'duplicate',
+        createdAt: Date.now(),
+        eatenAt: uniqueEatenAt(at.eatenAt, takenTimes(queryClient, at.localDate)),
+        localDate: at.localDate,
+        label: source.title,
+        emoji: source.items.find((i) => i.emoji)?.emoji ?? '🍽️',
+        error: null,
+        sourceId: source.id,
+        photoId: source.photoId,
+      };
+      keep(entry);
+      if (useOutbox.getState().online === false) return park(entry.id);
+      try {
+        const copy = await api.duplicateMeal(source.id, { eatenAt: entry.eatenAt, localDate: entry.localDate });
+        void dropEntry(entry.id);
+        haptics.success();
+        refresh(copy);
+        showToast({ message: `${t('detail.relogged')} · ${copy.title}` });
+        return copy;
+      } catch (error) {
+        if (isNetworkError(error)) return park(entry.id, error);
+        void dropEntry(entry.id);
+        throw error;
+      }
+    },
+    [api, keep, park, queryClient, refresh, showToast, t],
+  );
+
+  /** A product scanned without network: looked up, then logged at its standard portion, once back online. */
+  const queueBarcode = useCallback(
+    (code: string, at: { eatenAt: string; localDate: string }) => {
+      const id = shortId();
+      const eatenAt = uniqueEatenAt(at.eatenAt, takenTimes(queryClient, at.localDate));
+      keep({ id, kind: 'barcode', createdAt: Date.now(), eatenAt, localDate: at.localDate, label: t('outbox.barcodeLabel', { code }), emoji: '🏷️', error: null, code });
+      park(id);
+    },
+    [keep, park, queryClient, t],
+  );
+
+  return { log, retry: run, dismiss: remove, relog, queueBarcode };
 }
 
 // Today and Me both mount the sync hook: one run at a time is enough.

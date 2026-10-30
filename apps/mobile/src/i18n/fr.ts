@@ -361,6 +361,25 @@ export const fr = {
   'status.reached': 'atteint',
   'status.left': 'restant',
   'status.toGo': 'à atteindre',
+  // Offline queue: meals logged without network
+  'outbox.queued': 'Pas de réseau. Je l’ajoute dès son retour.',
+  'outbox.waiting': 'En attente de réseau',
+  'outbox.sending': 'Envoi…',
+  'outbox.sentMany': '{count} repas ajoutés',
+  'outbox.pendingOne': '1 repas en attente, compté dès son envoi',
+  'outbox.pendingMany': '{count} repas en attente, comptés dès leur envoi',
+  'outbox.photoLost': 'La photo n’est plus sur ce téléphone',
+  'outbox.notFood': 'Je n’y ai pas reconnu de repas',
+  'outbox.sourceGone': 'Le repas d’origine a été supprimé',
+  'outbox.barcodeTitle': 'Pas de réseau',
+  'outbox.barcodeBody': 'Je garde ce code-barres et j’ajoute le produit en portion standard dès le retour du réseau. Tu pourras l’ajuster ensuite.',
+  'outbox.barcodeKeep': 'Garder',
+  'outbox.barcodeLabel': 'Code-barres {code}',
+  'outbox.offlineTitle': 'Hors ligne',
+  'outbox.offlineBody': 'Tes repas restent sur ton téléphone et partent dès le retour du réseau.',
+  'outbox.signOutTitle': 'Des repas attendent le réseau',
+  'outbox.signOutOne': '1 repas n’a pas encore été envoyé. Si tu te déconnectes, il sera perdu.',
+  'outbox.signOutMany': '{count} repas n’ont pas encore été envoyés. Si tu te déconnectes, ils seront perdus.',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

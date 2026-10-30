@@ -13,10 +13,10 @@ import { useSession } from '@/lib/session';
 import type { PendingMeal } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme, verdictColor } from '@/theme';
 
-const THUMB = 60;
-const PAD = Space.md;
+export const THUMB = 60;
+export const PAD = Space.md;
 // Concentric radii: the thumbnail's corner follows the card's corner minus the padding.
-const THUMB_RADIUS = Radius.lg - PAD;
+export const THUMB_RADIUS = Radius.lg - PAD;
 
 function Thumb({ meal }: { meal: Meal }) {
   const { api } = useSession();

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
-import { ArrowUp, Images, PenLine, Star, X, Zap, ZapOff } from 'lucide-react-native';
+import { ArrowUp, CloudOff, Images, PenLine, Star, X, Zap, ZapOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
@@ -16,8 +16,9 @@ import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
+import { errorMessage, useMealLogger } from '@/lib/hooks';
 import { preparePhoto } from '@/lib/image';
+import { isNetworkError } from '@/lib/outbox';
 import { useApi } from '@/lib/session';
 import { useSettings, useToast } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
@@ -42,7 +43,7 @@ export default function Capture() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const api = useApi();
-  const { log } = useMealLogger();
+  const { log, queueBarcode } = useMealLogger();
   const [mode, setMode] = useState<Mode>(params.mode ?? 'photo');
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
@@ -59,6 +60,8 @@ export default function Capture() {
   const [product, setProduct] = useState<FoodItem | null>(null);
   const [grams, setGrams] = useState(100);
   const [scanError, setScanError] = useState<string | null>(null);
+  // Scanned without network: the code can wait for it.
+  const [offlineCode, setOfflineCode] = useState<string | null>(null);
   const scanning = useRef(false);
 
   const close = () => dismiss();
@@ -99,6 +102,10 @@ export default function Capture() {
       setProduct(item);
       setGrams(item.grams);
     } catch (e) {
+      if (isNetworkError(e)) {
+        setOfflineCode(code);
+        return;
+      }
       haptics.warning();
       setScanError(e instanceof ApiError && e.status === 404 ? t('capture.notFound') : t('common.offline'));
       setTimeout(() => (scanning.current = false), 2500);
@@ -108,6 +115,12 @@ export default function Capture() {
   const addProduct = () => {
     if (!product) return;
     void log({ ...timestampFor(date), items: [{ ...product, grams }] }, { label: product.name });
+    close();
+  };
+
+  const keepOfflineCode = () => {
+    if (!offlineCode) return;
+    queueBarcode(offlineCode, timestampFor(date));
     close();
   };
 
@@ -122,7 +135,7 @@ export default function Capture() {
           facing="back"
           enableTorch={torch}
           barcodeScannerSettings={mode === 'barcode' ? { barcodeTypes: BARCODES } : undefined}
-          onBarcodeScanned={mode === 'barcode' && !product ? ({ data }) => void onBarcode(data) : undefined}
+          onBarcodeScanned={mode === 'barcode' && !product && !offlineCode ? ({ data }) => void onBarcode(data) : undefined}
         />
       ) : null}
 
@@ -133,7 +146,7 @@ export default function Capture() {
         </View>
       ) : null}
 
-      {mode === 'barcode' && !product ? (
+      {mode === 'barcode' && !product && !offlineCode ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
           <View style={{ width: 280, height: 150, borderRadius: Radius.lg, borderWidth: 3, borderColor: 'rgba(255,255,255,0.9)' }} />
           <Txt variant="label" style={{ color: WHITE, marginTop: Space.lg }}>
@@ -183,8 +196,35 @@ export default function Capture() {
         </Animated.View>
       ) : null}
 
+      {/* No network after a scan: keep the code, the product is added once back online */}
+      {offlineCode ? (
+        <Animated.View
+          entering={FadeInDown.duration(220)}
+          style={{ position: 'absolute', left: Space.md, right: Space.md, bottom: insets.bottom + Space.md, backgroundColor: colors.surface, borderRadius: Radius.xl, padding: Space.xl, gap: Space.lg }}>
+          <View style={{ gap: Space.sm }}>
+            <Row gap={Space.sm}>
+              <CloudOff size={20} color={colors.text2} />
+              <Txt variant="heading">{t('outbox.barcodeTitle')}</Txt>
+            </Row>
+            <Txt tone="secondary">{t('outbox.barcodeBody')}</Txt>
+          </View>
+          <Row gap={Space.sm}>
+            <Button
+              title={t('common.cancel')}
+              variant="secondary"
+              style={{ flex: 1 }}
+              onPress={() => {
+                setOfflineCode(null);
+                scanning.current = false;
+              }}
+            />
+            <Button title={t('outbox.barcodeKeep')} variant="accent" style={{ flex: 1 }} onPress={keepOfflineCode} />
+          </Row>
+        </Animated.View>
+      ) : null}
+
       {/* Bottom controls */}
-      {!product ? (
+      {!product && !offlineCode ? (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom + Space.lg, gap: Space.xl, alignItems: 'center' }}>
           {mode === 'photo' && noteOpen ? (
             <Animated.View entering={FadeIn} style={{ width: '100%', paddingHorizontal: Space.lg }}>
@@ -256,8 +296,7 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
   const { t, locale } = useI18n();
   const insets = useSafeAreaInsets();
   const api = useApi();
-  const { log } = useMealLogger();
-  const refresh = useRefreshAfterMeal();
+  const { log, relog } = useMealLogger();
   const showToast = useToast((s) => s.show);
   const [text, setText] = useState('');
   const library = useQuery({ queryKey: ['library', date], queryFn: () => api.library(toLocalDate()) });
@@ -273,12 +312,13 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
     onDone();
   };
 
-  const relogMeal = async (meal: Meal) => {
-    haptics.success();
+  // Without network the copy waits in the queue; anything else is said in a toast once the screen is closed.
+  const relogMeal = (meal: Meal) => {
     onDone();
-    const copy = await api.duplicateMeal(meal.id, timestampFor(date));
-    refresh(copy);
-    showToast({ message: `${t('detail.relogged')} · ${copy.title}` });
+    relog(meal, timestampFor(date)).catch((error: unknown) => {
+      haptics.warning();
+      showToast({ message: errorMessage(error, t('common.error'), t('common.offline')) });
+    });
   };
 
   return (
@@ -314,7 +354,7 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
               {t('capture.favorites')}
             </Txt>
             {library.data.favoriteMeals.slice(0, 6).map((meal) => (
-              <Pressy key={meal.id} onPress={() => void relogMeal(meal)} style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.md, borderRadius: Radius.lg, backgroundColor: '#161618' }}>
+              <Pressy key={meal.id} onPress={() => relogMeal(meal)} style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.md, borderRadius: Radius.lg, backgroundColor: '#161618' }}>
                 <Star size={16} color="#FFD60A" fill="#FFD60A" />
                 <Txt variant="label" style={{ color: WHITE, flex: 1 }} numberOfLines={1}>
                   {meal.title}
