@@ -4,8 +4,8 @@ import { GoalTagSchema, NUTRIENT_KEYS, ReviewSchema } from '@symbiose/shared';
 import { z } from 'zod';
 
 import { HttpError } from '../errors';
-import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, REVIEWER } from './prompts';
-import type { Ai, BloodPressureBrief, EnergyExpenditureBrief, JournalBrief, MealAnalysisInput, UserContext } from './types';
+import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, MORNING, NUDGES, REVIEWER } from './prompts';
+import type { Ai, BloodPressureBrief, EnergyExpenditureBrief, JournalBrief, MealAnalysisInput, RecoveryBrief, UserContext } from './types';
 
 // Structured-output schemas. Kept free of numeric bounds: the server clamps
 // and validates everything afterwards.
@@ -129,6 +129,7 @@ const MEAL_ACTION_TOOL: Anthropic.Beta.BetaTool = {
 };
 
 const CravingOut = z.object({ tip: z.string(), alternative: z.string() });
+const NudgesOut = z.object({ lines: z.array(z.string()) });
 
 type Effort = 'low' | 'medium' | 'high';
 
@@ -138,6 +139,8 @@ const bloodPressureExtra = (brief: BloodPressureBrief | null) => (brief ? { bloo
 const expenditureExtra = (brief: EnergyExpenditureBrief | null) => (brief ? { energyExpenditure: brief } : {});
 /** The health journal only enters when there are notes. */
 const journalExtra = (brief: JournalBrief | null) => (brief ? { journal: brief } : {});
+/** Recovery only enters when the vitals are reliable. */
+const recoveryExtra = (brief: RecoveryBrief | null) => (brief ? { recovery: brief } : {});
 
 function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): string {
   const payload = {
@@ -256,6 +259,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         ...expenditureExtra(input.energyExpenditure),
         ...input.life,
         ...journalExtra(input.journal),
+        ...recoveryExtra(input.recovery),
       };
       const text = `${contextBlock(input, extra)}\n\n${input.message}`;
       try {
@@ -330,6 +334,39 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure), ...expenditureExtra(input.energyExpenditure), ...journalExtra(input.journal) })}\n\nWrite my review for this period.`;
       return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },
+
+    async morning(input, onText) {
+      const { locale: _l, profile: _p, plan: _pl, targets: _t, ...data } = input;
+      const text = `${contextBlock(input, data)}\n\nWrite my morning check-in for ${input.date}.`;
+      try {
+        const stream = client.beta.messages.stream({
+          model,
+          max_tokens: 2000,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          system: [{ type: 'text', text: MORNING, cache_control: { type: 'ephemeral' } }],
+          messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+          output_config: { effort: 'low' },
+        });
+        if (onText) stream.on('text', (delta) => onText(delta));
+        const message = await stream.finalMessage();
+        if (message.stop_reason === 'refusal') throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
+        const reply = message.content
+          .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+          .join('')
+          .trim();
+        if (!reply) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
+        return { text: reply };
+      } catch (error) {
+        throw mapError(error);
+      }
+    },
+
+    async cravingNudges(input) {
+      const { locale: _l, profile: _p, plan: _pl, targets: _t, ...data } = input;
+      const text = `${contextBlock(input, data)}\n\nWrite this week's nudges.`;
+      return run({ system: NUDGES, content: [{ type: 'text', text }], schema: NudgesOut, effort: 'low' });
+    },
   };
 }
 
@@ -368,5 +405,7 @@ export function createDisabledAi(): Ai {
     coach: fail,
     cravingTip: fail,
     review: fail,
+    morning: fail,
+    cravingNudges: fail,
   };
 }

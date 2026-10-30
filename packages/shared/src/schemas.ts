@@ -23,6 +23,28 @@ export type ActivityLevel = z.infer<typeof ActivityLevelSchema>;
 export const LocaleSchema = z.enum(['fr', 'en']);
 export type Locale = z.infer<typeof LocaleSchema>;
 
+/** Local clock time, "HH:MM". */
+export const ClockTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Expected HH:MM');
+
+/**
+ * The proactive coach (« Coach proactif »): off until switched on. Inside it,
+ * the morning check-in and the Monday review default on; the craving heads-up
+ * follows the goals when left unset (see `cravingHeadsUpByDefault`).
+ */
+export const ProactiveSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  morning: z.boolean().default(true),
+  cravings: z.boolean().optional(),
+  weekly: z.boolean().default(true),
+  /** A morning time the person picked; null follows their usual wake time. */
+  morningTime: ClockTimeSchema.nullable().default(null),
+  /** Nothing is sent between these two times. */
+  quietStart: ClockTimeSchema.default('22:00'),
+  quietEnd: ClockTimeSchema.default('07:00'),
+});
+export type ProactiveSettings = z.output<typeof ProactiveSettingsSchema>;
+export type ProactiveSettingsInput = z.input<typeof ProactiveSettingsSchema>;
+
 export const ProfileSchema = z.object({
   name: z.string().trim().max(60).default(''),
   sex: SexSchema,
@@ -38,6 +60,8 @@ export const ProfileSchema = z.object({
   trackSleep: z.boolean().optional(),
   trackHydration: z.boolean().optional(),
   trackMood: z.boolean().optional(),
+  /** The proactive coach; absent means off. */
+  proactive: ProactiveSettingsSchema.optional(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
@@ -599,6 +623,9 @@ export interface CoachMealAction extends CoachMealProposal {
   resultMealId: string | null;
 }
 
+/** Messages the coach writes on its own (proactive coach). */
+export type CoachMessageKind = 'morning';
+
 export interface CoachMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -606,6 +633,10 @@ export interface CoachMessage {
   /** A plan change, applied from the goals screen. */
   suggestion: CoachSuggestion | null;
   mealActions: CoachMealAction[];
+  /** Set on proactive messages (« Point du matin »); null or absent on the conversation's turns. */
+  kind?: CoachMessageKind | null;
+  /** The day a proactive message is about. */
+  localDate?: string | null;
   createdAt: string;
 }
 

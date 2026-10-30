@@ -2,6 +2,7 @@ import { BloodPressureCategorySchema, type BloodPressureCategory, type CoachMeal
 
 import type { Ai, AnalyzedItem, CoachInput, MealAnalysis } from './types';
 import { heuristicPlan } from '../services/goals';
+import { FALLBACK_NUDGES, templateMorning } from '../services/proactive';
 
 const elevated = (category: BloodPressureCategory | null | undefined) =>
   Boolean(category && BloodPressureCategorySchema.options.indexOf(category) >= BloodPressureCategorySchema.options.indexOf('high_normal'));
@@ -127,6 +128,20 @@ export function createMockAi(): Ai {
 
     async cravingTip() {
       return { tip: 'Bois un grand verre d’eau, puis sors marcher 5 minutes : l’envie retombe souvent en 10 minutes.', alternative: 'Un carré de chocolat noir 85 % et une poignée d’amandes' };
+    },
+
+    async morning(input, onText) {
+      const text = templateMorning(input);
+      for (const word of text.split(/(?<=[ \n])/)) {
+        onText?.(word);
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      return { text };
+    },
+
+    async cravingNudges(input) {
+      const lead = input.locale === 'fr' ? `Vers ${input.cravingWindow.start.replace(':', ' h ')}, ton créneau sucré : un en-cas protéiné prêt ?` : `Around ${input.cravingWindow.start}, your sugar slot: a protein snack ready?`;
+      return { lines: [lead, ...FALLBACK_NUDGES[input.locale]] };
     },
 
     async review(input) {

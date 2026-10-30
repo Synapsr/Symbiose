@@ -30,21 +30,17 @@ import { bloodPressureBrief } from '../services/blood-pressure';
 import { energyExpenditureBrief } from '../services/expenditure';
 import { journalBrief } from '../services/journal';
 import { lifeBrief } from '../services/life';
+import { proactiveTurn, toCoachMessage } from '../services/coach-messages';
 import { acceptMealActions, runMealAction } from '../services/meal-actions';
 import { toMeal } from '../services/meals';
+import { nightOf } from '../services/sleep';
 import { resolveUser } from '../services/users';
+import { recoveryBrief, recoveryFor } from '../services/vitals';
 import { workoutsBetween } from '../services/workouts';
 
 const HISTORY_TURNS = 20;
 
-const toMessage = (row: CoachMessageRow): CoachMessage => ({
-  id: row.id,
-  role: row.role,
-  content: row.content,
-  suggestion: row.suggestion ?? null,
-  mealActions: row.mealActions ?? [],
-  createdAt: row.createdAt,
-});
+const toMessage = toCoachMessage;
 
 /** The meals the coach may edit or delete: the conversation's day and the 2 days before. */
 function recentMeals(db: Db, userId: string, localDate: string, focus: NutrientKey[]): CoachMealBrief[] {
@@ -79,20 +75,26 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     .limit(HISTORY_TURNS)
     .all()
     .reverse();
+  // A proactive message follows a turn that says what it is, so turns still alternate and a reply to it reads as one.
+  const turns = history.flatMap((m) => {
+    const cue = proactiveTurn(m);
+    return [...(cue ? [{ role: 'user' as const, content: cue }] : []), { role: m.role, content: m.content }];
+  });
   // The conversation must start with a user turn.
-  while (history[0]?.role === 'assistant') history.shift();
+  while (turns[0]?.role === 'assistant') turns.shift();
 
   const day = daySummary(db, userId, localDate);
   const week = computeInsights(db, userId, addDays(localDate, -6), localDate);
   const brief = (w: Workout) => ({ type: w.type, minutes: Math.round(w.durationMin), kcal: w.activeKcal === null ? null : Math.round(w.activeKcal) });
   return {
     ...resolved.context,
-    history: history.map((m) => ({ role: m.role, content: m.content })),
+    history: turns,
     message: text,
     bloodPressure: bloodPressureBrief(db, userId, resolved.row.profile ?? null, localDate),
     energyExpenditure: energyExpenditureBrief(week.adaptiveEnergy),
     life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, localDate),
     journal: journalBrief(db, userId, addDays(localDate, -(TRANSIT_WINDOW_DAYS - 1)), localDate),
+    recovery: recoveryBrief(recoveryFor(db, userId, localDate, resolved.row.profile?.trackSleep ? nightOf(db, userId, localDate) : null)),
     today: {
       date: day.date,
       totals: day.totals,
