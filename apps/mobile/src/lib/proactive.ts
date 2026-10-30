@@ -28,6 +28,14 @@ import { useSettings } from './stores';
  * The proactive coach on the phone: the server's schedule, the morning
  * check-in being written, the notifications planned from both, and the
  * one sentence Today shows.
+ *
+ * Nothing wakes the app in the background on purpose. The night usually
+ * lands while the phone is locked, and HealthKit can't be read then
+ * (errorDatabaseInaccessible), nor can the session in the keychain;
+ * BGTaskScheduler picks its own moment, mostly overnight. So the morning
+ * notification is planned ahead with a generic line, and the check-in is
+ * written when the app opens (after a fresh sleep sync) or its notification
+ * is tapped, with its real first line when the app ran earlier that morning.
  */
 
 const minutesNow = () => {
