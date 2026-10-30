@@ -26,6 +26,7 @@ import { HttpError, notFound } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary } from '../services/day';
 import { bloodPressureBrief } from '../services/blood-pressure';
+import { lifeBrief } from '../services/life';
 import { acceptMealActions, runMealAction } from '../services/meal-actions';
 import { toMeal } from '../services/meals';
 import { resolveUser } from '../services/users';
@@ -86,6 +87,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     history: history.map((m) => ({ role: m.role, content: m.content })),
     message: text,
     bloodPressure: bloodPressureBrief(db, userId, resolved.row.profile ?? null, localDate),
+    life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, localDate),
     today: {
       date: day.date,
       totals: day.totals,

@@ -15,7 +15,10 @@ import { bloodPressureRoutes } from './routes/blood-pressure';
 import { coachRoutes } from './routes/coach';
 import { glanceRoutes } from './routes/glance';
 import { goalRoutes } from './routes/goals';
+import { hydrationRoutes } from './routes/hydration';
 import { mealRoutes } from './routes/meals';
+import { moodRoutes } from './routes/mood';
+import { sleepRoutes } from './routes/sleep';
 import { trackingRoutes } from './routes/tracking';
 import { workoutRoutes } from './routes/workouts';
 
@@ -62,6 +65,9 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/coach', coachRoutes(deps));
   app.route('/api/workouts', workoutRoutes(deps));
   app.route('/api/blood-pressure', bloodPressureRoutes(deps));
+  app.route('/api/sleep', sleepRoutes(deps));
+  app.route('/api/hydration', hydrationRoutes(deps));
+  app.route('/api/mood', moodRoutes(deps));
   app.route('/api/glance', glanceRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 

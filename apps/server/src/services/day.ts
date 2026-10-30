@@ -31,6 +31,9 @@ import { activity, cravings, meals, type ActivityRow, type CravingRow } from '..
 import { toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
 import { visibleTrend } from './blood-pressure';
+import { dayHydration, hydrationTrend } from './hydration';
+import { moodOf, moodTrend } from './mood';
+import { nightOf, sleepTrend } from './sleep';
 import { weightTrend } from './weights';
 import { activeMinutes, activityWeek, workoutsBetween, workoutsKcal } from './workouts';
 
@@ -107,6 +110,7 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
     .all()
     .map(toCraving);
 
+  const profile = resolved.row.profile!;
   return {
     date,
     targets: resolved.targets,
@@ -123,6 +127,9 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
       items: dayCravings,
     },
     streak: streakFor(db, userId, date),
+    sleep: profile.trackSleep ? nightOf(db, userId, date) : null,
+    hydration: profile.trackHydration ? dayHydration(db, userId, profile.sex, date) : null,
+    mood: profile.trackMood ? moodOf(db, userId, date) : null,
   };
 }
 
@@ -283,6 +290,10 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       cravingsOnActiveDays: activeDays.length >= 2 && restDays.length >= 2 ? { active: cravingsPerDay(activeDays), inactive: cravingsPerDay(restDays) } : null,
     },
     bloodPressure: visibleTrend(db, userId, profile, to, trendDays),
+    // Sleep and hydration follow the window; mood needs 30 days to say anything.
+    sleep: profile.trackSleep ? sleepTrend(db, userId, from, to) : null,
+    hydration: profile.trackHydration ? hydrationTrend(db, userId, profile.sex, from, to) : null,
+    mood: profile.trackMood ? moodTrend(db, userId, profile, plan, to, trendDays) : null,
     streak: streakFor(db, userId, to),
   };
 }

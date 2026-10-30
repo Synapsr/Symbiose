@@ -30,6 +30,7 @@ import { computeInsights, daySummary, library, toActivity, toCraving } from '../
 import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
 import { bloodPressureBrief } from '../services/blood-pressure';
+import { lifeBrief } from '../services/life';
 import { upsertWeights, weightTrend } from '../services/weights';
 import { activityToday } from '../services/workouts';
 
@@ -120,6 +121,7 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
           intensity: input.intensity,
           localTime: localTime(input.at),
           activityToday: activityToday(db, userId, input.localDate),
+          life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, input.localDate),
         });
       } catch (error) {
         console.warn('craving tip failed, using fallback', error);

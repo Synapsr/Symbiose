@@ -6,3 +6,4 @@ export * from './meals';
 export * from './activity';
 export * from './health';
 export * from './glance';
+export * from './life';

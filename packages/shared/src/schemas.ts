@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { DayHydration, HydrationTrend, MoodCheckIn, MoodTrend, SleepNight, SleepTrend } from './life';
 import { NutrientKeySchema, NutrientsSchema, type NutrientKey, type Nutrients } from './nutrients';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
@@ -33,6 +34,10 @@ export const ProfileSchema = z.object({
   timezone: z.string().max(64).default('Europe/Paris'),
   /** Opt-in: blood pressure shows up in insights and AI advice only when true. */
   trackBloodPressure: z.boolean().optional(),
+  /** Opt-in life modules, off by default (see `life.ts`). */
+  trackSleep: z.boolean().optional(),
+  trackHydration: z.boolean().optional(),
+  trackMood: z.boolean().optional(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
@@ -439,6 +444,12 @@ export interface DaySummary {
   activityWeek: ActivityWeek;
   cravings: { total: number; resisted: number; items: Craving[] };
   streak: number;
+  /** The night that ended this day; null unless sleep is tracked and recorded. */
+  sleep?: SleepNight | null;
+  /** Null unless hydration is tracked. */
+  hydration?: DayHydration | null;
+  /** The day's check-in; null when mood isn't tracked or nothing was checked in yet. */
+  mood?: MoodCheckIn | null;
 }
 
 export interface FoodSuggestion {
@@ -485,6 +496,10 @@ export interface InsightsResponse {
   activity: InsightsActivity;
   /** Null unless the person tracks blood pressure and has readings in the window. */
   bloodPressure?: BloodPressureTrend | null;
+  /** Opt-in modules: null unless tracked. Sleep and hydration follow the window, mood covers 30 days at least. */
+  sleep?: SleepTrend | null;
+  hydration?: HydrationTrend | null;
+  mood?: MoodTrend | null;
   streak: number;
 }
 

@@ -244,7 +244,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
 
     async coach(input, onText) {
       const history: Anthropic.Beta.BetaMessageParam[] = input.history.map((turn) => ({ role: turn.role, content: turn.content }));
-      const extra = { today: input.today, recentMeals: input.recentMeals, last7Days: input.week, ...bloodPressureExtra(input.bloodPressure) };
+      const extra = { today: input.today, recentMeals: input.recentMeals, last7Days: input.week, ...bloodPressureExtra(input.bloodPressure), ...input.life };
       const text = `${contextBlock(input, extra)}\n\n${input.message}`;
       try {
         const stream = client.beta.messages.stream({
@@ -284,15 +284,18 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     },
 
     async cravingTip(input) {
-      const text = `${contextBlock(input, { localTime: input.localTime, activityToday: input.activityToday })}\n\nI'm craving: ${input.what} (intensity ${input.intensity}/3)`;
+      const text = `${contextBlock(input, { localTime: input.localTime, activityToday: input.activityToday, ...input.life })}\n\nI'm craving: ${input.what} (intensity ${input.intensity}/3)`;
       return run({ system: CRAVING, content: [{ type: 'text', text }], schema: CravingOut, effort: 'low' });
     },
 
     async review(input) {
-      // The brief replaces the daily blood pressure points.
-      const { days, activity, bloodPressure: _trend, ...rest } = input.insights;
+      // The brief replaces the daily blood pressure points; the life modules' days join the compact days.
+      const { days, activity, bloodPressure: _trend, sleep, hydration, mood, ...rest } = input.insights;
       const { days: activityDays, ...activityStats } = activity;
       const moves = new Map(activityDays.map((d) => [d.date, d]));
+      const asleep = new Map(sleep?.nights.map((n) => [n.localDate, n.asleepMin]));
+      const water = new Map(hydration?.days.map((d) => [d.date, d.ml]));
+      const moods = new Map(mood?.days.map((d) => [d.date, d.mood]));
       const compactDays = days.map((d) => ({
         date: d.date,
         logged: d.logged,
@@ -302,8 +305,16 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         activeMinutes: moves.get(d.date)?.activeMinutes ?? 0,
         steps: moves.get(d.date)?.steps ?? null,
         workouts: moves.get(d.date)?.workouts ?? 0,
+        ...(sleep ? { asleepMin: asleep.get(d.date) ?? null } : {}),
+        ...(hydration ? { waterMl: water.get(d.date) ?? 0 } : {}),
+        ...(mood ? { mood: moods.get(d.date) ?? null } : {}),
       }));
-      const stats = { ...rest, activity: activityStats };
+      const life = {
+        ...(sleep ? { sleep: { averageMin: sleep.averageMin, bedtime: sleep.bedtime, wakeTime: sleep.wakeTime, regularityMin: sleep.regularityMin, cravingsAfterShortNights: sleep.cravingsAfterShortNights } } : {}),
+        ...(hydration ? { hydration: { averageMl: hydration.averageMl, goalMl: hydration.days.at(-1)?.goalMl, daysReached: hydration.daysReached, daysLogged: hydration.daysLogged } } : {}),
+        ...(mood ? { mood: { average: mood.average, checkIns: mood.days.length, link: mood.link, persistentLow: mood.persistentLow } } : {}),
+      };
+      const stats = { ...rest, activity: activityStats, ...life };
       const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure) })}\n\nWrite my review for this period.`;
       return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },
