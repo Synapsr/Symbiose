@@ -1,34 +1,10 @@
-import { defaultActivityGoals, GoalPlanSchema, type ActivityGoals, type GoalPlan, type GoalTag, type Locale, type NutrientKey, type NutrientRule } from '@symbiose/shared';
+import { clampActivityGoals, clampRuleValue, defaultActivityGoals, GoalPlanSchema, type GoalPlan, type GoalTag, type Locale, type NutrientKey, type NutrientRule } from '@symbiose/shared';
 
 import type { PlanDraft } from '../ai/types';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(Number.isFinite(value) ? value : min, min), max);
 
-/** Realistic daily bounds for rule values, in each nutrient's unit. */
-const RULE_BOUNDS: Record<Exclude<NutrientKey, 'kcal'>, [number, number]> = {
-  protein: [30, 350],
-  carbs: [20, 600],
-  sugar: [10, 250],
-  addedSugar: [0, 150],
-  fat: [20, 250],
-  satFat: [5, 80],
-  fiber: [10, 80],
-  sodium: [500, 6000],
-};
-
 const unique = <T,>(list: T[]) => [...new Set(list)];
-
-/** Zero or missing means "no goal" for the optional guardrails. */
-const optionalGoal = (value: number | null, min: number, max: number) => (value && value > 0 ? Math.round(clamp(value, min, max)) : null);
-
-function clampActivity(activity: ActivityGoals | null): ActivityGoals | null {
-  if (!activity) return null;
-  return {
-    weeklyActiveMinutes: Math.round(clamp(activity.weeklyActiveMinutes, 60, 600)),
-    dailySteps: optionalGoal(activity.dailySteps, 3000, 20_000),
-    weeklyStrengthSessions: optionalGoal(activity.weeklyStrengthSessions, 1, 6),
-  };
-}
 
 const slug = (value: string) =>
   value
@@ -44,11 +20,10 @@ export function planFromDraft(draft: PlanDraft, intentions: string, overrides: G
   const rulesByNutrient = new Map<NutrientKey, NutrientRule>();
   for (const rule of draft.rules) {
     if (rule.nutrient === 'kcal') continue;
-    const [min, max] = RULE_BOUNDS[rule.nutrient];
     rulesByNutrient.set(rule.nutrient, {
       nutrient: rule.nutrient,
       kind: rule.kind,
-      value: Math.round(clamp(rule.value, min, max)),
+      value: clampRuleValue(rule.nutrient, rule.value),
       reason: (rule.reason ?? '').slice(0, 240),
     });
   }
@@ -72,7 +47,7 @@ export function planFromDraft(draft: PlanDraft, intentions: string, overrides: G
     coachTone: draft.coachTone,
     adjustForActivity: draft.adjustForActivity,
     overrides,
-    activity: clampActivity(draft.activity),
+    activity: clampActivityGoals(draft.activity),
   };
   return GoalPlanSchema.parse(plan);
 }

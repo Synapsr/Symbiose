@@ -2,7 +2,6 @@ import { computeProgress, zeroNutrients, type DaySummary, type Meal, type Target
 import { describe, expect, it } from 'vitest';
 
 import { momentOn, withoutMeal } from './day-logic';
-import { keepTogether } from './format';
 
 describe('momentOn', () => {
   const now = new Date(2026, 9, 30, 16, 5);
@@ -36,18 +35,5 @@ describe('withoutMeal', () => {
 
   it('never goes below zero', () => {
     expect(withoutMeal({ ...day, totals: zeroNutrients() }, coca).totals.addedSugar).toBe(0);
-  });
-});
-
-describe('keepTogether', () => {
-  it('keeps French punctuation with its word', () => {
-    expect(keepTogether('Comment tu t’appelles ?')).toBe('Comment tu t’appelles ?');
-    expect(keepTogether('Pour l’écrire, touche « + ».')).toBe('Pour l’écrire, touche « + ».');
-    expect(keepTogether('Pas de drame : on avance', true)).toBe('Pas de drame : on avance');
-  });
-
-  it('leaves times and English alone', () => {
-    expect(keepTogether('20:15 · Dîner')).toBe('20:15 · Dîner');
-    expect(keepTogether('Clear the conversation?')).toBe('Clear the conversation?');
   });
 });

@@ -166,6 +166,16 @@ export function focusNutrients(plan: GoalPlan | null): NutrientKey[] {
   return focus.filter((key) => key !== 'kcal');
 }
 
+/**
+ * The goal's headline nutrient, for Trends (and the same rule as the Today hero): the plan's first
+ * focus, so calories lead only when the plan puts them first; never calories when they're hidden.
+ */
+export function goalNutrient(plan: Pick<GoalPlan, 'focus'> | null, hideCalories = false): NutrientKey {
+  const first = plan?.focus[0] ?? 'kcal';
+  if (first !== 'kcal' || !hideCalories) return first;
+  return plan?.focus.find((key) => key !== 'kcal') ?? 'protein';
+}
+
 function roundTo(value: number, step: number): number {
   return Math.round(value / step) * step;
 }

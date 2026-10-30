@@ -1,24 +1,45 @@
-import { ageFromBirthYear, type Profile } from '@symbiose/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ageFromBirthYear, everydayWaterGoalMl, hydrationGoalMl, WATER_SIZES, type Locale, type Profile } from '@symbiose/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, CodeXml, Download, EyeOff, FaceSlightlySmiling, GlassWater, Hand, HeartPulse, LogOut, Moon, Server, Target, Trash2, User, Watch } from 'lucide-react-native';
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+  ChevronDown,
+  ChevronRight,
+  CodeXml,
+  Download,
+  EyeOff,
+  FaceSlightlySmiling,
+  Gauge,
+  GlassWater,
+  Hand,
+  HeartPulse,
+  Languages,
+  LogOut,
+  Minus,
+  Moon,
+  Plus,
+  Server,
+  Trash2,
+  Watch,
+  Activity,
+} from 'lucide-react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
+import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { JournalLink } from '@/components/journal/journal-link';
+import { signed } from '@/components/insights/adaptive-energy-card';
 import { CoachSettings } from '@/components/settings/coach-settings';
-import { Card, Dot, Pressy, Row, SectionTitle, Txt } from '@/components/ui';
+import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
-import { formatAmount } from '@/lib/format';
+import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules } from '@/lib/health';
 import { useHealthSync, useToday } from '@/lib/hooks';
 import { clearOutbox, useOutbox } from '@/lib/outbox';
 import { useApi, useSession, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
-import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
+import { LIFE_COLORS, NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
 /** The opt-in modules: a profile switch each, and the health-store types it needs (mood needs none). */
 type ModuleKey = 'trackHydration' | 'trackSleep' | 'trackMood' | 'trackBloodPressure';
@@ -31,6 +52,7 @@ const HEALTH_MODULE: Record<ModuleKey, keyof HealthModules | null> = {
 /** Turning a module on (again) re-reads its history from the store, asking for its types first if needed. */
 const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, bloodPressure: { lastBpSync: 0 }, vitals: { lastVitalsSync: 0 } } as const;
 
+/** Me is settings only: who I am, my goals, what I track, the coach, devices, preferences, account. */
 export default function Me() {
   const { t, locale, nutrient } = useI18n();
   const { colors } = useTheme();
@@ -51,6 +73,12 @@ export default function Me() {
   const setUser = useSetUser();
   const queryClient = useQueryClient();
   const modules = healthModules(profile);
+  const refreshData = () => {
+    void queryClient.invalidateQueries({ queryKey: ['day'] });
+    void queryClient.invalidateQueries({ queryKey: ['insights'] });
+    void queryClient.invalidateQueries({ queryKey: ['weekly-review'] });
+    void queryClient.invalidateQueries({ queryKey: ['goals'] });
+  };
 
   const toggleHealth = async (on: boolean) => {
     if (on) {
@@ -65,25 +93,58 @@ export default function Me() {
     }
   };
 
-  // Opt-in: saved on the profile (the server and the coach use it). With the new profile, the health sync
-  // asks the store for the module's types once (see `grantedScopes`), then imports its history.
-  const toggleModule = useMutation({
-    mutationFn: ({ key, on }: { key: ModuleKey; on: boolean }) => api.saveProfile({ ...profile, [key]: on } satisfies Profile),
-    onSuccess: (saved, { key, on }) => {
-      const module = HEALTH_MODULE[key];
-      if (on && module) settings.set(RESYNC[module]);
-      if (on) haptics.success();
+  // Every profile setting saves on its own: the server and the coach read the profile.
+  const saveProfile = useMutation({
+    mutationFn: (patch: Partial<Profile>) => api.saveProfile({ ...profile, ...patch } satisfies Profile),
+    onSuccess: (saved, patch) => {
+      // Turning a module on imports its history: the health sync asks for its types once (see `grantedScopes`).
+      for (const key of Object.keys(HEALTH_MODULE) as ModuleKey[]) {
+        const module = HEALTH_MODULE[key];
+        if (patch[key] === true && module) settings.set(RESYNC[module]);
+      }
       setUser(saved);
-      void queryClient.invalidateQueries({ queryKey: ['day'] });
-      void queryClient.invalidateQueries({ queryKey: ['insights'] });
+      refreshData();
     },
     onError: () => haptics.warning(),
   });
   const moduleSwitch = (key: ModuleKey) => {
-    const pending = toggleModule.isPending && toggleModule.variables.key === key;
-    return <Switch value={pending ? toggleModule.variables.on : profile[key] === true} disabled={toggleModule.isPending} onValueChange={(on) => toggleModule.mutate({ key, on })} />;
+    const pending = saveProfile.isPending && saveProfile.variables[key] !== undefined;
+    return (
+      <Switch
+        value={pending ? saveProfile.variables[key] === true : profile[key] === true}
+        disabled={saveProfile.isPending}
+        onValueChange={(on) => {
+          haptics.soft();
+          saveProfile.mutate({ [key]: on });
+        }}
+      />
+    );
   };
   const store = healthAvailable ? health.storeName[locale] : null;
+
+  // The measured expenditure as of today, to say what the automatic budget does.
+  const goals = useQuery({ queryKey: ['goals', today], queryFn: () => api.goals(today), enabled: !settings.hideCalories });
+  const adaptive = goals.data?.adaptiveEnergy ?? null;
+  const toggleAdaptive = useMutation({
+    // Opting in starts a gradual ramp from today; the server keeps the date.
+    mutationFn: async (on: boolean) => {
+      await api.saveGoals({ ...plan, adaptiveEnergy: on ? { since: today } : null });
+      return api.me();
+    },
+    onSuccess: (saved) => {
+      haptics.soft();
+      setUser(saved);
+      refreshData();
+    },
+    onError: () => haptics.warning(),
+  });
+  const adaptiveOn = toggleAdaptive.isPending ? toggleAdaptive.variables : Boolean(plan.adaptiveEnergy);
+  const adaptiveHint =
+    adaptiveOn && adaptive?.enabled && adaptive.appliedKcal
+      ? t('energy.autoApplied', { kcal: signed(adaptive.appliedKcal, formatNumber(Math.abs(adaptive.appliedKcal), locale)) })
+      : adaptiveOn
+        ? t('energy.autoWaiting')
+        : t('energy.autoHint');
 
   // The waiting meals belong to this account on this server: signing out forgets them, after a warning.
   const waiting = useOutbox((s) => s.items.length);
@@ -120,89 +181,67 @@ export default function Me() {
     ]);
   };
 
+  const pendingLocale = saveProfile.isPending ? saveProfile.variables.locale : undefined;
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingHorizontal: Space.lg, paddingBottom: insets.bottom + 120, maxWidth: 640, width: '100%', alignSelf: 'center' }}>
-      <Row gap={Space.lg} style={{ paddingHorizontal: 4 }}>
-        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.inverted, alignItems: 'center', justifyContent: 'center' }}>
-          <Txt variant="title" color={colors.onInverted} style={{ fontSize: 26 }}>
-            {(profile.name || user.email).slice(0, 1).toUpperCase()}
-          </Txt>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Txt variant="title" style={{ fontSize: 26 }}>
-            {profile.name || user.email}
-          </Txt>
-          <Txt tone="secondary">
-            {t('me.age', { age: ageFromBirthYear(profile.birthYear) })} · {profile.heightCm} cm · {profile.weightKg} kg
-          </Txt>
-        </View>
-      </Row>
-
-      <SectionTitle>{t('me.goals')}</SectionTitle>
-      <Pressy onPress={() => router.push('/goals')}>
-        <Card style={{ gap: Space.md, marginTop: -Space.sm }}>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <Txt variant="heading" style={{ flex: 1 }}>
-              {plan.title}
+      <Pressy onPress={() => router.push('/profile')} accessibilityRole="button" accessibilityLabel={profile.name || user.email}>
+        <Row gap={Space.lg} style={{ paddingHorizontal: 4 }}>
+          <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: colors.inverted, alignItems: 'center', justifyContent: 'center' }}>
+            <Txt variant="title" color={colors.onInverted} style={{ fontSize: 24 }}>
+              {(profile.name || user.email).slice(0, 1).toUpperCase()}
             </Txt>
-            <ChevronRight size={20} color={colors.text3} />
-          </Row>
-          <Txt tone="secondary" numberOfLines={3}>
-            {plan.summary}
-          </Txt>
-          <Row gap={Space.sm} style={{ flexWrap: 'wrap' }}>
-            {plan.rules.map((rule) => (
-              <Row key={rule.nutrient} gap={6} style={{ backgroundColor: colors.surface2, borderRadius: Radius.pill, paddingHorizontal: 12, height: 30 }}>
-                <Dot color={NUTRIENT_COLORS[rule.nutrient]} size={6} />
-                <Txt variant="caption">
-                  {nutrient(rule.nutrient)} {rule.kind === 'max' ? '≤' : '≥'} {formatAmount(rule.nutrient, rule.value, locale)}
-                </Txt>
-              </Row>
-            ))}
-          </Row>
-        </Card>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Txt variant="title" numberOfLines={1} style={{ fontSize: 26 }}>
+              {profile.name || user.email}
+            </Txt>
+            <Txt tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+              {t('me.age', { age: ageFromBirthYear(profile.birthYear) })} · {profile.heightCm} cm · {formatNumber(profile.weightKg, locale, 1)} kg
+            </Txt>
+          </View>
+          <ChevronRight size={20} color={colors.text3} />
+        </Row>
       </Pressy>
 
-      <JournalLink />
-
-      <SectionTitle>{t('proactive.section')}</SectionTitle>
-      <CoachSettings />
-
-      <SectionTitle>{t('me.health')}</SectionTitle>
+      <SectionTitle>{t('me.goals')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>
-        <Item
-          icon={<Watch size={20} color={colors.accent} />}
-          title={healthAvailable ? health.storeName[locale] : t('me.health')}
-          subtitle={healthAvailable ? (settings.healthEnabled ? t('me.healthOn', { store: health.storeName[locale] }) : t('me.healthOff')) : t('me.healthUnavailable')}
-          right={healthAvailable ? <Switch value={settings.healthEnabled} onValueChange={(v) => void toggleHealth(v)} /> : null}
-        />
-      </Card>
-
-      {/* What Symbiose follows besides meals and movement: each module is off until switched on. */}
-      <SectionTitle>{t('me.modules')}</SectionTitle>
-      <Card padded={false} style={{ marginTop: -Space.sm }}>
-        <Item icon={<GlassWater size={20} color={colors.text} />} title={t('me.trackHydration')} subtitle={t('me.trackHydrationHint')} right={moduleSwitch('trackHydration')} />
-        <Divider />
-        <Item
-          icon={<Moon size={20} color={colors.text} />}
-          title={t('me.trackSleep')}
-          subtitle={store ? t('me.trackSleepHint', { store }) : t('me.trackSleepHintNoStore')}
-          right={moduleSwitch('trackSleep')}
-        />
-        <Divider />
-        <Item icon={<FaceSlightlySmiling size={20} color={colors.text} />} title={t('me.trackMood')} subtitle={t('me.trackMoodHint')} right={moduleSwitch('trackMood')} />
-        <Divider />
-        <Item icon={<HeartPulse size={20} color={colors.text} />} title={t('me.trackBp')} subtitle={t('me.trackBpHint')} right={moduleSwitch('trackBloodPressure')} />
-      </Card>
-
-      <SectionTitle>{t('me.profile')}</SectionTitle>
-      <Card padded={false} style={{ marginTop: -Space.sm }}>
-        <Item icon={<User size={20} color={colors.text} />} title={t('me.editProfile')} onPress={() => router.push('/profile')} chevron />
-        <Divider />
-        <Item icon={<Target size={20} color={colors.text} />} title={t('me.editGoals')} onPress={() => router.push('/goals')} chevron />
+        <Pressy onPress={() => router.push('/goals')} accessibilityRole="button" accessibilityLabel={plan.title}>
+          <View style={{ paddingHorizontal: Space.xl, paddingVertical: Space.lg, gap: Space.md }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Txt variant="label" style={{ fontSize: 16, flex: 1 }} numberOfLines={2}>
+                {plan.title}
+              </Txt>
+              <ChevronRight size={18} color={colors.text3} />
+            </Row>
+            {plan.rules.length ? (
+              <Row gap={Space.sm} style={{ flexWrap: 'wrap' }}>
+                {plan.rules.map((rule) => (
+                  <Row key={rule.nutrient} gap={6} style={{ backgroundColor: colors.surface2, borderRadius: Radius.pill, paddingHorizontal: 12, height: 28 }}>
+                    <Dot color={NUTRIENT_COLORS[rule.nutrient]} size={6} />
+                    <Txt variant="caption" style={{ fontVariant: ['tabular-nums'] }}>
+                      {nutrient(rule.nutrient)} {rule.kind === 'max' ? '≤' : '≥'} {formatAmount(rule.nutrient, rule.value, locale)}
+                    </Txt>
+                  </Row>
+                ))}
+              </Row>
+            ) : null}
+          </View>
+        </Pressy>
+        {!settings.hideCalories ? (
+          <>
+            <Divider />
+            <Item
+              icon={<Gauge size={20} color={colors.text} />}
+              title={t('energy.auto')}
+              subtitle={adaptiveHint}
+              right={<Switch value={adaptiveOn} disabled={toggleAdaptive.isPending} onValueChange={(on) => toggleAdaptive.mutate(on)} accessibilityLabel={t('energy.auto')} />}
+            />
+          </>
+        ) : null}
         <Divider />
         <Item
           icon={<EyeOff size={20} color={colors.text} />}
@@ -210,16 +249,66 @@ export default function Me() {
           subtitle={t('me.hideCaloriesHint')}
           right={<Switch value={settings.hideCalories} onValueChange={(v) => settings.set({ hideCalories: v })} />}
         />
+      </Card>
+
+      {/* What Symbiose follows besides meals and movement: each module is off until switched on. */}
+      <SectionTitle>{t('me.tracking')}</SectionTitle>
+      <Card padded={false} style={{ marginTop: -Space.sm }}>
+        <HydrationItem profile={profile} right={moduleSwitch('trackHydration')} onGoal={(waterGoalMl) => saveProfile.mutate({ waterGoalMl })} />
         <Divider />
+        {/* The why of a module helps to switch it on; once it's on, the row stays short. */}
+        <Item icon={<Moon size={20} color={colors.text} />} title={t('me.trackSleep')} subtitle={profile.trackSleep ? undefined : store ? t('me.trackSleepHint', { store }) : t('me.trackSleepHintNoStore')} right={moduleSwitch('trackSleep')} />
+        <Divider />
+        <Item icon={<FaceSlightlySmiling size={20} color={colors.text} />} title={t('me.trackMood')} subtitle={profile.trackMood ? undefined : t('me.trackMoodHint')} right={moduleSwitch('trackMood')} />
+        <Divider />
+        <Item icon={<HeartPulse size={20} color={colors.text} />} title={t('me.trackBp')} subtitle={profile.trackBloodPressure ? undefined : t('me.trackBpHint')} right={moduleSwitch('trackBloodPressure')} />
+      </Card>
+
+      <SectionTitle>{t('me.coach')}</SectionTitle>
+      <CoachSettings />
+
+      <SectionTitle>{t('me.devices')}</SectionTitle>
+      <Card padded={false} style={{ marginTop: -Space.sm }}>
+        <Item
+          icon={<Activity size={20} color={colors.accent} />}
+          title={healthAvailable ? health.storeName[locale] : t('me.healthStores')}
+          subtitle={healthAvailable ? (settings.healthEnabled ? t('me.healthOn', { store: health.storeName[locale] }) : t('me.healthOff')) : t('me.healthUnavailable')}
+          right={healthAvailable ? <Switch value={settings.healthEnabled} onValueChange={(v) => void toggleHealth(v)} /> : null}
+        />
+        {Platform.OS === 'ios' ? (
+          <>
+            <Divider />
+            <Item icon={<Watch size={20} color={colors.text} />} title={t('me.watch')} subtitle={t('me.watchHint')} />
+          </>
+        ) : null}
+      </Card>
+
+      <SectionTitle>{t('me.preferences')}</SectionTitle>
+      <Card padded={false} style={{ marginTop: -Space.sm }}>
         <Item
           icon={<Hand size={20} color={colors.text} style={{ transform: [{ scaleX: -1 }] }} />}
           title={t('me.leftHanded')}
           subtitle={t('me.leftHandedHint')}
           right={<Switch value={settings.leftHanded} onValueChange={(v) => settings.set({ leftHanded: v })} />}
         />
+        <Divider />
+        <Item
+          icon={<Languages size={20} color={colors.text} />}
+          title={t('me.language')}
+          right={
+            <Segmented<Locale>
+              value={pendingLocale ?? profile.locale}
+              onChange={(value) => value !== profile.locale && saveProfile.mutate({ locale: value })}
+              options={[
+                { value: 'fr', label: 'FR' },
+                { value: 'en', label: 'EN' },
+              ]}
+            />
+          }
+        />
       </Card>
 
-      <SectionTitle>{t('me.server')}</SectionTitle>
+      <SectionTitle>{t('me.account')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>
         <Item icon={<Server size={20} color={colors.text} />} title={api.baseUrl.replace(/^https?:\/\//, '')} subtitle={user.email} />
         <Divider />
@@ -245,6 +334,129 @@ export default function Me() {
   );
 }
 
+/**
+ * Hydration: the switch, and once it's on, the everyday goal and what one tap pours (the glass
+ * size, kept on this phone). A tap on the row opens both; the goal saves a moment after the last step.
+ */
+function HydrationItem({ profile, right, onGoal }: { profile: Profile; right: ReactNode; onGoal: (ml: number | null) => void }) {
+  const { t, locale } = useI18n();
+  const { colors } = useTheme();
+  const glassMl = useSettings((s) => s.glassMl);
+  const setSettings = useSettings((s) => s.set);
+  const on = profile.trackHydration === true;
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<number | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const recommended = hydrationGoalMl(profile.sex);
+  const goal = draft ?? everydayWaterGoalMl(profile);
+  const chosen = draft !== null ? draft !== recommended : (profile.waterGoalMl ?? null) !== null;
+
+  const turn = useSharedValue(0);
+  useEffect(() => {
+    turn.set(withTiming(open && on ? 1 : 0, { duration: 240, easing: Easing.bezier(0.2, 0, 0, 1) }));
+  }, [open, on, turn]);
+  const chevron = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 180}deg` }] }));
+
+  const step = (delta: number) => {
+    const next = Math.min(5000, Math.max(1000, goal + delta));
+    if (next === goal) return haptics.warning();
+    haptics.tap();
+    setDraft(next);
+    clearTimeout(timer.current);
+    // The draft stays on screen: it is what was saved.
+    timer.current = setTimeout(() => onGoal(next === recommended ? null : next), 700);
+  };
+  const reset = () => {
+    haptics.tap();
+    clearTimeout(timer.current);
+    setDraft(recommended);
+    onGoal(null);
+  };
+
+  return (
+    <View>
+      <Pressy haptic={on} onPress={() => on && setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open && on }}>
+        <Row gap={Space.lg} style={{ paddingHorizontal: Space.xl, paddingVertical: Space.lg, minHeight: 60 }}>
+          <View style={{ width: 24, alignItems: 'center' }}>
+            <GlassWater size={20} color={colors.text} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Txt variant="label" style={{ fontSize: 16 }}>
+              {t('me.trackHydration')}
+            </Txt>
+            <Row gap={4}>
+              <Txt variant="caption" tone="secondary" style={{ flexShrink: 1, fontVariant: ['tabular-nums'] }}>
+                {on ? t('me.hydrationSummary', { goal: formatLiters(goal, locale), glass: glassMl }) : t('me.trackHydrationHint')}
+              </Txt>
+              {on ? (
+                <Animated.View style={chevron}>
+                  <ChevronDown size={14} color={colors.text3} />
+                </Animated.View>
+              ) : null}
+            </Row>
+          </View>
+          {right}
+        </Row>
+      </Pressy>
+
+      {open && on ? (
+        <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(140)} style={{ paddingLeft: 64, paddingRight: Space.xl, paddingBottom: Space.lg, gap: Space.lg }}>
+          <View style={{ gap: Space.sm }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <View style={{ gap: 2, flex: 1 }}>
+                <Txt variant="caption" tone="secondary">
+                  {t('me.waterGoal')}
+                </Txt>
+                {chosen ? (
+                  <Pressy onPress={reset} haptic={false} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'flex-start' }}>
+                    <Txt variant="caption" tone="accent">
+                      {t('me.waterGoalChosen', { goal: formatLiters(recommended, locale) })}
+                    </Txt>
+                  </Pressy>
+                ) : (
+                  <Txt variant="caption" tone="tertiary">
+                    {t('me.waterGoalDefault')}
+                  </Txt>
+                )}
+              </View>
+              <Row gap={Space.sm}>
+                <IconButton label={t('me.waterLess')} size={36} icon={<Minus size={16} color={colors.text} />} onPress={() => step(-100)} />
+                <Txt variant="label" style={{ minWidth: 52, textAlign: 'center', fontSize: 16, fontVariant: ['tabular-nums'] }}>
+                  {formatLiters(goal, locale)}
+                </Txt>
+                <IconButton label={t('me.waterMore')} size={36} icon={<Plus size={16} color={colors.text} />} onPress={() => step(100)} />
+              </Row>
+            </Row>
+          </View>
+          <View style={{ gap: Space.sm }}>
+            <Txt variant="caption" tone="secondary">
+              {t('me.glass')}
+            </Txt>
+            <Row gap={Space.sm}>
+              {WATER_SIZES.map((ml) => {
+                const selected = ml === glassMl;
+                return (
+                  <Pressy
+                    key={ml}
+                    onPress={() => setSettings({ glassMl: ml })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    style={{ flex: 1, height: 34, borderRadius: Radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: selected ? LIFE_COLORS.water : colors.surface2 }}>
+                    <Txt variant="label" color={selected ? '#FFFFFF' : colors.text} style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>
+                      {ml} ml
+                    </Txt>
+                  </Pressy>
+                );
+              })}
+            </Row>
+          </View>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
 function Item({
   icon,
   title,
@@ -267,7 +479,7 @@ function Item({
     <Row gap={Space.lg} style={{ paddingHorizontal: Space.xl, paddingVertical: Space.lg, minHeight: 60 }}>
       <View style={{ width: 24, alignItems: 'center' }}>{icon}</View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Txt variant="label" style={{ fontSize: 16 }} tone={danger ? 'danger' : 'primary'} numberOfLines={1}>
+        <Txt variant="label" style={{ fontSize: 16 }} tone={danger ? 'danger' : 'primary'} numberOfLines={2}>
           {title}
         </Txt>
         {subtitle ? (

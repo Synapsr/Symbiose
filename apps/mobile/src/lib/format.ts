@@ -16,16 +16,6 @@ export function formatNumber(value: number, locale: Locale, decimals = 0): strin
   return formatter.format(value).replace(/\u202F/g, '\u00A0');
 }
 
-/**
- * French typography: a space before « ? ! : ; » or inside « » never breaks the
- * line, so « Comment tu t'appelles ? » can't leave the « ? » alone below. A
- * narrow no-break space, or a regular one for Fraunces, which barely draws U+202F.
- */
-export function keepTogether(text: string, serif = false): string {
-  const space = serif ? ' ' : ' ';
-  return text.replace(/ ([?!:;»])/g, `${space}$1`).replace(/« /g, `«${space}`);
-}
-
 /** "12 g", "1 240 kcal", "830 mg". */
 export function formatAmount(key: NutrientKey, value: number, locale: Locale, withUnit = true): string {
   const rounded = roundNutrient(key, value);

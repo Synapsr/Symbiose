@@ -24,8 +24,8 @@ export function lifeBrief(db: Db, userId: string, profile: Profile | null, plan:
   }
 
   if (profile.trackHydration) {
-    const today = dayHydration(db, userId, profile.sex, date);
-    const before = hydrationTrend(db, userId, profile.sex, addDays(date, -7), addDays(date, -1));
+    const today = dayHydration(db, userId, profile, date);
+    const before = hydrationTrend(db, userId, profile, addDays(date, -7), addDays(date, -1));
     brief.hydration = { todayMl: today.totalMl, goalMl: today.goalMl, average7Ml: before.averageMl, daysReached7: before.daysReached };
   }
 

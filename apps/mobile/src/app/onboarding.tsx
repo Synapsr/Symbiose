@@ -191,7 +191,7 @@ export default function Onboarding() {
                 <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
                   <Watch size={34} color={colors.accent} />
                 </View>
-                <Txt variant="title">{t('onb.health.title')}</Txt>
+                <Txt variant="title">{t('onb.health.title', { store: health.storeName[locale] })}</Txt>
               </View>
               <View style={{ gap: Space.lg }}>
                 {BENEFITS.map(({ icon: Icon, key }, i) => (

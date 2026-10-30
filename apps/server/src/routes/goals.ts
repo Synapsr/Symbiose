@@ -1,4 +1,4 @@
-import { computeTargets, GoalDraftInputSchema, GoalPlanSchema, LocalDateSchema, toLocalDate, type GoalsResponse } from '@symbiose/shared';
+import { computeTargets, GoalDraftInputSchema, GoalPlanSchema, LocalDateSchema, sanitizePlan, toLocalDate, type GoalsResponse } from '@symbiose/shared';
 import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -54,8 +54,9 @@ export function goalRoutes({ db, ai, config }: Deps) {
     return c.json<GoalsResponse & { aiGenerated: boolean }>({ plan, targets, energy, aiGenerated: ai.enabled });
   });
 
+  /** Saves a plan as is, no AI: edited by hand on the goals screen, or a draft confirmed. Bounds still apply. */
   app.put('/', validate('json', z.object({ plan: GoalPlanSchema })), (c) => {
-    const input = c.req.valid('json').plan;
+    const input = sanitizePlan(c.req.valid('json').plan);
     const userId = c.get('userId');
     // Clients that don't know the opt-in don't send it: keep the stored choice (null turns it off).
     const stored = getUserRow(db, userId).plan?.adaptiveEnergy;

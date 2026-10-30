@@ -43,7 +43,7 @@ type DayRow =
  * timeline. Logging happens through the two thumb buttons: 📷 and « + ».
  */
 export default function Today() {
-  const { t, locale, nutrient } = useI18n();
+  const { t, plural, locale, nutrient } = useI18n();
   const { colors, elevation } = useTheme();
   const insets = useSafeAreaInsets();
   const user = useUser();
@@ -114,7 +114,7 @@ export default function Today() {
     ...(data?.cravings.items ?? []).map((craving) => ({ type: 'craving' as const, at: Date.parse(craving.at), craving })),
   ].sort((a, b) => b.at - a.at);
   const streak = data?.streak ?? 0;
-  const streakLabel = streak === 1 ? t('today.streakOne') : t('today.streakLong', { count: streak });
+  const streakLabel = plural('today.streakLabel', streak);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>

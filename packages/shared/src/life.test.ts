@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hydrationGoalMl, mergeSleepSegments, moodLink, moodPersistentlyLow, nightsByWakeDate, type MoodDay, type SleepSegment } from './life';
+import { everydayWaterGoalMl, hydrationGoalMl, mergeSleepSegments, moodLink, moodPersistentlyLow, nightsByWakeDate, type MoodDay, type SleepSegment } from './life';
 
 /** Local time on 29–31 Oct 2026, whatever the machine's time zone. */
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);
@@ -70,6 +70,11 @@ describe('hydration', () => {
     expect(hydrationGoalMl('female', 320)).toBe(1900);
     expect(hydrationGoalMl('male', 5000)).toBe(2750);
     expect(hydrationGoalMl('male', null)).toBe(2000);
+    // A goal chosen by hand replaces the base; workouts still add to it.
+    expect(hydrationGoalMl('male', 0, 2600)).toBe(2600);
+    expect(hydrationGoalMl('female', 320, 2400)).toBe(2700);
+    expect(everydayWaterGoalMl({ sex: 'female', waterGoalMl: null })).toBe(1600);
+    expect(everydayWaterGoalMl({ sex: 'male', waterGoalMl: 3000 })).toBe(3000);
   });
 });
 

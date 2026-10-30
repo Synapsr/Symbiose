@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 
 import {
   ActivityInputSchema,
@@ -14,7 +14,8 @@ import {
   type FoodItem,
   type InsightsResponse,
   type LibraryResponse,
-  type Review,
+  type WeeklyReview,
+  type WeeklyReviewState,
   type WeightTrend,
   WeightInputSchema,
 } from '@symbiose/shared';
@@ -23,16 +24,14 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 
 import { requireAuth, type AuthEnv } from '../auth';
-import { activity, aiCache, cravings } from '../db/schema';
+import { activity, cravings } from '../db/schema';
 import { HttpError, notFound } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary, library, toActivity, toCraving } from '../services/day';
 import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
-import { bloodPressureBrief } from '../services/blood-pressure';
-import { energyExpenditureBrief } from '../services/expenditure';
-import { journalBrief } from '../services/journal';
 import { lifeBrief } from '../services/life';
+import { generateReview, weeklyReviewState } from '../services/review';
 import { upsertWeights, weightTrend } from '../services/weights';
 import { activityToday } from '../services/workouts';
 
@@ -162,29 +161,24 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
     days: z.coerce.number().int().min(1).max(90).default(7),
     to: LocalDateSchema.optional(),
   });
+  /** Calories hidden on the device: the goal's headline nutrient is never kcal then. */
+  const hideCaloriesQuery = z.object({ hideCalories: z.enum(['0', '1']).optional() });
 
-  app.get('/insights', validate('query', rangeQuery), (c) => {
-    const { days, to = toLocalDate() } = c.req.valid('query');
-    return c.json<InsightsResponse>(computeInsights(db, c.get('userId'), addDays(to, -(days - 1)), to));
+  app.get('/insights', validate('query', rangeQuery.extend(hideCaloriesQuery.shape)), (c) => {
+    const { days, to = toLocalDate(), hideCalories } = c.req.valid('query');
+    return c.json<InsightsResponse>(computeInsights(db, c.get('userId'), addDays(to, -(days - 1)), to, { hideCalories: hideCalories === '1' }));
   });
 
-  /** AI-written review of a period, cached until the underlying data changes. */
+  /** The saved « Bilan de la semaine », and whether it should be (re)written now. */
+  app.get('/insights/review', validate('query', z.object({ to: LocalDateSchema.optional() }).extend(hideCaloriesQuery.shape)), (c) => {
+    const { to = toLocalDate(), hideCalories } = c.req.valid('query');
+    return c.json<WeeklyReviewState>(weeklyReviewState(db, ai, c.get('userId'), to, { hideCalories: hideCalories === '1' }));
+  });
+
+  /** AI-written review of a period, cached until the underlying data changes; the 7-day one is saved as the weekly review. */
   app.post('/insights/review', validate('json', rangeQuery), async (c) => {
     const { days, to = toLocalDate() } = c.req.valid('json');
-    const userId = c.get('userId');
-    const insights = computeInsights(db, userId, addDays(to, -(days - 1)), to);
-    if (insights.loggedDays === 0) throw new HttpError(409, 'not_enough_data', 'Log a few meals first');
-    const resolved = resolveUser(db, userId, to);
-    const bloodPressure = bloodPressureBrief(db, userId, resolved.row.profile ?? null, to);
-    const journal = journalBrief(db, userId, insights.from, to);
-    const key = createHash('sha256')
-      .update(JSON.stringify({ userId, insights, bloodPressure, journal, plan: resolved.row.plan, model: ai.model }))
-      .digest('hex');
-    const cached = db.select().from(aiCache).where(eq(aiCache.key, key)).get();
-    if (cached) return c.json<Review>(cached.value as Review);
-    const review = await ai.review({ ...resolved.context, insights, bloodPressure, energyExpenditure: energyExpenditureBrief(insights.adaptiveEnergy), journal });
-    db.insert(aiCache).values({ key, userId, value: review, createdAt: nowIso() }).onConflictDoNothing().run();
-    return c.json<Review>(review);
+    return c.json<WeeklyReview>(await generateReview(db, ai, c.get('userId'), to, days));
   });
 
   app.get('/photos/:id', async (c) => {

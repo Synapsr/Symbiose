@@ -17,6 +17,14 @@ export function translate(locale: Locale, key: TranslationKey, params?: Record<s
   return text;
 }
 
+/** Keys that come in `.one` / `.other` forms, without the suffix. */
+export type PluralKey = { [K in TranslationKey]: K extends `${infer Base}.one` ? Base : never }[TranslationKey];
+
+/** French keeps 0 and 1 singular (« 0 jour », « 1 jour »); English only 1. */
+export function pluralForm(locale: Locale, count: number): 'one' | 'other' {
+  return (locale === 'fr' ? Math.abs(count) < 2 : count === 1) ? 'one' : 'other';
+}
+
 export const LocaleContext = createContext<Locale>(deviceLocale());
 
 export function useI18n() {
@@ -24,6 +32,9 @@ export function useI18n() {
   return {
     locale,
     t: (key: TranslationKey, params?: Record<string, string | number>) => translate(locale, key, params),
+    /** « 1 jour », « 3 jours »: `{count}` is filled in. */
+    plural: (key: PluralKey, count: number, params?: Record<string, string | number>) =>
+      translate(locale, `${key}.${pluralForm(locale, count)}` as TranslationKey, { count, ...params }),
     nutrient: (key: NutrientKey) => NUTRIENT_META[key].label[locale],
     nutrientShort: (key: NutrientKey) => NUTRIENT_META[key].short[locale],
   };
