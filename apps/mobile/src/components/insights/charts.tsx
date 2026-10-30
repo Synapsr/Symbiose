@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { View, type LayoutChangeEvent } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 
 import { Row, Txt } from '@/components/ui';
@@ -90,22 +89,42 @@ export function HourBars({ hours, color }: { hours: number[]; color: string }) {
   );
 }
 
-export function Sparkline({ values, color }: { values: number[]; color: string }) {
-  const [width, setWidth] = useState(0);
-  const height = 56;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const points = values.map((v, i) => `${(i / Math.max(values.length - 1, 1)) * width},${height - 6 - ((v - min) / span) * (height - 12)}`);
-  const last = points[points.length - 1]?.split(',').map(Number) ?? [0, 0];
+// ---------------------------------------------------------------- Mini charts for compact rows
+
+const MINI_WIDTH = 72;
+const MINI_HEIGHT = 28;
+
+/** Tiny daily bars: days without data stay a faint stub. */
+export function MiniBars({ values, color, max }: { values: (number | null)[]; color: string; max?: number }) {
+  const { colors } = useTheme();
+  const top = Math.max(max ?? 0, ...values.map((v) => v ?? 0), 1);
   return (
-    <View style={{ height }} onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}>
-      {width > 0 ? (
-        <Svg width={width} height={height}>
-          <Polyline points={points.join(' ')} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
-          <Circle cx={last[0]} cy={last[1]} r={4} fill={color} />
-        </Svg>
-      ) : null}
+    <View style={{ width: MINI_WIDTH, height: MINI_HEIGHT, flexDirection: 'row', alignItems: 'flex-end', gap: values.length > 10 ? 1 : 3 }}>
+      {values.map((value, i) => (
+        <View key={i} style={{ flex: 1, height: value ? Math.max(3, (value / top) * MINI_HEIGHT) : 3, borderRadius: 2, backgroundColor: value ? color : colors.surface2 }} />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Tiny line over the period: `x` is each point's place in it (0..1), the last point is stressed.
+ * `dots` draws dots alone, for values that are levels (a mood), each in its own colour.
+ */
+export function MiniLine({ points, color, dots = false, range }: { points: { x: number; y: number; color?: string }[]; color: string; dots?: boolean; range?: [number, number] }) {
+  const { colors } = useTheme();
+  const ys = points.map((p) => p.y);
+  const [low, high] = range ?? [Math.min(...ys), Math.max(...ys)];
+  const span = high - low || 1;
+  const xy = points.map((p) => ({ x: 3 + p.x * (MINI_WIDTH - 6), y: 3 + ((high - p.y) / span) * (MINI_HEIGHT - 6), color: p.color ?? color }));
+  const last = xy.at(-1);
+  return (
+    <View style={{ width: MINI_WIDTH, height: MINI_HEIGHT }}>
+      <Svg width={MINI_WIDTH} height={MINI_HEIGHT}>
+        {!dots && xy.length > 1 ? <Polyline points={xy.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {dots ? xy.map((p, i) => <Circle key={i} cx={p.x} cy={p.y} r={2.6} fill={p.color} />) : null}
+        {last && !dots ? <Circle cx={last.x} cy={last.y} r={3} fill={color} stroke={colors.surface} strokeWidth={1.5} /> : null}
+      </Svg>
     </View>
   );
 }

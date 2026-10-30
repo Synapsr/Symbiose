@@ -36,6 +36,8 @@ import type {
   SleepTrend,
   UpdateMealInput,
   User,
+  WeeklyReview,
+  WeeklyReviewState,
   WaterEntry,
   WaterImport,
   WaterInput,
@@ -178,8 +180,11 @@ export function createApi(baseUrl: string, token: string) {
     updateNote: (id: string, patch: JournalEntryPatch) => call<JournalEntry>('PATCH', `/api/journal/${id}`, patch),
     deleteNote: (id: string) => call<void>('DELETE', `/api/journal/${id}`),
 
-    insights: (days: number, to: string) => call<InsightsResponse>('GET', `/api/insights?days=${days}&to=${to}`),
-    review: (days: number, to: string) => call<Review>('POST', '/api/insights/review', { days, to }, AI_TIMEOUT),
+    insights: (days: number, to: string, hideCalories = false) => call<InsightsResponse>('GET', `/api/insights?days=${days}&to=${to}&hideCalories=${hideCalories ? 1 : 0}`),
+    /** The saved « Bilan de la semaine » and whether to (re)write it now. */
+    weeklyReview: (to: string, hideCalories = false) => call<WeeklyReviewState>('GET', `/api/insights/review?to=${to}&hideCalories=${hideCalories ? 1 : 0}`),
+    /** Writes the review of the 7 days ending on `to` and saves it (older servers return the review alone). */
+    review: (to: string) => call<Review & Partial<WeeklyReview>>('POST', '/api/insights/review', { days: 7, to }, AI_TIMEOUT),
 
     coachMessages: () => call<CoachMessage[]>('GET', '/api/coach/messages'),
     sendCoach: (text: string, localDate: string) =>

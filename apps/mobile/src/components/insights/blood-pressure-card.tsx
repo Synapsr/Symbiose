@@ -15,19 +15,19 @@ import { Radius, Space, useTheme, type Palette } from '@/theme';
 
 const HEIGHT = 110;
 /** Calm, distinct from the systolic line, readable in both themes. */
-const DIASTOLIC = '#7C9FD8';
+export const DIASTOLIC = '#7C9FD8';
 
 /** Calm colours: green when it's good, neutral in between, amber (never red) when it's worth a doctor's look. */
-function categoryColor(category: BloodPressureCategory, colors: Palette): string {
+export function categoryColor(category: BloodPressureCategory, colors: Palette): string {
   if (category === 'optimal' || category === 'normal') return colors.accent;
   if (category === 'grade2' || category === 'grade3') return colors.warning;
   return colors.text2;
 }
 
-const needsDoctor = (category: BloodPressureCategory | null) => category === 'grade2' || category === 'grade3';
+export const needsDoctor = (category: BloodPressureCategory | null) => category === 'grade2' || category === 'grade3';
 
 /** Daily averages: systolic above, diastolic below, the last day as a dot. */
-function BpChart({ points, color }: { points: BloodPressureTrend['points']; color: string }) {
+export function BpChart({ points, color }: { points: BloodPressureTrend['points']; color: string }) {
   const [width, setWidth] = useState(0);
   const low = Math.min(...points.map((p) => p.diastolic)) - 6;
   const high = Math.max(...points.map((p) => p.systolic)) + 6;
@@ -232,7 +232,7 @@ export function BloodPressureCard({ trend }: { trend: BloodPressureTrend | null 
 }
 
 /** « Dernière mesure : 132/85 · 30 oct. · pouls 68 ». Readings typed here can be deleted with a long press; imported ones live in the health app. */
-function LatestReading({ reading, onDelete }: { reading: BloodPressureReading; onDelete: (reading: BloodPressureReading) => void }) {
+export function LatestReading({ reading, onDelete }: { reading: BloodPressureReading; onDelete: (reading: BloodPressureReading) => void }) {
   const { t, locale } = useI18n();
   const text = (
     <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>

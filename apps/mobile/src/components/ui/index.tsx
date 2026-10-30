@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Children, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -17,6 +17,7 @@ import {
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { LocaleContext } from '@/i18n';
 import { haptics } from '@/lib/haptics';
 import { Fonts, Motion, Radius, Space, useTheme, type Palette } from '@/theme';
 
@@ -50,15 +51,32 @@ function toneColor(tone: Tone, colors: Palette): string {
   }[tone];
 }
 
+/** Fraunces barely draws the narrow no-break space (U+202F): its variants get a regular no-break space. */
+const FRAUNCES: ReadonlySet<Variant> = new Set(['display', 'number', 'title', 'accent']);
+
+/**
+ * French typography, for every text in the app (copy, AI and the person's own words): a no-break
+ * space before « ? ! : ; » and inside guillemets, so a mark never ends up alone at the start of a line.
+ */
+function frenchSpacing(children: ReactNode, space: string): ReactNode {
+  return Children.map(children, (child) => (typeof child === 'string' ? child.replace(/ ([?!:;»])/g, `${space}$1`).replace(/« /g, `«${space}`) : child));
+}
+
 export function Txt({
   variant = 'body',
   tone = 'primary',
   color,
   style,
+  children,
   ...props
 }: TextProps & { variant?: Variant; tone?: Tone; color?: string }) {
   const { colors } = useTheme();
-  return <RNText {...props} style={[VARIANTS[variant], { color: color ?? toneColor(tone, colors) }, style]} />;
+  const locale = useContext(LocaleContext);
+  return (
+    <RNText {...props} style={[VARIANTS[variant], { color: color ?? toneColor(tone, colors) }, style]}>
+      {locale === 'fr' ? frenchSpacing(children, FRAUNCES.has(variant) ? '\u00A0' : '\u202F') : children}
+    </RNText>
+  );
 }
 
 /** Counts smoothly to its value (eased), so changes feel alive instead of jumping. */

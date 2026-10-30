@@ -1,83 +1,66 @@
-import type { NutrientKey } from '@symbiose/shared';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { goalNutrient, type InsightsResponse } from '@symbiose/shared';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Camera, Flame, Sparkles } from 'lucide-react-native';
+import { Camera } from 'lucide-react-native';
 import { useState } from 'react';
-import { Platform, RefreshControl, ScrollView, View } from 'react-native';
+import { Platform, RefreshControl, ScrollView } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ActivityCard } from '@/components/insights/activity-card';
-import { AdaptiveEnergyCard } from '@/components/insights/adaptive-energy-card';
-import { BloodPressureCard } from '@/components/insights/blood-pressure-card';
-import { DayBars, HourBars } from '@/components/insights/charts';
-import { HydrationCard } from '@/components/insights/hydration-card';
-import { MoodCard } from '@/components/insights/mood-card';
-import { SleepCard } from '@/components/insights/sleep-card';
-import { WeightCard } from '@/components/insights/weight-card';
-import { Bar, Button, Card, Dot, Pressy, Row, SectionTitle, Segmented, Skeleton, Txt } from '@/components/ui';
+import { ActivityCard, hasActivity } from '@/components/insights/activity-card';
+import { BodyCard } from '@/components/insights/body-card';
+import { RowsCard } from '@/components/insights/expand-row';
+import { GoalCard } from '@/components/insights/goal-card';
+import { WaterTrendRow } from '@/components/insights/hydration-card';
+import { moodDaysIn, MoodTrendRow } from '@/components/insights/mood-card';
+import { ReviewCard } from '@/components/insights/review-card';
+import { SleepTrendRow } from '@/components/insights/sleep-card';
+import { SourcesCard } from '@/components/insights/sources-card';
+import { Pressy, Row, Segmented, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
-import { formatAmount, formatNumber, weekdayInitial } from '@/lib/format';
 import { errorMessage, useToday } from '@/lib/hooks';
 import { useApi, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
-import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
+import { Radius, Space, useTheme } from '@/theme';
 
+/**
+ * Tendances, read-only and short: the saved weekly review, the goal's number, where it comes from,
+ * then body, activity and the rest of life in compact rows that open on a tap. The range applies
+ * to every card but the weekly review, which is about the week by definition.
+ */
 export default function Insights() {
-  const { t, locale, nutrient } = useI18n();
+  const { t } = useI18n();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const api = useApi();
-  const user = useUser();
   const today = useToday();
+  const queryClient = useQueryClient();
   const hideCalories = useSettings((s) => s.hideCalories);
   const [range, setRange] = useState<'7' | '30'>('7');
   const days = Number(range);
-  const query = useQuery({ queryKey: ['insights', days, today], queryFn: () => api.insights(days, today) });
-  const review = useMutation({ mutationFn: () => api.review(days, today) });
+  const query = useQuery({
+    queryKey: ['insights', days, today, hideCalories],
+    queryFn: () => api.insights(days, today, hideCalories),
+    // Switching range keeps the cards on screen while the other period loads.
+    placeholderData: keepPreviousData,
+  });
   const data = query.data;
-
-  const primary = data?.focus[0] ?? 'kcal';
-  const primaryAdherence = data?.adherence.find((a) => a.nutrient === primary);
-  // Weight comes first when the goals are about body weight.
-  const weightFirst = Boolean(user.plan && user.plan.calorieMode !== 'maintain');
-  // Same for activity, which also matters for muscle.
-  const activityFirst = weightFirst || Boolean(user.plan?.tags.some((tag) => tag === 'lose_weight' || tag === 'gain_muscle'));
-  const trackBp = user.profile?.trackBloodPressure === true;
-  // Body cards don't need meals: they show even before the first one is logged.
-  // Measured expenditure sits under the weight it is read from; it's all about calories.
-  const body = data ? (
-    <>
-      <WeightCard weight={data.weight} plan={user.plan} />
-      {data.adaptiveEnergy && !hideCalories ? <AdaptiveEnergyCard adaptive={data.adaptiveEnergy} /> : null}
-      {trackBp ? <BloodPressureCard trend={data.bloodPressure ?? null} /> : null}
-    </>
-  ) : null;
-  const activityCard = data?.activity ? <ActivityCard activity={data.activity} /> : null;
-  // The opt-in modules: each card only when its switch is on (the server sends null otherwise).
-  const life = data ? (
-    <>
-      {data.sleep ? <SleepCard trend={data.sleep} dates={data.days.map((d) => d.date)} /> : null}
-      {data.hydration ? <HydrationCard trend={data.hydration} /> : null}
-      {data.mood ? <MoodCard trend={data.mood} to={data.to} /> : null}
-    </>
-  ) : null;
-  const logged = Boolean(data && data.loggedDays > 0);
+  const refresh = () => {
+    void query.refetch();
+    void queryClient.invalidateQueries({ queryKey: ['weekly-review'] });
+  };
 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentInsetAdjustmentBehavior="automatic"
-      refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} />}
-      contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingHorizontal: Space.lg, paddingBottom: insets.bottom + 120, maxWidth: 640, width: '100%', alignSelf: 'center' }}>
-      <Row style={{ justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: Space.lg }}>
+      refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isPlaceholderData} onRefresh={refresh} />}
+      contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingHorizontal: Space.lg, paddingBottom: insets.bottom + 120, maxWidth: 640, width: '100%', alignSelf: 'center', gap: Space.lg }}>
+      <Row style={{ justifyContent: 'space-between', paddingHorizontal: 4 }}>
         <Txt variant="title">{t('insights.title')}</Txt>
         <Segmented
           value={range}
-          onChange={(v) => {
-            setRange(v);
-            review.reset();
-          }}
+          onChange={setRange}
           options={[
             { value: '7', label: t('insights.week') },
             { value: '30', label: t('insights.month') },
@@ -85,203 +68,71 @@ export default function Insights() {
         />
       </Row>
 
+      <ReviewCard today={today} hideCalories={hideCalories} />
+
       {!data ? (
         query.error ? (
           <Txt tone="warning">{errorMessage(query.error, t('common.error'), t('common.offline'))}</Txt>
         ) : (
-          <View style={{ gap: Space.lg }}>
-            <Skeleton width="100%" height={220} radius={Radius.xl} />
-            <Skeleton width="100%" height={160} radius={Radius.xl} />
-          </View>
+          <Skeleton width="100%" height={300} radius={Radius.xl} />
         )
       ) : (
-        <Animated.View entering={FadeIn} style={{ gap: Space.lg }}>
-          {!logged ? (
-            <Pressy
-              onPress={() => router.push('/capture')}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md, paddingHorizontal: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.surface2 }}>
-              <Camera size={16} color={colors.text2} />
-              <Txt variant="caption" tone="secondary" style={{ flex: 1 }}>
-                {t('insights.empty')}
-              </Txt>
-            </Pressy>
-          ) : null}
-
-          {logged ? (
-            <Card style={{ gap: Space.lg }}>
-              <View style={{ gap: 2 }}>
-                <Row gap={6}>
-                  <Dot color={primary === 'kcal' ? colors.accent : NUTRIENT_COLORS[primary]} />
-                  <Txt variant="label" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-                    {nutrient(primary)} · {t('insights.average').toLowerCase()}
-                  </Txt>
-                </Row>
-                <Txt variant="display" style={{ fontSize: 40 }}>
-                  {formatAmount(primary, data.averages[primary], locale)}
-                </Txt>
-                <Row gap={Space.md}>
-                  <Txt variant="caption" tone="secondary">
-                    {t('insights.logged', { count: data.loggedDays })}
-                  </Txt>
-                  {data.streak > 0 ? (
-                    <Row gap={4}>
-                      <Flame size={13} color={colors.warning} fill={colors.warning} />
-                      <Txt variant="caption" tone="secondary">
-                        {t('today.streak', { count: data.streak })}
-                      </Txt>
-                    </Row>
-                  ) : null}
-                </Row>
-              </View>
-              <DayBars
-                values={data.days.map((d) => (d.logged ? d.totals[primary] : null))}
-                labels={data.days.map((d) => weekdayInitial(d.date, locale))}
-                target={primaryAdherence?.target ?? (primary === 'kcal' ? (data.days.at(-1)?.kcalTarget ?? 2000) : 0)}
-                kind={primaryAdherence?.kind ?? 'target'}
-                color={primary === 'kcal' ? colors.accent : NUTRIENT_COLORS[primary]}
-              />
-              {!hideCalories && primary !== 'kcal' ? (
-                <Txt variant="caption" tone="secondary">
-                  {formatNumber(data.averages.kcal, locale)} kcal · {formatAmount('protein', data.averages.protein, locale)} {nutrient('protein').toLowerCase()} · {formatAmount('fiber', data.averages.fiber, locale)}{' '}
-                  {nutrient('fiber').toLowerCase()}
-                </Txt>
-              ) : null}
-            </Card>
-          ) : null}
-
-          {weightFirst ? body : null}
-          {activityFirst ? activityCard : null}
-
-          {logged && data.adherence.length ? (
-            <>
-              <SectionTitle>{t('insights.adherence')}</SectionTitle>
-              <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>
-                {data.adherence.map((a) => (
-                  <View key={a.nutrient} style={{ gap: 8 }}>
-                    <Row style={{ justifyContent: 'space-between' }}>
-                      <Row gap={8}>
-                        <Dot color={NUTRIENT_COLORS[a.nutrient]} />
-                        <Txt variant="label">
-                          {nutrient(a.nutrient)} {a.kind === 'max' ? '≤' : a.kind === 'min' ? '≥' : '≈'} {formatAmount(a.nutrient, a.target, locale)}
-                        </Txt>
-                      </Row>
-                      <Txt variant="caption" tone="secondary">
-                        {t('insights.daysOk', { ok: a.daysOk, total: a.daysLogged })}
-                      </Txt>
-                    </Row>
-                    <Bar progress={a.daysLogged ? a.daysOk / a.daysLogged : 0} color={NUTRIENT_COLORS[a.nutrient]} />
-                  </View>
-                ))}
-              </Card>
-            </>
-          ) : null}
-
-          {logged && (Object.entries(data.topSources) as [NutrientKey, (typeof data.topSources)[NutrientKey]][]).map(([key, sources]) =>
-            sources && sources.length ? (
-              <View key={key}>
-                <SectionTitle>
-                  {t('insights.sources')} · {nutrient(key).toLowerCase()}
-                </SectionTitle>
-                <Card style={{ gap: Space.md, marginTop: -Space.sm }}>
-                  {sources.map((s) => (
-                    <View key={s.name} style={{ gap: 6 }}>
-                      <Row style={{ justifyContent: 'space-between' }}>
-                        <Txt variant="label" numberOfLines={1} style={{ flex: 1 }}>
-                          {s.emoji} {s.name} <Txt variant="caption" tone="tertiary">×{s.count}</Txt>
-                        </Txt>
-                        <Txt variant="label" tone="secondary">
-                          {formatAmount(key, s.amount, locale)}
-                        </Txt>
-                      </Row>
-                      <Bar progress={s.amount / (sources[0]?.amount || 1)} color={NUTRIENT_COLORS[key]} height={6} />
-                    </View>
-                  ))}
-                </Card>
-              </View>
-            ) : null,
-          )}
-
-          {logged && data.byHour.hours.some((h) => h > 0) ? (
-            <>
-              <SectionTitle>
-                {t('insights.when')} · {nutrient(data.byHour.nutrient).toLowerCase()}
-              </SectionTitle>
-              <Card style={{ marginTop: -Space.sm }}>
-                <HourBars hours={data.byHour.hours} color={data.byHour.nutrient === 'kcal' ? colors.accent : NUTRIENT_COLORS[data.byHour.nutrient]} />
-              </Card>
-            </>
-          ) : null}
-
-          {data.cravings.total > 0 ? (
-            <Card style={{ gap: 4 }}>
-              <Txt variant="overline" tone="secondary">
-                {t('insights.cravings')}
-              </Txt>
-              <Txt variant="number">{t('insights.cravingsBody', { resisted: data.cravings.resisted, total: data.cravings.total })}</Txt>
-              {data.cravings.topWhat.length ? (
-                <Txt variant="caption" tone="tertiary">
-                  {data.cravings.topWhat.join(' · ')}
-                </Txt>
-              ) : null}
-            </Card>
-          ) : null}
-
-          {!weightFirst ? body : null}
-          {!activityFirst ? activityCard : null}
-          {life}
-
-          {logged ? (
-            <>
-              <SectionTitle>{t('insights.review')}</SectionTitle>
-              <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>
-                {review.data ? (
-                  <Animated.View entering={FadeIn} style={{ gap: Space.lg }}>
-                    <Txt variant="heading" style={{ lineHeight: 26 }}>
-                      {review.data.headline}
-                    </Txt>
-                    <ReviewList title={t('insights.wins')} items={review.data.wins} color={colors.accent} />
-                    <ReviewList title={t('insights.patterns')} items={review.data.patterns} color={colors.warning} />
-                    <ReviewList title={t('insights.next')} items={review.data.nextSteps} color={NUTRIENT_COLORS.fat} />
-                  </Animated.View>
-                ) : (
-                  <>
-                    {review.error ? (
-                      <Txt variant="caption" tone="warning">
-                        {errorMessage(review.error, t('common.error'), t('common.offline'))}
-                      </Txt>
-                    ) : null}
-                    <Button
-                      title={review.isPending ? t('insights.reviewing') : t('insights.reviewCta')}
-                      icon={<Sparkles size={18} color={colors.onInverted} />}
-                      loading={review.isPending}
-                      onPress={() => review.mutate()}
-                    />
-                  </>
-                )}
-              </Card>
-            </>
-          ) : null}
-        </Animated.View>
+        <Cards data={data} hideCalories={hideCalories} today={today} />
       )}
     </ScrollView>
   );
 }
 
-function ReviewList({ title, items, color }: { title: string; items: string[]; color: string }) {
-  if (!items.length) return null;
+function Cards({ data, hideCalories, today }: { data: InsightsResponse; hideCalories: boolean; today: string }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const user = useUser();
+  const plan = user.plan;
+  const hero = data.hero ?? goalNutrient(plan, hideCalories);
+  const logged = data.loggedDays > 0;
+
+  // Body: weight when it's the goal or when there are weigh-ins; blood pressure when tracked; the
+  // measured expenditure only for weight goals, or once enough weigh-ins make it meaningful.
+  const weightGoal = Boolean(plan && (plan.calorieMode !== 'maintain' || plan.tags.some((tag) => tag === 'lose_weight' || tag === 'gain_muscle')));
+  const showWeight = weightGoal || data.weight.latest !== null;
+  const trackBp = user.profile?.trackBloodPressure === true;
+  const adaptive = data.adaptiveEnergy && !hideCalories && (weightGoal || data.adaptiveEnergy.missing.weighIns === 0) ? data.adaptiveEnergy : null;
+
+  // « Ta vie »: one row per module that is on and has something to show.
+  const sleep = data.sleep && data.sleep.nights.length ? data.sleep : null;
+  const water = data.hydration && data.hydration.daysLogged ? data.hydration : null;
+  const mood = data.mood && (moodDaysIn(data.mood, data.from).length || data.mood.persistentLow) ? data.mood : null;
+
   return (
-    <View style={{ gap: Space.sm }}>
-      <Txt variant="overline" tone="secondary">
-        {title}
-      </Txt>
-      {items.map((item) => (
-        <Row key={item} gap={Space.md} style={{ alignItems: 'flex-start' }}>
-          <View style={{ marginTop: 7 }}>
-            <Dot color={color} />
-          </View>
-          <Txt style={{ flex: 1 }}>{item}</Txt>
-        </Row>
-      ))}
-    </View>
+    <Animated.View entering={FadeIn.duration(260)} style={{ gap: Space.lg }}>
+      {logged ? (
+        <GoalCard data={data} hero={hero} hideCalories={hideCalories} />
+      ) : (
+        <Pressy
+          onPress={() => router.push('/capture')}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md, paddingHorizontal: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.surface2 }}>
+          <Camera size={16} color={colors.text2} />
+          <Txt variant="caption" tone="secondary" style={{ flex: 1, fontSize: 14 }}>
+            {t('insights.empty')}
+          </Txt>
+        </Pressy>
+      )}
+
+      {logged ? <SourcesCard data={data} hero={hero} /> : null}
+
+      {showWeight || trackBp || adaptive ? (
+        <BodyCard weight={showWeight ? data.weight : null} bloodPressure={trackBp ? (data.bloodPressure ?? null) : undefined} adaptive={adaptive} plan={plan} from={data.from} to={data.to} />
+      ) : null}
+
+      {hasActivity(data.activity) ? <ActivityCard activity={data.activity} /> : null}
+
+      {sleep || water || mood ? (
+        <RowsCard title={t('insights.life')}>
+          {sleep ? <SleepTrendRow first trend={sleep} dates={data.days.map((d) => d.date)} /> : null}
+          {water ? <WaterTrendRow first={!sleep} trend={water} today={today} /> : null}
+          {mood ? <MoodTrendRow first={!sleep && !water} trend={mood} from={data.from} to={data.to} /> : null}
+        </RowsCard>
+      ) : null}
+    </Animated.View>
   );
 }
