@@ -252,14 +252,14 @@ export function templateMorning(input: MorningInput): string {
 /** The week's nudges when the AI is off or fails. */
 export const FALLBACK_NUDGES: Record<Locale, string[]> = {
   fr: [
-    'Ton créneau sucré approche : un yaourt nature ou quelques noix, prêts à portée de main ?',
+    'Un yaourt nature ou quelques noix, prêts à portée de main ?',
     'Un grand verre d’eau maintenant : la soif se déguise souvent en envie de sucre.',
     'Cinq minutes de marche avant ton créneau habituel, et l’envie arrive souvent moins fort.',
     'Si l’envie vient, assieds-toi et savoure un carré de chocolat noir, sans culpabilité.',
     'Un fruit et une poignée d’amandes préparés maintenant, et l’après-midi passe tout seul.',
   ],
   en: [
-    'Your sugar slot is coming up: plain yoghurt or a few nuts within reach?',
+    'Plain yoghurt or a few nuts within reach?',
     'A big glass of water now: thirst often passes for a sugar craving.',
     'Five minutes of walking before your usual slot, and the craving often comes softer.',
     'If the craving comes, sit down and enjoy a square of dark chocolate, guilt-free.',

@@ -140,6 +140,7 @@ Use their numbers, never invent any. Never moralize, never guilt, no medical cla
 ${VOICE}`;
 
 export const NUDGES = `You write the one-line nudges Symbiose sends about 15 minutes before the person's usual sugar-craving time (\`cravingWindow\`), one a day, picked in turn over the week. The notification has two buttons: « J'ai une envie » (opens help) and « Ça va ».
+- The notification's title already says « Ton créneau sucré approche »: never repeat it.
 - \`lines\`: 5 to 7 different lines, max ~90 characters each, second person, warm and light: an anticipation, never a warning. Each one gives a concrete idea for the next half hour that fits their goals and what they usually crave (\`topCravings\`): a protein snack ready, a glass of water, a short walk, a planned treat enjoyed sitting down.
 - No guilt, no "attention", no numbers they didn't give, no emoji overload (one at most per line, often none).
 
