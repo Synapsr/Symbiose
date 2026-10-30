@@ -7,6 +7,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSeq
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EnergyCard, heroNutrient, NutrientBars } from '@/components/today/energy-card';
+import { hasLifeCard, LifeCard, SleepLine } from '@/components/today/life-card';
 import { MealCard, PendingMealCard } from '@/components/today/meal-card';
 import { MoveCard } from '@/components/today/move-card';
 import { WeekStrip } from '@/components/today/week-strip';
@@ -86,6 +87,7 @@ export default function Today() {
                 <Txt variant="title" numberOfLines={2}>
                   {date === today ? greeting(t, name) : dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
                 </Txt>
+                {day.data?.sleep ? <SleepLine night={day.data.sleep} /> : null}
               </View>
               {day.data && day.data.streak > 0 ? (
                 <Row gap={4} style={[{ backgroundColor: colors.surface, borderRadius: Radius.pill, paddingHorizontal: Space.md, height: 34 }, elevation]}>
@@ -118,6 +120,11 @@ export default function Today() {
                   <MoveCard day={day.data} isToday={date === today} />
                 </Reveal>
               ) : null}
+              {hasLifeCard(day.data, user.profile, date === today) ? (
+                <Reveal index={6}>
+                  <LifeCard day={day.data} isToday={date === today} />
+                </Reveal>
+              ) : null}
             </>
           ) : day.error ? (
             <Card>
@@ -132,7 +139,7 @@ export default function Today() {
         </View>
 
         {showCraving ? (
-          <Reveal index={6}>
+          <Reveal index={7}>
             <Pressy
               onPress={() => router.push('/craving')}
               style={{ marginTop: Space.lg, flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.accentSoft }}>
@@ -151,7 +158,7 @@ export default function Today() {
           </Reveal>
         ) : null}
 
-        <Reveal index={7}>
+        <Reveal index={8}>
           <SectionTitle>{t('today.meals')}</SectionTitle>
           <View style={{ gap: Space.sm }}>
             {pending.map((p) => (

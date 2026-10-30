@@ -10,6 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ActivityCard } from '@/components/insights/activity-card';
 import { BloodPressureCard } from '@/components/insights/blood-pressure-card';
 import { DayBars, HourBars } from '@/components/insights/charts';
+import { HydrationCard } from '@/components/insights/hydration-card';
+import { MoodCard } from '@/components/insights/mood-card';
+import { SleepCard } from '@/components/insights/sleep-card';
 import { WeightCard } from '@/components/insights/weight-card';
 import { Bar, Button, Card, Dot, Pressy, Row, SectionTitle, Segmented, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
@@ -48,6 +51,14 @@ export default function Insights() {
     </>
   ) : null;
   const activityCard = data?.activity ? <ActivityCard activity={data.activity} /> : null;
+  // The opt-in modules: each card only when its switch is on (the server sends null otherwise).
+  const life = data ? (
+    <>
+      {data.sleep ? <SleepCard trend={data.sleep} dates={data.days.map((d) => d.date)} /> : null}
+      {data.hydration ? <HydrationCard trend={data.hydration} /> : null}
+      {data.mood ? <MoodCard trend={data.mood} to={data.to} /> : null}
+    </>
+  ) : null;
   const logged = Boolean(data && data.loggedDays > 0);
 
   return (
@@ -214,6 +225,7 @@ export default function Insights() {
 
           {!weightFirst ? body : null}
           {!activityFirst ? activityCard : null}
+          {life}
 
           {logged ? (
             <>

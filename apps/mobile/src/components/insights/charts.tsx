@@ -5,19 +5,21 @@ import Svg, { Circle, Polyline } from 'react-native-svg';
 import { Row, Txt } from '@/components/ui';
 import { Radius, Space, useTheme } from '@/theme';
 
-/** Daily bars with a dashed target line; days above a "max" target turn amber. */
+/** Daily bars with a dashed target line; days above a "max" target turn amber, days under a "min" one can fade (`softUnder`). */
 export function DayBars({
   values,
   labels,
   target,
   kind,
   color,
+  softUnder = false,
 }: {
   values: (number | null)[];
   labels: string[];
   target: number;
   kind: 'max' | 'min' | 'target';
   color: string;
+  softUnder?: boolean;
 }) {
   const { colors } = useTheme();
   const height = 140;
@@ -30,13 +32,14 @@ export function DayBars({
         <View style={{ position: 'absolute', left: 0, right: 0, top: targetY, borderTopWidth: 1.5, borderStyle: 'dashed', borderColor: colors.text3 }} />
         {values.map((value, i) => {
           const over = value !== null && kind === 'max' && value > target;
+          const under = softUnder && value !== null && kind === 'min' && value < target;
           return (
             <View key={i} style={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
               <View
                 style={{
                   height: value === null ? 3 : Math.max(3, (value / max) * height),
                   borderRadius: dense ? 3 : Radius.sm / 2,
-                  backgroundColor: value === null ? colors.surface2 : over ? colors.warning : color,
+                  backgroundColor: value === null ? colors.surface2 : over ? colors.warning : under ? `${color}66` : color,
                 }}
               />
             </View>

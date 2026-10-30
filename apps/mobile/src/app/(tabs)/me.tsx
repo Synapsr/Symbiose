@@ -1,8 +1,8 @@
-import { ageFromBirthYear } from '@symbiose/shared';
+import { ageFromBirthYear, type Profile } from '@symbiose/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, CodeXml, Download, EyeOff, Hand, HeartPulse, LogOut, Server, Target, Trash2, User, Watch } from 'lucide-react-native';
+import { ChevronRight, CodeXml, Download, EyeOff, FaceSlightlySmiling, GlassWater, Hand, HeartPulse, LogOut, Moon, Server, Target, Trash2, User, Watch } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,11 +11,22 @@ import { Card, Dot, Pressy, Row, SectionTitle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { BP_SCOPES, health, HEALTH_SCOPES } from '@/lib/health';
+import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules } from '@/lib/health';
 import { useHealthSync, useToday } from '@/lib/hooks';
 import { useApi, useSession, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
+
+/** The opt-in modules: a profile switch each, and the health-store types it needs (mood needs none). */
+type ModuleKey = 'trackHydration' | 'trackSleep' | 'trackMood' | 'trackBloodPressure';
+const HEALTH_MODULE: Record<ModuleKey, keyof HealthModules | null> = {
+  trackHydration: 'hydration',
+  trackSleep: 'sleep',
+  trackMood: null,
+  trackBloodPressure: 'bloodPressure',
+};
+/** Turning a module on (again) re-reads its history from the store, asking for its types first if needed. */
+const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, bloodPressure: { lastBpSync: 0 } } as const;
 
 export default function Me() {
   const { t, locale, nutrient } = useI18n();
@@ -36,12 +47,12 @@ export default function Me() {
   const plan = user.plan!;
   const setUser = useSetUser();
   const queryClient = useQueryClient();
-  const trackBp = profile.trackBloodPressure === true;
+  const modules = healthModules(profile);
 
   const toggleHealth = async (on: boolean) => {
     if (on) {
-      const granted = await health.connect({ bloodPressure: trackBp }).catch(() => false);
-      settings.set(granted ? { healthEnabled: true, healthScopes: HEALTH_SCOPES, ...(trackBp ? { bpScopes: BP_SCOPES } : null) } : { healthEnabled: false });
+      const granted = await health.connect(modules).catch(() => false);
+      settings.set(granted ? { healthEnabled: true, healthScopes: HEALTH_SCOPES, ...grantedScopes(modules) } : { healthEnabled: false });
       if (granted) {
         haptics.success();
         void syncHealth(true);
@@ -51,19 +62,25 @@ export default function Me() {
     }
   };
 
-  // Opt-in: saved on the profile (the server and the coach use it), then the health store is asked for the readings.
-  const toggleBp = useMutation({
-    mutationFn: (on: boolean) => api.saveProfile({ ...profile, trackBloodPressure: on }),
-    onSuccess: async (saved, on) => {
+  // Opt-in: saved on the profile (the server and the coach use it). With the new profile, the health sync
+  // asks the store for the module's types once (see `grantedScopes`), then imports its history.
+  const toggleModule = useMutation({
+    mutationFn: ({ key, on }: { key: ModuleKey; on: boolean }) => api.saveProfile({ ...profile, [key]: on } satisfies Profile),
+    onSuccess: (saved, { key, on }) => {
+      const module = HEALTH_MODULE[key];
+      if (on && module) settings.set(RESYNC[module]);
+      if (on) haptics.success();
       setUser(saved);
+      void queryClient.invalidateQueries({ queryKey: ['day'] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
-      if (on && settings.healthEnabled && health.source) {
-        const granted = await health.connect({ bloodPressure: true }).catch(() => false);
-        if (granted) settings.set({ bpScopes: BP_SCOPES, lastBpSync: 0 });
-      }
     },
     onError: () => haptics.warning(),
   });
+  const moduleSwitch = (key: ModuleKey) => {
+    const pending = toggleModule.isPending && toggleModule.variables.key === key;
+    return <Switch value={pending ? toggleModule.variables.on : profile[key] === true} disabled={toggleModule.isPending} onValueChange={(on) => toggleModule.mutate({ key, on })} />;
+  };
+  const store = healthAvailable ? health.storeName[locale] : null;
 
   const confirmDelete = () => {
     const run = async () => {
@@ -134,13 +151,23 @@ export default function Me() {
           subtitle={healthAvailable ? (settings.healthEnabled ? t('me.healthOn', { store: health.storeName[locale] }) : t('me.healthOff')) : t('me.healthUnavailable')}
           right={healthAvailable ? <Switch value={settings.healthEnabled} onValueChange={(v) => void toggleHealth(v)} /> : null}
         />
+      </Card>
+
+      {/* What Symbiose follows besides meals and movement: each module is off until switched on. */}
+      <SectionTitle>{t('me.modules')}</SectionTitle>
+      <Card padded={false} style={{ marginTop: -Space.sm }}>
+        <Item icon={<GlassWater size={20} color={colors.text} />} title={t('me.trackHydration')} subtitle={t('me.trackHydrationHint')} right={moduleSwitch('trackHydration')} />
         <Divider />
         <Item
-          icon={<HeartPulse size={20} color={colors.text} />}
-          title={t('me.trackBp')}
-          subtitle={t('me.trackBpHint')}
-          right={<Switch value={toggleBp.isPending ? toggleBp.variables : trackBp} disabled={toggleBp.isPending} onValueChange={(v) => toggleBp.mutate(v)} />}
+          icon={<Moon size={20} color={colors.text} />}
+          title={t('me.trackSleep')}
+          subtitle={store ? t('me.trackSleepHint', { store }) : t('me.trackSleepHintNoStore')}
+          right={moduleSwitch('trackSleep')}
         />
+        <Divider />
+        <Item icon={<FaceSlightlySmiling size={20} color={colors.text} />} title={t('me.trackMood')} subtitle={t('me.trackMoodHint')} right={moduleSwitch('trackMood')} />
+        <Divider />
+        <Item icon={<HeartPulse size={20} color={colors.text} />} title={t('me.trackBp')} subtitle={t('me.trackBpHint')} right={moduleSwitch('trackBloodPressure')} />
       </Card>
 
       <SectionTitle>{t('me.profile')}</SectionTitle>
