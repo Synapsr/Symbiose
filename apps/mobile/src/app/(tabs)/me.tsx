@@ -13,6 +13,7 @@ import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules } from '@/lib/health';
 import { useHealthSync, useToday } from '@/lib/hooks';
+import { clearOutbox, useOutbox } from '@/lib/outbox';
 import { useApi, useSession, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
@@ -82,9 +83,29 @@ export default function Me() {
   };
   const store = healthAvailable ? health.storeName[locale] : null;
 
+  // The waiting meals belong to this account on this server: signing out forgets them, after a warning.
+  const waiting = useOutbox((s) => s.items.length);
+  const confirmSignOut = () => {
+    const run = async () => {
+      await clearOutbox();
+      await signOut();
+    };
+    if (!waiting) return void run();
+    const body = waiting === 1 ? t('outbox.signOutOne') : t('outbox.signOutMany', { count: waiting });
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm?.(`${t('outbox.signOutTitle')}\n\n${body}`)) void run();
+      return;
+    }
+    Alert.alert(t('outbox.signOutTitle'), body, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('me.signOut'), style: 'destructive', onPress: () => void run() },
+    ]);
+  };
+
   const confirmDelete = () => {
     const run = async () => {
       await api.deleteAccount();
+      await clearOutbox();
       await signOut();
     };
     if (Platform.OS === 'web') {
@@ -202,7 +223,7 @@ export default function Me() {
           chevron
         />
         <Divider />
-        <Item icon={<LogOut size={20} color={colors.text} />} title={t('me.signOut')} onPress={() => void signOut()} />
+        <Item icon={<LogOut size={20} color={colors.text} />} title={t('me.signOut')} onPress={confirmSignOut} />
         <Divider />
         <Item icon={<Trash2 size={20} color={colors.danger} />} title={t('me.deleteAccount')} danger onPress={confirmDelete} />
       </Card>

@@ -72,11 +72,18 @@ async function request<T>(baseUrl: string, token: string | null, method: string,
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
-    throw new ApiError(0, 'network', error instanceof Error ? error.message : 'Network error');
+    const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+    throw new ApiError(0, timedOut ? 'timeout' : 'network', error instanceof Error ? error.message : 'Network error');
   }
   if (res.status === 204) return undefined as T;
   const text = await res.text();
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  let data: unknown = null;
+  try {
+    data = text ? (JSON.parse(text) as unknown) : null;
+  } catch {
+    // A proxy's HTML error page keeps its status; a 200 that isn't JSON is a captive portal (plane, hotel Wi-Fi): no real network.
+    if (res.ok) throw new ApiError(0, 'network', 'Unexpected response');
+  }
   if (!res.ok) {
     const err = (data as { error?: { code?: string; message?: string } } | null)?.error;
     throw new ApiError(res.status, err?.code ?? 'http_error', err?.message ?? `HTTP ${res.status}`);
@@ -113,6 +120,8 @@ export function createApi(baseUrl: string, token: string) {
     saveGoals: (plan: GoalPlan) => call<GoalsResponse>('PUT', '/api/goals', { plan }),
 
     day: (date: string) => call<DaySummary>('GET', `/api/days/${date}`),
+    /** A day's meals alone: what the offline queue checks before sending a capture again. */
+    meals: (date: string) => call<Meal[]>('GET', `/api/meals?date=${date}`),
     createMeal: (input: CreateMealInput) => call<Meal>('POST', '/api/meals', input, AI_TIMEOUT),
     meal: (id: string) => call<Meal>('GET', `/api/meals/${id}`),
     updateMeal: (id: string, input: UpdateMealInput) => call<Meal>('PATCH', `/api/meals/${id}`, input),

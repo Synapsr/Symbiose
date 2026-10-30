@@ -13,9 +13,9 @@ import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { formatAmount, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { errorMessage, useRefreshAfterMeal } from '@/lib/hooks';
+import { errorMessage, useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
 import { useApi } from '@/lib/session';
-import { useSettings, useToast } from '@/lib/stores';
+import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme, verdictColor } from '@/theme';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -44,7 +44,7 @@ function MealEditor({ meal }: { meal: Meal }) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const refresh = useRefreshAfterMeal();
-  const showToast = useToast((s) => s.show);
+  const logger = useMealLogger();
   const hideCalories = useSettings((s) => s.hideCalories);
 
   const [items, setItems] = useState<FoodItem[]>(meal.items);
@@ -91,14 +91,10 @@ function MealEditor({ meal }: { meal: Meal }) {
     },
     onError,
   });
+  // Sent, or kept for later without network (the logger says which); other errors stay on screen.
   const relog = useMutation({
-    mutationFn: () => api.duplicateMeal(meal.id, { eatenAt: toLocalDateTime(), localDate: toLocalDate() }),
-    onSuccess: (copy) => {
-      haptics.success();
-      refresh(copy);
-      showToast({ message: `${t('detail.relogged')} · ${copy.title}` });
-      dismiss();
-    },
+    mutationFn: () => logger.relog(meal, { eatenAt: toLocalDateTime(), localDate: toLocalDate() }),
+    onSuccess: () => dismiss(),
     onError,
   });
 
