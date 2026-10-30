@@ -7,13 +7,17 @@ import type {
   FoodItem,
   GoalPlan,
   InsightsResponse,
+  JournalKind,
   Locale,
   MealType,
   NutrientKey,
   Nutrients,
   Profile,
   Review,
+  StoolConsistency,
   Targets,
+  TransitEase,
+  TransitSummary,
   Verdict,
   WeightTrend,
   WorkoutType,
@@ -54,6 +58,30 @@ export interface EnergyExpenditureBrief {
   /** Shift applied to today's maintenance so far. */
   appliedKcal: number;
   missing?: { days: number; completeDays: number; weighIns: number };
+}
+
+/** One note of the health journal, compact: structured fields when given, the words cut short. */
+export interface JournalNoteBrief {
+  date: string;
+  time: string;
+  kind: JournalKind;
+  consistency?: StoolConsistency;
+  /** Bristol stool type, 1–7. */
+  bristol?: number;
+  ease?: TransitEase;
+  /** 1 (very low) to 5 (very good). */
+  feeling?: number;
+  text?: string;
+}
+
+/** The health journal over a few days, for the coach and the review; null when empty. */
+export interface JournalBrief {
+  /** Oldest first; past an overall size cap, the oldest are left out. */
+  entries: JournalNoteBrief[];
+  /** Notes left out by the cap. */
+  omitted: number;
+  /** Bowel movements over the same days (or since tracking started); null when none is tracked. */
+  transit: Omit<TransitSummary, 'counts' | 'to'> | null;
 }
 
 /** Movement so far on a given day. */
@@ -121,6 +149,8 @@ export interface CoachInput extends UserContext {
   message: string;
   bloodPressure: BloodPressureBrief | null;
   energyExpenditure: EnergyExpenditureBrief | null;
+  /** Health journal notes of the last 14 days. */
+  journal: JournalBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };
@@ -158,6 +188,8 @@ export interface ReviewInput extends UserContext {
   insights: InsightsResponse;
   bloodPressure: BloodPressureBrief | null;
   energyExpenditure: EnergyExpenditureBrief | null;
+  /** Health journal notes of the period. */
+  journal: JournalBrief | null;
 }
 
 export interface Ai {

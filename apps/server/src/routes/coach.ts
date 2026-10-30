@@ -7,6 +7,7 @@ import {
   focusNutrients,
   localTime,
   mealTotals,
+  TRANSIT_WINDOW_DAYS,
   toLocalDateTime,
   type CoachMealAction,
   type CoachMealActionResult,
@@ -27,6 +28,7 @@ import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary } from '../services/day';
 import { bloodPressureBrief } from '../services/blood-pressure';
 import { energyExpenditureBrief } from '../services/expenditure';
+import { journalBrief } from '../services/journal';
 import { acceptMealActions, runMealAction } from '../services/meal-actions';
 import { toMeal } from '../services/meals';
 import { resolveUser } from '../services/users';
@@ -65,7 +67,7 @@ function recentMeals(db: Db, userId: string, localDate: string, focus: NutrientK
     });
 }
 
-/** Everything the coach knows: profile, plan, today, the last 7 days and the conversation. */
+/** Everything the coach knows: profile, plan, today, the last 7 days, the journal's last 14 and the conversation. */
 function buildCoachInput(db: Db, userId: string, text: string, localDate: string): CoachInput {
   const resolved = resolveUser(db, userId, localDate);
   const history = db
@@ -88,6 +90,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     message: text,
     bloodPressure: bloodPressureBrief(db, userId, resolved.row.profile ?? null, localDate),
     energyExpenditure: energyExpenditureBrief(week.adaptiveEnergy),
+    journal: journalBrief(db, userId, addDays(localDate, -(TRANSIT_WINDOW_DAYS - 1)), localDate),
     today: {
       date: day.date,
       totals: day.totals,

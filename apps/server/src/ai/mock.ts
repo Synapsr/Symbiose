@@ -106,9 +106,12 @@ export function createMockAi(): Ai {
       const kcal = Math.round(input.today.totals.kcal);
       const sugar = Math.round(input.today.totals.addedSugar);
       const meal = mockMealAction(input);
+      const transit = input.journal?.transit;
       const reply =
         meal?.reply ??
-        `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`;
+        (transit && /transit|ventre|selles|digest|bowel|gut/i.test(input.message)
+          ? `D'après ton carnet, c'est environ ${String(transit.perDay).replace('.', ',')} passage par jour sur ${transit.days} jours. Pour un transit régulier, vise une trentaine de grammes de fibres et 1,5 L d'eau par jour, et bouge un peu après les repas.`
+          : `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`);
       for (const word of reply.split(/(?<= )/)) {
         onText?.(word);
         await new Promise((r) => setTimeout(r, 40));

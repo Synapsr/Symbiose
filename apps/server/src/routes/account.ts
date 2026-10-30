@@ -5,11 +5,12 @@ import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, bloodPressure, coachMessages, cravings, meals, users, weights, workouts } from '../db/schema';
+import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, users, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { toReading } from '../services/blood-pressure';
 import { toActivity, toCraving } from '../services/day';
+import { toJournalEntry } from '../services/journal';
 import { toMeal } from '../services/meals';
 import { getUserRow, toUser } from '../services/users';
 import { toWorkout } from '../services/workouts';
@@ -87,6 +88,7 @@ export function meRoutes({ db, config, photos }: Deps) {
       workouts: db.select().from(workouts).where(eq(workouts.userId, userId)).all().map(toWorkout),
       bloodPressure: db.select().from(bloodPressure).where(eq(bloodPressure.userId, userId)).all().map(toReading),
       cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
+      journal: db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).all().map(toJournalEntry),
       coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),
     };
     c.header('Content-Disposition', `attachment; filename="symbiose-export-${payload.exportedAt.slice(0, 10)}.json"`);
