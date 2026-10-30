@@ -96,6 +96,7 @@
           }
         }
       ],
+      "./plugins/with-watch-shared",
       "@bacons/apple-targets"
     ],
     "experiments": {
