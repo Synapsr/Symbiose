@@ -1,0 +1,19 @@
+{
+  "name": "symbiose",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source, AI-first life companion. Starts with effortless, goal-aware meal tracking.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.27.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:server": "pnpm --filter @symbiose/server dev",
+    "dev:mobile": "pnpm --filter @symbiose/mobile start",
+    "build:server": "pnpm --filter @symbiose/server build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint"
+  }
+}

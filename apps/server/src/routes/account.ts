@@ -1,0 +1,97 @@
+import { randomUUID } from 'node:crypto';
+
+import { CredentialsSchema, ProfileSchema, type AuthResponse } from '@symbiose/shared';
+import { count, eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+
+import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
+import { activity, coachMessages, cravings, meals, users } from '../db/schema';
+import { HttpError } from '../errors';
+import { nowIso, validate, type Deps } from '../http';
+import { toActivity, toCraving } from '../services/day';
+import { toMeal } from '../services/meals';
+import { getUserRow, toUser } from '../services/users';
+
+export function authRoutes({ db, config }: Deps) {
+  const app = new Hono();
+  const limiter = rateLimit(10, 60_000);
+
+  app.post('/register', limiter, validate('json', CredentialsSchema), async (c) => {
+    const { email, password, name } = c.req.valid('json');
+    const existingUsers = db.select({ n: count() }).from(users).get()?.n ?? 0;
+    if (existingUsers > 0 && !config.allowSignup) {
+      throw new HttpError(403, 'signup_closed', 'Sign-ups are closed on this server');
+    }
+    if (db.select({ id: users.id }).from(users).where(eq(users.email, email)).get()) {
+      throw new HttpError(409, 'email_taken', 'An account already exists with this email');
+    }
+    const row = db
+      .insert(users)
+      .values({
+        id: randomUUID(),
+        email,
+        passwordHash: await hashPassword(password),
+        name: name ?? '',
+        isAdmin: existingUsers === 0,
+        createdAt: nowIso(),
+      })
+      .returning()
+      .get();
+    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row) }, 201);
+  });
+
+  app.post('/login', limiter, validate('json', CredentialsSchema.pick({ email: true, password: true })), async (c) => {
+    const { email, password } = c.req.valid('json');
+    const row = db.select().from(users).where(eq(users.email, email)).get();
+    if (!row || !(await verifyPassword(password, row.passwordHash))) {
+      throw new HttpError(401, 'invalid_credentials', 'Wrong email or password');
+    }
+    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row) });
+  });
+
+  return app;
+}
+
+export function meRoutes({ db, config, photos }: Deps) {
+  const app = new Hono<AuthEnv>();
+  app.use(requireAuth(config.jwtSecret));
+
+  app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')))));
+
+  app.put('/profile', validate('json', ProfileSchema), (c) => {
+    const profile = c.req.valid('json');
+    const row = db
+      .update(users)
+      .set({ profile, name: profile.name })
+      .where(eq(users.id, c.get('userId')))
+      .returning()
+      .get();
+    return c.json(toUser(row));
+  });
+
+  /** Everything we store about the user, as JSON. */
+  app.get('/export', (c) => {
+    const userId = c.get('userId');
+    const user = toUser(getUserRow(db, userId));
+    const payload = {
+      exportedAt: nowIso(),
+      user,
+      meals: db.select().from(meals).where(eq(meals.userId, userId)).all().map(toMeal),
+      activity: db.select().from(activity).where(eq(activity.userId, userId)).all().map(toActivity),
+      cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
+      coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),
+    };
+    c.header('Content-Disposition', `attachment; filename="symbiose-export-${payload.exportedAt.slice(0, 10)}.json"`);
+    return c.json(payload);
+  });
+
+  app.delete('/', async (c) => {
+    const userId = c.get('userId');
+    const photoIds = db.select({ id: meals.photoId }).from(meals).where(eq(meals.userId, userId)).all();
+    for (const { id } of photoIds) if (id) await photos.remove(userId, id);
+    db.delete(users).where(eq(users.id, userId)).run();
+    return c.body(null, 204);
+  });
+
+  return app;
+}

@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# React Native tooling is happiest with a flat node_modules.
+nodeLinker: hoisted
+
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
