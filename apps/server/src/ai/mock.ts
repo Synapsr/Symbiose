@@ -2,6 +2,7 @@ import { BloodPressureCategorySchema, type BloodPressureCategory, type CoachMeal
 
 import type { Ai, AnalyzedItem, CoachInput, MealAnalysis } from './types';
 import { heuristicPlan } from '../services/goals';
+import { FALLBACK_NUDGES, templateMorning } from '../services/proactive';
 
 const elevated = (category: BloodPressureCategory | null | undefined) =>
   Boolean(category && BloodPressureCategorySchema.options.indexOf(category) >= BloodPressureCategorySchema.options.indexOf('high_normal'));
@@ -107,8 +108,18 @@ export function createMockAi(): Ai {
       const sugar = Math.round(input.today.totals.addedSugar);
       const meal = mockMealAction(input);
       const transit = input.journal?.transit;
+      // « pourquoi ? » right after a morning check-in: the reasoning behind it.
+      const afterMorning = input.history.at(-2)?.content.startsWith('[Morning check-in') && /pourquoi|why/i.test(input.message);
+      const night = input.life.sleep?.lastNight;
+      const lower = input.recovery && input.recovery.status !== 'usual';
+      const why = afterMorning
+        ? input.locale === 'fr'
+          ? `Parce que ta nuit a été plus courte que d’habitude${night ? ` (${Math.floor(night.asleepMin / 60)} h ${String(night.asleepMin % 60).padStart(2, '0')})` : ''} : après une nuit courte, la faim et l’envie de sucre montent souvent l’après-midi.${lower ? ' Ta récupération semble aussi un peu plus basse ce matin, d’où le « vas-y en douceur ».' : ''} Un en-cas protéiné prévu à l’avance t’évite de décider au moment où l’envie arrive.`
+          : `Because your night was shorter than usual: after a short night, hunger and sugar cravings often rise in the afternoon.${lower ? ' Your recovery also seems a little lower this morning, hence the « go easy ».' : ''} A protein snack planned ahead saves you deciding when the craving hits.`
+        : null;
       const reply =
         meal?.reply ??
+        why ??
         (transit && /transit|ventre|selles|digest|bowel|gut/i.test(input.message)
           ? `D'après ton carnet, c'est environ ${String(transit.perDay).replace('.', ',')} passage par jour sur ${transit.days} jours. Pour un transit régulier, vise une trentaine de grammes de fibres et 1,5 L d'eau par jour, et bouge un peu après les repas.`
           : `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`);
@@ -127,6 +138,20 @@ export function createMockAi(): Ai {
 
     async cravingTip() {
       return { tip: 'Bois un grand verre d’eau, puis sors marcher 5 minutes : l’envie retombe souvent en 10 minutes.', alternative: 'Un carré de chocolat noir 85 % et une poignée d’amandes' };
+    },
+
+    async morning(input, onText) {
+      const text = templateMorning(input);
+      for (const word of text.split(/(?<=[ \n])/)) {
+        onText?.(word);
+        await new Promise((r) => setTimeout(r, 30));
+      }
+      return { text };
+    },
+
+    async cravingNudges(input) {
+      const lead = input.locale === 'fr' ? `Un en-cas protéiné prêt pour ${input.cravingWindow.start.replace(':', ' h ')} ?` : `A protein snack ready for ${input.cravingWindow.start}?`;
+      return { lines: [lead, ...FALLBACK_NUDGES[input.locale]] };
     },
 
     async review(input) {

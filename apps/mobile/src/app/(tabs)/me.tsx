@@ -29,6 +29,7 @@ import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, wi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { signed } from '@/components/insights/adaptive-energy-card';
+import { CoachSettings } from '@/components/settings/coach-settings';
 import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
@@ -49,7 +50,7 @@ const HEALTH_MODULE: Record<ModuleKey, keyof HealthModules | null> = {
   trackBloodPressure: 'bloodPressure',
 };
 /** Turning a module on (again) re-reads its history from the store, asking for its types first if needed. */
-const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, bloodPressure: { lastBpSync: 0 } } as const;
+const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, bloodPressure: { lastBpSync: 0 }, vitals: { lastVitalsSync: 0 } } as const;
 
 /** Me is settings only: who I am, my goals, what I track, the coach, devices, preferences, account. */
 export default function Me() {
@@ -263,7 +264,8 @@ export default function Me() {
         <Item icon={<HeartPulse size={20} color={colors.text} />} title={t('me.trackBp')} subtitle={profile.trackBloodPressure ? undefined : t('me.trackBpHint')} right={moduleSwitch('trackBloodPressure')} />
       </Card>
 
-      {/* Coach: <SectionTitle>{t('me.coach')}</SectionTitle> then <CoachSettings /> from '@/components/settings/coach-settings' (proactive-coach branch). */}
+      <SectionTitle>{t('me.coach')}</SectionTitle>
+      <CoachSettings />
 
       <SectionTitle>{t('me.devices')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>

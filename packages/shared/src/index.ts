@@ -10,3 +10,4 @@ export * from './expenditure';
 export * from './life';
 export * from './journal';
 export * from './plan-limits';
+export * from './proactive';

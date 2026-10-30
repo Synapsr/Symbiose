@@ -115,6 +115,12 @@ const fakeAi: Ai = {
   async review() {
     return { headline: 'Bonne semaine', wins: ['a'], patterns: ['b'], nextSteps: ['c'] };
   },
+  async morning() {
+    return { text: 'Nuit de 7 h.\nHier : 12 g de sucres ajoutés.\nUn en-cas protéiné vers 15 h 30.' };
+  },
+  async cravingNudges() {
+    return { lines: ['Un verre d’eau ?', 'Quelques noix ?', 'Cinq minutes de marche ?'] };
+  },
 };
 
 function makeApp(ai: Ai, overrides: Partial<Config> = {}) {

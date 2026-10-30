@@ -13,9 +13,13 @@ import type {
   MoodLink,
   NutrientKey,
   Nutrients,
+  ProactiveConfidence,
   Profile,
+  RecoveryReason,
+  RecoveryStatus,
   Review,
   StoolConsistency,
+  TargetKind,
   Targets,
   TransitEase,
   TransitSummary,
@@ -118,6 +122,14 @@ export interface LifeBrief {
   };
 }
 
+/** Last night's vitals against the person's own baseline; only when reliable. */
+export interface RecoveryBrief {
+  status: RecoveryStatus;
+  confidence: ProactiveConfidence;
+  /** What moved: hrv_below, rhr_above, short_night. */
+  reasons: RecoveryReason[];
+}
+
 /** Movement so far on a given day. */
 export interface ActivityToday {
   steps: number | null;
@@ -186,6 +198,8 @@ export interface CoachInput extends UserContext {
   life: LifeBrief;
   /** Health journal notes of the last 14 days. */
   journal: JournalBrief | null;
+  /** Last night's vitals, when the morning check-in imports them and there is enough history. */
+  recovery: RecoveryBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };
@@ -228,6 +242,41 @@ export interface ReviewInput extends UserContext {
   journal: JournalBrief | null;
 }
 
+/** What the morning check-in (« Point du matin ») is written from. */
+export interface MorningInput extends UserContext {
+  date: string;
+  /** In English, e.g. "Monday". */
+  weekday: string;
+  sleepTracked: boolean;
+  /** Last night against their usual; null when sleep isn't tracked or the night isn't in yet. */
+  night: {
+    asleepMin: number;
+    bedtime: string;
+    wakeTime: string;
+    /** Median over the 14 nights before; null with fewer than 5. */
+    usualAsleepMin: number | null;
+  } | null;
+  recovery: RecoveryBrief | null;
+  /** Their own cravings per day after short nights vs the others (30 days), when known. */
+  cravingsAfterShortNights: { short: number; normal: number } | null;
+  yesterday: {
+    date: string;
+    meals: number;
+    /** Their hero metric (the one Today shows first) against its target. */
+    hero: { nutrient: NutrientKey; consumed: number; target: number; kind: TargetKind } | null;
+    cravings: { total: number; resisted: number; what: string[] };
+  };
+  /** Their usual sugar-craving slot, local "HH:MM". */
+  cravingWindow: { start: string; end: string } | null;
+}
+
+/** What the week's one-line craving nudges are written from. */
+export interface NudgesInput extends UserContext {
+  cravingWindow: { start: string; end: string; source: 'cravings' | 'sugar' };
+  /** What they crave most over the last 28 days. */
+  topCravings: string[];
+}
+
 export interface Ai {
   readonly enabled: boolean;
   readonly model: string | null;
@@ -237,4 +286,8 @@ export interface Ai {
   coach(input: CoachInput, onText?: (delta: string) => void): Promise<CoachOutput>;
   cravingTip(input: CravingInput): Promise<CravingOutput>;
   review(input: ReviewInput): Promise<Review>;
+  /** The morning check-in, 3 to 5 short lines, streamed through `onText`. */
+  morning(input: MorningInput, onText?: (delta: string) => void): Promise<{ text: string }>;
+  /** 5 to 7 one-line nudges for the craving heads-up, written once a week. */
+  cravingNudges(input: NudgesInput): Promise<{ lines: string[] }>;
 }
