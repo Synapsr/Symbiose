@@ -217,6 +217,8 @@ export function useProactiveSync() {
     });
     void replaceScheduled(planned);
   }, [copyKey, cravingTimes, morningSeen, schedule, today, weekNudges]);
+  // Signed out (the tabs go away): nothing more from this account's coach.
+  useEffect(() => () => void replaceScheduled([]), []);
 
   // Taps on the notifications and their buttons.
   useNotificationResponses(({ data, action }) => {
