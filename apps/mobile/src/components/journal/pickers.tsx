@@ -3,13 +3,13 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
-import { MOOD_LEVELS, MoodFace, moodColor } from '@/components/mood-face';
+import { MOOD_LEVELS, MoodFace, moodColor, moodLabel } from '@/components/mood-face';
 import { Pressy, Row, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { haptics } from '@/lib/haptics';
 import { Motion, Radius, Space, useTheme } from '@/theme';
 
-import { feelingLabel, KIND_META, kindLabel } from './meta';
+import { KIND_META, kindLabel } from './meta';
 
 /** The kinds, a touch more compact than the regular chips so all five fit on two lines. */
 export function KindChips({ value, onChange }: { value: JournalKind; onChange: (kind: JournalKind) => void }) {
@@ -85,7 +85,7 @@ function Face({ level, selected, dimmed, onPress }: { level: number; selected: b
   const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + grow.value * 0.14 }] }));
   const color = selected ? moodColor(level, colors) : colors.text2;
   return (
-    <Pressy haptic={false} hitSlop={6} onPress={onPress} accessibilityRole="button" accessibilityLabel={t(feelingLabel(level))} accessibilityState={{ selected }}>
+    <Pressy haptic={false} hitSlop={6} onPress={onPress} accessibilityRole="button" accessibilityLabel={t(moodLabel(level))} accessibilityState={{ selected }}>
       <Animated.View style={[style, dimmed ? { opacity: 0.45 } : null]}>
         <MoodFace mood={level} size={FACE} color={color} filled={selected} fillOpacity={0.2} />
       </Animated.View>
@@ -105,7 +105,7 @@ export function FeelingPicker({ value, onChange }: { value: number | undefined; 
         {value !== undefined ? (
           <Animated.View key={value} entering={FadeIn.duration(200)}>
             <Txt variant="caption" tone="primary" style={{ fontWeight: '600' }}>
-              {t(feelingLabel(value))}
+              {t(moodLabel(value))}
             </Txt>
           </Animated.View>
         ) : null}

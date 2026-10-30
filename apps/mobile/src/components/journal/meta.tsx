@@ -2,7 +2,7 @@ import { consistencyOf, localTime, type JournalEntry, type JournalKind } from '@
 import { FaceSlightlySmiling, NotebookPen, Pill, Thermometer, Toilet, type LucideIcon } from 'lucide-react-native';
 import { View } from 'react-native';
 
-import { MoodFace, moodColor } from '@/components/mood-face';
+import { MoodFace, moodColor, moodLabel } from '@/components/mood-face';
 import type { TranslationKey } from '@/i18n';
 import { useTheme, type Palette } from '@/theme';
 
@@ -18,7 +18,6 @@ export const KIND_META: Record<JournalKind, { icon: LucideIcon; color: (colors: 
 };
 
 export const kindLabel = (kind: JournalKind): TranslationKey => `journal.kind.${kind}`;
-export const feelingLabel = (feeling: number): TranslationKey => `journal.feeling.${Math.min(5, Math.max(1, Math.round(feeling)))}` as TranslationKey;
 
 /** « Transit · normal, facile », « Bien », « Symptôme »: the structured part of a note, in words. */
 export function headline(entry: Pick<JournalEntry, 'kind' | 'data'>, t: T): string {
@@ -29,7 +28,7 @@ export function headline(entry: Pick<JournalEntry, 'kind' | 'data'>, t: T): stri
       return details.length ? `${t('journal.kind.transit')} · ${details.join(', ').toLowerCase()}` : t('journal.kind.transit');
     }
     case 'feeling':
-      return feeling !== undefined ? t(feelingLabel(feeling)) : t('journal.kind.feeling');
+      return feeling !== undefined ? t(moodLabel(feeling)) : t('journal.kind.feeling');
     case 'other':
       return t('journal.kind.otherShort');
     default:
