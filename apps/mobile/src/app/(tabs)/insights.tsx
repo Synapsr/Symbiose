@@ -108,7 +108,6 @@ function FirstDays({ hero }: { hero: NutrientKey }) {
 
 function Cards({ data, hideCalories, today }: { data: InsightsResponse; hideCalories: boolean; today: string }) {
   const { t } = useI18n();
-  const { colors } = useTheme();
   const user = useUser();
   const plan = user.plan;
   const hero = data.hero ?? goalNutrient(plan, hideCalories);
