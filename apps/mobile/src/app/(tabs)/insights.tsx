@@ -8,6 +8,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActivityCard } from '@/components/insights/activity-card';
+import { AdaptiveEnergyCard } from '@/components/insights/adaptive-energy-card';
 import { BloodPressureCard } from '@/components/insights/blood-pressure-card';
 import { DayBars, HourBars } from '@/components/insights/charts';
 import { WeightCard } from '@/components/insights/weight-card';
@@ -41,9 +42,11 @@ export default function Insights() {
   const activityFirst = weightFirst || Boolean(user.plan?.tags.some((tag) => tag === 'lose_weight' || tag === 'gain_muscle'));
   const trackBp = user.profile?.trackBloodPressure === true;
   // Body cards don't need meals: they show even before the first one is logged.
+  // Measured expenditure sits under the weight it is read from; it's all about calories.
   const body = data ? (
     <>
       <WeightCard weight={data.weight} plan={user.plan} />
+      {data.adaptiveEnergy && !hideCalories ? <AdaptiveEnergyCard adaptive={data.adaptiveEnergy} /> : null}
       {trackBp ? <BloodPressureCard trend={data.bloodPressure ?? null} /> : null}
     </>
   ) : null;

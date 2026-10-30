@@ -1,5 +1,5 @@
 import { activityGoalsFor, type EnergyBreakdown, type GoalPlan, type NutrientKey, type Targets } from '@symbiose/shared';
-import { Check, Dumbbell, Footprints, Leaf, SportShoe, Watch } from 'lucide-react-native';
+import { Check, Dumbbell, Footprints, Gauge, Leaf, SportShoe, Watch } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { Card, Dot, Row, Txt } from '@/components/ui';
@@ -63,6 +63,16 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
               <Watch size={14} color={colors.accent} />
               <Txt variant="caption" tone="accent">
                 {t('plan.activityOn')}
+              </Txt>
+            </Row>
+          ) : null}
+          {plan.adaptiveEnergy ? (
+            <Row gap={6} style={{ marginTop: plan.adjustForActivity ? 0 : Space.sm }}>
+              <Gauge size={14} color={colors.accent} />
+              <Txt variant="caption" tone="accent" style={{ flexShrink: 1, fontVariant: ['tabular-nums'] }}>
+                {energy.adaptiveKcal
+                  ? t('plan.adaptiveOn', { kcal: `${energy.adaptiveKcal > 0 ? '+' : '−'}${formatNumber(Math.abs(energy.adaptiveKcal), locale)}` })
+                  : t('plan.adaptiveWaiting')}
               </Txt>
             </Row>
           ) : null}
