@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ToastHost } from '@/components/ui/toast';
 import { deviceLocale, LocaleContext } from '@/i18n';
+import { useSignedOutSync } from '@/lib/glance';
 import { SessionProvider, useSession } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { useTheme } from '@/theme';
@@ -48,6 +49,7 @@ function AppNavigator() {
   useEffect(() => {
     if (!booting) void SplashScreen.hideAsync();
   }, [booting]);
+  useSignedOutSync(ready && !session);
   if (booting) return null;
 
   const signedIn = Boolean(session && user);

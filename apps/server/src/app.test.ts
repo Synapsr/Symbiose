@@ -20,8 +20,11 @@ import {
   type JournalEntry,
   type JournalEntryInput,
   type Meal,
+  type MoodCheckIn,
   type Profile,
+  type SleepTrend,
   type User,
+  type WaterEntry,
   type Workout,
 } from '@symbiose/shared';
 import { eq } from 'drizzle-orm';
@@ -29,10 +32,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDisabledAi } from './ai/claude';
 import { createMockAi } from './ai/mock';
-import type { Ai, CoachInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from './ai/types';
+import type { Ai, CoachInput, CravingInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from './ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
-import { coachMessages, journalEntries } from './db/schema';
+import { coachMessages, journalEntries, moods, sleepNights, waterLogs } from './db/schema';
 import type { Config } from './env';
 import { heuristicPlan, planFromDraft } from './services/goals';
 import { PhotoStore } from './services/photos';
@@ -1103,6 +1106,253 @@ describe('adaptive energy', () => {
     await request('PUT', '/api/goals', { plan: { ...plan, adaptiveEnergy: { since: today } } }, newcomer);
     await request('POST', '/api/coach/messages', { text: 'Et moi ?', localDate: today }, newcomer);
     expect(seen.coach.at(-1)!.energyExpenditure).toMatchObject({ estimateKcal: null, autoAdjust: true, appliedKcal: 0, missing: { days: 11, completeDays: 6, weighIns: 3 } });
+  });
+});
+
+describe('life modules', () => {
+  const seen = { coach: [] as CoachInput[], review: [] as ReviewInput[], craving: [] as CravingInput[] };
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async coach(input) {
+        seen.coach.push(input);
+        return { reply: 'ok', planChange: null, mealActions: [] };
+      },
+      async review(input) {
+        seen.review.push(input);
+        return fakeAi.review(input);
+      },
+      async cravingTip(input) {
+        seen.craving.push(input);
+        return fakeAi.cravingTip(input);
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const yesterday = addDays(today, -1);
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  let ownerId = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const her: Profile = { ...profile, sex: 'female', weightKg: 62 };
+  const track = (modules: Partial<Profile>, token = owner) => request('PUT', '/api/me/profile', { ...her, ...modules }, token);
+  /** A night that ends at 07:00 `daysAgo` days ago, after `asleepMin` minutes asleep. */
+  const night = (daysAgo: number, asleepMin: number, bed = '23:30') => {
+    const localDate = addDays(today, -daysAgo);
+    const bedDate = bed < '12:00' ? localDate : addDays(localDate, -1);
+    return { localDate, bedtime: at(bedDate, bed), wakeTime: at(localDate, '07:00'), asleepMin, inBedMin: asleepMin + 20 };
+  };
+  const day = async () => (await request<DaySummary>('GET', `/api/days/${today}`)).body;
+  const insights = async () => (await request<InsightsResponse>('GET', '/api/insights?days=7')).body;
+  const askCoach = async () => {
+    await request('POST', '/api/coach/messages', { text: 'Comment je vais ?', localDate: today });
+    return seen.coach.at(-1)!;
+  };
+
+  beforeAll(async () => {
+    owner = await register('life@example.com');
+    stranger = await register('other-life@example.com');
+    ownerId = (await request<User>('PUT', '/api/me/profile', her)).body.id;
+    await request('PUT', '/api/me/profile', her, stranger);
+  });
+
+  it('imports nights from the health store, one per wake-up day, without duplicates', async () => {
+    const first = await request<{ written: number }>('PUT', '/api/sleep', {
+      source: 'healthkit',
+      nights: [night(2, 420, '23:00'), night(1, 360, '00:30'), night(0, 450)],
+    });
+    expect(first.body.written).toBe(3);
+    // The watch synced more of last night: importing it again replaces it.
+    await request('PUT', '/api/sleep', { source: 'healthkit', nights: [night(0, 470)] });
+
+    const trend = await request<SleepTrend>('GET', '/api/sleep?days=7');
+    expect(trend.body.nights.map((n) => [n.localDate, n.asleepMin])).toEqual([
+      [addDays(today, -2), 420],
+      [yesterday, 360],
+      [today, 470],
+    ]);
+    expect(trend.body).toMatchObject({ averageMin: 417, bedtime: '23:40', wakeTime: '07:00', cravingsAfterShortNights: null, windowDays: 7 });
+    // Middles of the night at 03:00, 03:45 and 03:15: a spread of about 19 minutes.
+    expect(trend.body.regularityMin).toBe(19);
+    expect((await request('PUT', '/api/sleep', { source: 'healthkit', nights: [{ ...night(0, 470), asleepMin: 2000 }] })).status).toBe(400);
+  });
+
+  it('keeps the modules out of the day, insights and the AI while they are off', async () => {
+    expect((await request<WaterEntry>('POST', '/api/hydration', { at: at(today, '08:00'), localDate: today, ml: 250 })).status).toBe(201);
+    expect((await request('PUT', '/api/mood', { at: at(today, '09:00'), localDate: today, mood: 2 })).status).toBe(200);
+
+    const summary = await day();
+    expect([summary.sleep, summary.hydration, summary.mood]).toEqual([null, null, null]);
+    const stats = await insights();
+    expect([stats.sleep, stats.hydration, stats.mood]).toEqual([null, null, null]);
+    expect((await askCoach()).life).toEqual({});
+    await request('POST', '/api/cravings', { at: at(today, '16:00'), localDate: today, what: 'chocolat', intensity: 2 });
+    expect(seen.craving.at(-1)?.life).toEqual({});
+  });
+
+  it('sets a drinks goal from the profile and the workouts, logs glasses and imports drinks once', async () => {
+    await track({ trackHydration: true });
+    expect((await day()).hydration).toMatchObject({ totalMl: 250, goalMl: 1600 });
+
+    const glass = await request<WaterEntry>('POST', '/api/hydration', { at: at(today, '10:00'), localDate: today, ml: 500, externalId: 'ignored' });
+    expect(glass.body).toMatchObject({ ml: 500, source: 'manual', externalId: null });
+    const imported = {
+      source: 'healthkit',
+      entries: [
+        { externalId: 'hk-w1', at: at(today, '11:00'), localDate: today, ml: 330 },
+        { externalId: 'hk-w2', at: at(yesterday, '12:00'), localDate: yesterday, ml: 1700 },
+      ],
+    };
+    expect((await request<{ written: number }>('PUT', '/api/hydration', imported)).body.written).toBe(2);
+    await request('PUT', '/api/hydration', imported);
+    // A 320 kcal run adds about as many ml, rounded to 50.
+    await request('POST', '/api/workouts', { type: 'running', startedAt: at(today, '07:00'), localDate: today, durationMin: 30, activeKcal: 320, source: 'manual' });
+    const hydration = (await day()).hydration!;
+    expect(hydration).toMatchObject({ totalMl: 1080, goalMl: 1900 });
+    expect(hydration.entries.map((e) => e.ml)).toEqual([250, 500, 330]);
+
+    expect((await request('DELETE', `/api/hydration/${glass.body.id}`, undefined, stranger)).status).toBe(404);
+    const hk = hydration.entries.find((e) => e.externalId === 'hk-w1')!;
+    expect((await request<{ error: { code: string } }>('DELETE', `/api/hydration/${hk.id}`)).body.error.code).toBe('imported_drink');
+    expect((await request('DELETE', `/api/hydration/${glass.body.id}`)).status).toBe(204);
+    expect((await day()).hydration?.totalMl).toBe(580);
+
+    const trend = (await insights()).hydration!;
+    expect(trend.days).toHaveLength(7);
+    expect(trend).toMatchObject({ averageMl: 1140, daysLogged: 2, daysReached: 1, windowDays: 7 });
+  });
+
+  it('keeps one mood check-in per day, the latest one', async () => {
+    await track({ trackHydration: true, trackMood: true });
+    expect((await day()).mood).toMatchObject({ mood: 2, note: null, at: at(today, '09:00') });
+    const update = await request<MoodCheckIn>('PUT', '/api/mood', { at: at(today, '18:00'), localDate: today, mood: 4, note: '  Bonne journée ' });
+    expect(update.body).toMatchObject({ localDate: today, mood: 4, note: 'Bonne journée', at: at(today, '18:00') });
+    expect((await day()).mood).toMatchObject({ mood: 4, note: 'Bonne journée' });
+    expect((await request('PUT', '/api/mood', { at: at(today, '18:05'), localDate: today, mood: 6 })).status).toBe(400);
+
+    expect((await request('DELETE', `/api/mood/${today}`)).status).toBe(204);
+    expect((await request('DELETE', `/api/mood/${today}`)).status).toBe(404);
+    expect((await day()).mood).toBeNull();
+    await request('PUT', '/api/mood', { at: at(today, '18:00'), localDate: today, mood: 4, note: 'Bonne journée' });
+  });
+
+  it('relates mood and cravings to short nights, humbly, and tells the AI', async () => {
+    await track({ trackHydration: true, trackMood: true, trackSleep: true });
+    // Short nights on odd days, with a low mood and a craving; good nights on even days.
+    const nights = [1, 2, 3, 4, 5, 6].map((d) => night(d, d % 2 ? 300 : 480));
+    await request('PUT', '/api/sleep', { source: 'health_connect', nights: [...nights, night(0, 450)] });
+    for (const d of [1, 2, 3, 4, 5, 6]) {
+      const date = addDays(today, -d);
+      await request('PUT', '/api/mood', { at: at(date, '20:00'), localDate: date, mood: d % 2 ? 2 : 4 });
+      if (d % 2) await request('POST', '/api/cravings', { at: at(date, '16:00'), localDate: date, what: 'sucre', intensity: 2 });
+    }
+
+    expect((await day()).sleep).toMatchObject({ localDate: today, asleepMin: 450, source: 'health_connect' });
+    const stats = await insights();
+    // One craving after each short night; today's single craving over four good nights.
+    expect(stats.sleep).toMatchObject({ averageMin: 399, cravingsAfterShortNights: { short: 1, normal: 0.3 } });
+    expect(stats.mood).toMatchObject({
+      average: 3.1,
+      persistentLow: false,
+      windowDays: 30,
+      link: { factor: 'shortSleep', withAvg: 2, withoutAvg: 4, withDays: 3, withoutDays: 4 },
+    });
+
+    const life = (await askCoach()).life;
+    expect(life.sleep).toEqual({
+      lastNight: { date: today, asleepMin: 450, bedtime: '23:30', wakeTime: '07:00' },
+      average7Min: 399,
+      nights7: 7,
+      shortNights7: 3,
+      cravingsAfterShortNights: { short: 1, normal: 0.3 },
+    });
+    expect(life.hydration).toEqual({ todayMl: 580, goalMl: 1900, average7Ml: 1700, daysReached7: 1 });
+    expect(life.mood).toMatchObject({ today: { mood: 4, note: 'Bonne journée', time: '18:00' }, average7: 3.1, persistentLow: false, link: { factor: 'shortSleep' } });
+    expect(life.mood?.last7).toHaveLength(7);
+
+    await request('POST', '/api/cravings', { at: at(today, '17:00'), localDate: today, what: 'gâteau', intensity: 3 });
+    expect(seen.craving.at(-1)?.life).toMatchObject({ sleep: { lastNight: { asleepMin: 450 } }, hydration: { todayMl: 580 }, mood: { today: { mood: 4 } } });
+
+    // The review sees the trends through the insights.
+    const item = { ...croissantAnalysis.items[0]!, id: 'croissant', source: 'manual' };
+    await request('POST', '/api/meals', { eatenAt: at(today, '08:00'), localDate: today, items: [item] });
+    await request('POST', '/api/insights/review', { days: 7 });
+    expect(seen.review.at(-1)?.insights.mood?.link?.factor).toBe('shortSleep');
+    expect(seen.review.at(-1)?.insights.sleep?.nights).toHaveLength(7);
+  });
+
+  it('gently flags very low moods only when they last', async () => {
+    await track({ trackMood: true }, stranger);
+    for (const d of [5, 3, 2, 1]) await request('PUT', '/api/mood', { at: at(addDays(today, -d), '21:00'), localDate: addDays(today, -d), mood: 1 }, stranger);
+    await request('PUT', '/api/mood', { at: at(today, '09:00'), localDate: today, mood: 2 }, stranger);
+    expect((await request<InsightsResponse>('GET', '/api/insights?days=7', undefined, stranger)).body.mood).toMatchObject({ persistentLow: true, link: null });
+    await request('POST', '/api/coach/messages', { text: 'Bof', localDate: today }, stranger);
+    expect(seen.coach.at(-1)?.life.mood?.persistentLow).toBe(true);
+    // A better day: four very low days still, but the latest isn't low anymore.
+    await request('PUT', '/api/mood', { at: at(today, '19:00'), localDate: today, mood: 4 }, stranger);
+    expect((await request<InsightsResponse>('GET', '/api/insights?days=7', undefined, stranger)).body.mood?.persistentLow).toBe(false);
+  });
+
+  it('keeps the switches when an older profile form saves, exports everything and deletes it with the account', async () => {
+    await request('PUT', '/api/me/profile', her);
+    expect((await request<User>('GET', '/api/me')).body.profile).toMatchObject({ trackSleep: true, trackHydration: true, trackMood: true });
+    await track({ trackSleep: false, trackHydration: true, trackMood: true });
+    expect((await day()).sleep).toBeNull();
+    expect((await askCoach()).life.sleep).toBeUndefined();
+
+    const exported = await request<{ sleep: unknown[]; hydration: WaterEntry[]; mood: MoodCheckIn[] }>('GET', '/api/me/export');
+    expect(exported.body.sleep).toHaveLength(7);
+    expect(exported.body.hydration).toHaveLength(3);
+    expect(exported.body.mood).toHaveLength(7);
+
+    expect((await request('DELETE', '/api/me')).status).toBe(204);
+    for (const table of [sleepNights, waterLogs, moods]) expect(app.db.select().from(table).where(eq(table.userId, ownerId)).all()).toEqual([]);
+  });
+});
+
+describe('meals sent late from the offline queue', () => {
+  const mealInputs: MealAnalysisInput[] = [];
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async analyzeMeal(input) {
+        mealInputs.push(input);
+        return croissantAnalysis;
+      },
+    },
+    { allowSignup: true },
+  );
+  const { request: call, register } = clientFor(app);
+  let token = '';
+  const request = <T,>(method: string, path: string, body?: unknown) => call<T>(method, path, token, body);
+  const day = '2026-10-30';
+
+  beforeAll(async () => {
+    token = await register('offline@example.com');
+    expect((await request('PUT', '/api/me/profile', profile)).status).toBe(200);
+  });
+
+  it('keeps the exact capture time, which is what the app matches a lost response on', async () => {
+    const eatenAt = `${day}T12:30:07+01:00`;
+    expect((await request<Meal>('POST', '/api/meals', { eatenAt, localDate: day, text: 'une salade' })).status).toBe(201);
+    const listed = await request<Meal[]>('GET', `/api/meals?date=${day}`);
+    expect(listed.body.filter((m) => m.eatenAt === eatenAt)).toHaveLength(1);
+  });
+
+  it('analyses a late meal with only what was eaten before it', async () => {
+    await request('POST', '/api/meals', { eatenAt: `${day}T20:00:00+01:00`, localDate: day, text: 'le dîner' });
+    // The breakfast captured offline arrives after dinner.
+    await request('POST', '/api/meals', { eatenAt: `${day}T08:00:00+01:00`, localDate: day, text: 'le petit-déjeuner' });
+    const breakfast = mealInputs.find((i) => i.text === 'le petit-déjeuner')!;
+    expect(breakfast.dayTotalsBefore.kcal).toBe(0);
+    const dinner = mealInputs.find((i) => i.text === 'le dîner')!;
+    expect(dinner.dayTotalsBefore.kcal).toBeGreaterThan(0); // the 12:30 salad
+    await request('POST', '/api/meals', { eatenAt: `${day}T22:00:00+01:00`, localDate: day, text: 'une tisane' });
+    const late = mealInputs.find((i) => i.text === 'une tisane')!;
+    expect(late.dayTotalsBefore.kcal).toBeGreaterThan(dinner.dayTotalsBefore.kcal);
   });
 });
 

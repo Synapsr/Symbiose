@@ -1,10 +1,16 @@
 import {
+  mergeSleepSegments,
+  nightsByWakeDate,
   toLocalDate,
   toLocalDateTime,
   type BloodPressureReadingInput,
   type Locale,
   type Meal,
+  type Profile,
   type Sex,
+  type SleepNightInput,
+  type SleepSegment,
+  type WaterInput,
   type WorkoutInput,
   type WorkoutIntensity,
   type WorkoutType,
@@ -39,10 +45,14 @@ export const HEALTH_SCOPES = 2;
 
 /** Same idea for the opt-in blood pressure types, asked only to people who track it. */
 export const BP_SCOPES = 1;
+/** And for the opt-in sleep and water types. */
+export const SLEEP_SCOPES = 1;
+export const WATER_SCOPES = 1;
 
 /** Marks the readings Symbiose writes to the store, so they're not imported back as duplicates. */
 export const OWN_READING_KEY = 'SymbioseReadingId';
 export const OWN_RECORD_PREFIX = 'symbiose-bp-';
+export const OWN_WATER_PREFIX = 'symbiose-water-';
 
 /** A manual reading saved on the server, to copy into the health store. */
 export interface BloodPressureWrite {
@@ -50,6 +60,33 @@ export interface BloodPressureWrite {
   measuredAt: Date;
   systolic: number;
   diastolic: number;
+}
+
+/** A glass logged in the app, to copy into the health store. */
+export interface WaterWrite {
+  id: string;
+  at: Date;
+  ml: number;
+}
+
+/** The opt-in data types to ask the store for, from the profile's switches. */
+export interface HealthModules {
+  bloodPressure?: boolean;
+  sleep?: boolean;
+  hydration?: boolean;
+}
+
+export function healthModules(profile: Profile | null | undefined): HealthModules {
+  return { bloodPressure: profile?.trackBloodPressure === true, sleep: profile?.trackSleep === true, hydration: profile?.trackHydration === true };
+}
+
+/** The settings to save once the store was asked for these modules. */
+export function grantedScopes(modules: HealthModules): { bpScopes?: number; sleepScopes?: number; waterScopes?: number } {
+  return {
+    ...(modules.bloodPressure ? { bpScopes: BP_SCOPES } : null),
+    ...(modules.sleep ? { sleepScopes: SLEEP_SCOPES } : null),
+    ...(modules.hydration ? { waterScopes: WATER_SCOPES } : null),
+  };
 }
 
 /**
@@ -64,9 +101,9 @@ export interface HealthBridge {
   isAvailable(): Promise<boolean>;
   /**
    * Asks for read (activity, workouts, body) and write (nutrition) permissions,
-   * plus blood pressure when the person tracks it.
+   * plus blood pressure, sleep and water for the modules the person turned on.
    */
-  connect(options?: { bloodPressure?: boolean }): Promise<boolean>;
+  connect(options?: HealthModules): Promise<boolean>;
   readDay(day: Date): Promise<DayHealth>;
   /** Every body-weight reading between two dates (from a connected scale or typed into Health). */
   readWeights(from: Date, to: Date): Promise<WeightReading[]>;
@@ -78,6 +115,13 @@ export interface HealthBridge {
   readBloodPressure(from: Date, to: Date): Promise<BloodPressureReadingInput[]>;
   writeBloodPressure(reading: BloodPressureWrite): Promise<void>;
   writeMeal(meal: Meal): Promise<void>;
+  /** Nights that ended between two dates, merged from the stages and keyed by wake-up day. */
+  readSleep(from: Date, to: Date): Promise<SleepNightInput[]>;
+  /** Drinks between two dates, without the glasses Symbiose wrote itself. */
+  readWater(from: Date, to: Date): Promise<WaterInput[]>;
+  writeWater(entry: WaterWrite): Promise<void>;
+  /** Removes a glass Symbiose wrote (an undo in the app). */
+  deleteWater(id: string): Promise<void>;
 }
 
 export function dayBounds(day: Date): { start: Date; end: Date } {
@@ -148,6 +192,24 @@ export function toBloodPressureInput(reading: { externalId: string; measuredAt: 
     diastolic,
     pulse,
   };
+}
+
+/** Raw stages from any number of sources → one night per wake-up day, in the server's shape. */
+export function toSleepNights(segments: SleepSegment[]): SleepNightInput[] {
+  return nightsByWakeDate(mergeSleepSegments(segments), (night) => toLocalDate(night.end)).map((night) => ({
+    localDate: toLocalDate(night.end),
+    bedtime: toLocalDateTime(night.start),
+    wakeTime: toLocalDateTime(night.end),
+    asleepMin: Math.min(1440, night.asleepMin),
+    inBedMin: night.inBedMin === null ? null : Math.min(1440, night.inBedMin),
+  }));
+}
+
+/** One drink from the store, in our shape. Returns null for implausible amounts. */
+export function toWaterInput(drink: { externalId: string; at: Date; ml: number }): WaterInput | null {
+  const ml = Math.round(drink.ml);
+  if (!(ml >= 1 && ml <= 3000)) return null;
+  return { externalId: drink.externalId.slice(0, 120), at: toLocalDateTime(drink.at), localDate: toLocalDate(drink.at), ml };
 }
 
 /**

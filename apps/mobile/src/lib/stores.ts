@@ -1,4 +1,4 @@
-import type { CreateMealInput } from '@symbiose/shared';
+import { DEFAULT_GLASS_ML, type CreateMealInput } from '@symbiose/shared';
 import { create } from 'zustand';
 
 import { storage } from './storage';
@@ -13,10 +13,17 @@ interface SettingsState {
   lastWeightSync: number;
   lastWorkoutSync: number;
   lastBpSync: number;
+  lastSleepSync: number;
+  lastWaterSync: number;
   /** Version of the health permissions granted (see `HEALTH_SCOPES`). */
   healthScopes: number;
   /** Version of the blood pressure permissions granted (see `BP_SCOPES`). */
   bpScopes: number;
+  /** Same for sleep and water (`SLEEP_SCOPES`, `WATER_SCOPES`). */
+  sleepScopes: number;
+  waterScopes: number;
+  /** What one tap on the water button logs; a long press picks another size and remembers it. */
+  glassMl: number;
   /** Mirrors the thumb-reach controls (camera button, capture tools, toast action) to the left. */
   leftHanded: boolean;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
@@ -33,13 +40,32 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   lastWeightSync: 0,
   lastWorkoutSync: 0,
   lastBpSync: 0,
+  lastSleepSync: 0,
+  lastWaterSync: 0,
   healthScopes: 0,
   bpScopes: 0,
+  sleepScopes: 0,
+  waterScopes: 0,
+  glassMl: DEFAULT_GLASS_ML,
   leftHanded: false,
   set: (patch) => {
     set(patch);
-    const { hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, lastBpSync, healthScopes, bpScopes, leftHanded } = get();
-    const persisted = { hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, lastBpSync, healthScopes, bpScopes, leftHanded };
+    const s = get();
+    const persisted = {
+      hideCalories: s.hideCalories,
+      healthEnabled: s.healthEnabled,
+      lastWeightSync: s.lastWeightSync,
+      lastWorkoutSync: s.lastWorkoutSync,
+      lastBpSync: s.lastBpSync,
+      lastSleepSync: s.lastSleepSync,
+      lastWaterSync: s.lastWaterSync,
+      healthScopes: s.healthScopes,
+      bpScopes: s.bpScopes,
+      sleepScopes: s.sleepScopes,
+      waterScopes: s.waterScopes,
+      glassMl: s.glassMl,
+      leftHanded: s.leftHanded,
+    };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },
   load: async () => {

@@ -114,12 +114,17 @@ export function getMealRow(db: Db, userId: string, id: string): MealRow {
   return row;
 }
 
-/** What was eaten that day, excluding one meal (the one being analysed). */
-function totalsBefore(db: Db, userId: string, localDate: string, excludeId?: string) {
+/**
+ * What was eaten that day before `eatenAt`, excluding one meal (the one being
+ * analysed). By time, not by arrival: a lunch logged offline and sent after
+ * dinner doesn't count the dinner.
+ */
+function totalsBefore(db: Db, userId: string, localDate: string, eatenAt: string, excludeId?: string) {
   const conditions = [eq(meals.userId, userId), eq(meals.localDate, localDate)];
   if (excludeId) conditions.push(ne(meals.id, excludeId));
-  const rows = db.select({ items: meals.items }).from(meals).where(and(...conditions)).all();
-  return roundNutrients(sumNutrients(rows.map((r) => mealTotals(r.items))));
+  const rows = db.select({ items: meals.items, eatenAt: meals.eatenAt }).from(meals).where(and(...conditions)).all();
+  const before = Date.parse(eatenAt);
+  return roundNutrients(sumNutrients(rows.filter((r) => Date.parse(r.eatenAt) < before).map((r) => mealTotals(r.items))));
 }
 
 function ensureFood(analysis: MealAnalysis): void {
@@ -149,7 +154,7 @@ export async function createMeal({ db, ai, photos }: MealDeps, userId: string, i
       text: input.text ?? null,
       localTime: localTime(input.eatenAt),
       mealTypeHint: mealType,
-      dayTotalsBefore: totalsBefore(db, userId, input.localDate),
+      dayTotalsBefore: totalsBefore(db, userId, input.localDate, input.eatenAt),
       ...mealActivity(db, userId, input.localDate, input.eatenAt),
       bloodPressureCategory: bloodPressureBrief(db, userId, resolved.row.profile ?? null, input.localDate)?.category ?? null,
     });
@@ -215,7 +220,7 @@ export async function refineMeal({ db, ai, photos }: MealDeps, userId: string, i
     text: existing.inputText,
     localTime: localTime(existing.eatenAt),
     mealTypeHint: existing.mealType,
-    dayTotalsBefore: totalsBefore(db, userId, existing.localDate, existing.id),
+    dayTotalsBefore: totalsBefore(db, userId, existing.localDate, existing.eatenAt, existing.id),
     ...mealActivity(db, userId, existing.localDate, existing.eatenAt),
     bloodPressureCategory: bloodPressureBrief(db, userId, resolved.row.profile ?? null, existing.localDate)?.category ?? null,
     previous: { title: existing.title, items: existing.items },

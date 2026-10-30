@@ -1,19 +1,25 @@
 import { randomUUID } from 'node:crypto';
 
-import { CredentialsSchema, ProfileSchema, type AuthResponse } from '@symbiose/shared';
+import { CredentialsSchema, ProfileSchema, type AuthResponse, type Profile } from '@symbiose/shared';
 import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, users, weights, workouts } from '../db/schema';
+import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { toReading } from '../services/blood-pressure';
 import { toActivity, toCraving } from '../services/day';
+import { toWaterEntry } from '../services/hydration';
 import { toJournalEntry } from '../services/journal';
 import { toMeal } from '../services/meals';
+import { toMood } from '../services/mood';
+import { toNight } from '../services/sleep';
 import { getUserRow, toUser } from '../services/users';
 import { toWorkout } from '../services/workouts';
+
+/** Opt-in switches: profile forms that predate one don't send it, and must not turn it off. */
+const OPT_INS = ['trackBloodPressure', 'trackSleep', 'trackHydration', 'trackMood'] as const satisfies (keyof Profile)[];
 
 export function authRoutes({ db, config }: Deps) {
   const app = new Hono();
@@ -62,10 +68,9 @@ export function meRoutes({ db, config, photos }: Deps) {
   app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')))));
 
   app.put('/profile', validate('json', ProfileSchema), (c) => {
-    const input = c.req.valid('json');
-    // Profile forms that predate the opt-in don't send it: keep the stored choice.
-    const stored = getUserRow(db, c.get('userId')).profile?.trackBloodPressure;
-    const profile = input.trackBloodPressure === undefined && stored !== undefined ? { ...input, trackBloodPressure: stored } : input;
+    const profile = { ...c.req.valid('json') };
+    const stored = getUserRow(db, c.get('userId')).profile;
+    for (const key of OPT_INS) if (profile[key] === undefined && stored?.[key] !== undefined) profile[key] = stored[key];
     const row = db
       .update(users)
       .set({ profile, name: profile.name })
@@ -87,6 +92,9 @@ export function meRoutes({ db, config, photos }: Deps) {
       weights: db.select().from(weights).where(eq(weights.userId, userId)).all(),
       workouts: db.select().from(workouts).where(eq(workouts.userId, userId)).all().map(toWorkout),
       bloodPressure: db.select().from(bloodPressure).where(eq(bloodPressure.userId, userId)).all().map(toReading),
+      sleep: db.select().from(sleepNights).where(eq(sleepNights.userId, userId)).all().map(toNight),
+      hydration: db.select().from(waterLogs).where(eq(waterLogs.userId, userId)).all().map(toWaterEntry),
+      mood: db.select().from(moods).where(eq(moods.userId, userId)).all().map(toMood),
       cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
       journal: db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).all().map(toJournalEntry),
       coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),

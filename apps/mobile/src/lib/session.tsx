@@ -6,10 +6,21 @@ import { ApiError, createApi, type Api } from './api';
 import { storage } from './storage';
 
 const KEY = 'symbiose.session';
+/** The last known user, so the app opens without network (metro, plane) and its waiting meals stay in reach. */
+const USER_KEY = 'symbiose.user';
 
 interface StoredSession {
   serverUrl: string;
   token: string;
+}
+
+function readCachedUser(raw: string | null, session: StoredSession | null): User | null {
+  try {
+    const known = raw ? (JSON.parse(raw) as StoredSession & { user: User }) : null;
+    return session && known?.serverUrl === session.serverUrl && known.token === session.token ? known.user : null;
+  } catch {
+    return null;
+  }
 }
 
 interface SessionValue {
@@ -30,11 +41,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<StoredSession | null>(null);
+  const [cachedUser, setCachedUser] = useState<User | null>(null);
 
   useEffect(() => {
-    storage
-      .get(KEY)
-      .then((raw) => setSession(raw ? (JSON.parse(raw) as StoredSession) : null))
+    Promise.all([storage.get(KEY), storage.get(USER_KEY).catch(() => null)])
+      .then(([raw, rawUser]) => {
+        const stored = raw ? (JSON.parse(raw) as StoredSession) : null;
+        setCachedUser(readCachedUser(rawUser, stored));
+        setSession(stored);
+      })
       .catch(() => setSession(null))
       .finally(() => setReady(true));
   }, []);
@@ -48,21 +63,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return await storedApi!.me();
       } catch (error) {
         // A revoked token or a deleted account: forget the stored session.
-        if (isAuthError(error)) await storage.remove(KEY);
+        if (isAuthError(error)) await Promise.all([storage.remove(KEY), storage.remove(USER_KEY)]);
         throw error;
       }
     },
     enabled: Boolean(storedApi),
     staleTime: 60_000,
     retry: (count, error) => !isAuthError(error) && count < 2,
+    // Opens with the last known user when the server can't be reached; refreshed right away.
+    initialData: cachedUser ?? undefined,
+    initialDataUpdatedAt: 0,
   });
   // ...and treat the user as signed out right away.
   const revoked = isAuthError(me.error);
   const api = revoked ? null : storedApi;
 
+  useEffect(() => {
+    if (session && me.data) void storage.set(USER_KEY, JSON.stringify({ ...session, user: me.data })).catch(() => undefined);
+  }, [session, me.data]);
+
   const signOut = useCallback(async () => {
-    await storage.remove(KEY);
+    await Promise.all([storage.remove(KEY), storage.remove(USER_KEY)]);
     queryClient.clear();
+    setCachedUser(null);
     setSession(null);
   }, [queryClient]);
 

@@ -1,16 +1,18 @@
 import { addDays } from '@symbiose/shared';
 import { router } from 'expo-router';
-import { Camera, Flame, Sparkles } from 'lucide-react-native';
+import { Camera, CloudOff, Flame, Sparkles } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { PanResponder, Platform, RefreshControl, ScrollView, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { JournalRow } from '@/components/journal/journal-row';
 import { NoteAction } from '@/components/journal/note-action';
 import { EnergyCard, heroNutrient, NutrientBars } from '@/components/today/energy-card';
+import { hasLifeCard, LifeCard, SleepLine } from '@/components/today/life-card';
 import { MealCard, PendingMealCard } from '@/components/today/meal-card';
 import { MoveCard } from '@/components/today/move-card';
+import { QueuedMealCard } from '@/components/today/queued-meal-card';
 import { WeekStrip } from '@/components/today/week-strip';
 import { Card, Pressy, Reveal, Row, SectionTitle, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
@@ -18,6 +20,8 @@ import { formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage, useDay, useHealthSync, useMealLogger, useToday } from '@/lib/hooks';
 import { useJournal } from '@/lib/journal';
+import { dropEntry, isNetworkError, retryEntry, useOutbox } from '@/lib/outbox';
+import { timeline } from '@/lib/outbox-logic';
 import { useUser } from '@/lib/session';
 import { usePending, useSettings } from '@/lib/stores';
 import { dayVoice, greeting } from '@/lib/voice';
@@ -38,6 +42,11 @@ export default function Today() {
   const hideCalories = useSettings((s) => s.hideCalories);
   const allPending = usePending((s) => s.items);
   const pending = allPending.filter((p) => p.input.localDate === date);
+  // Captures waiting for the network (those still in their first attempt show as "analysing" above).
+  const outbox = useOutbox((s) => s.items);
+  const live = useOutbox((s) => s.live);
+  const sending = useOutbox((s) => s.sending);
+  const queued = outbox.filter((q) => q.localDate === date && !live.includes(q.id));
   const { retry, dismiss } = useMealLogger();
   const syncHealth = useHealthSync(today);
   const leftHanded = useSettings((s) => s.leftHanded);
@@ -64,12 +73,10 @@ export default function Today() {
   );
 
   const dateLabel = formatDay(date, locale, { today: t('common.today'), yesterday: t('common.yesterday') });
-  const empty = Boolean(day.data && day.data.meals.length === 0 && pending.length === 0);
-  // Meals and journal notes on one timeline, newest first.
-  const timeline = [
-    ...(day.data?.meals ?? []).map((meal) => ({ at: Date.parse(meal.eatenAt), meal, note: null })),
-    ...notes.map((note) => ({ at: Date.parse(note.at), meal: null, note })),
-  ].sort((a, b) => b.at - a.at);
+  const empty = Boolean(day.data && day.data.meals.length === 0 && pending.length === 0 && queued.length === 0);
+  const offline = isNetworkError(day.error);
+  // Meals, captures waiting for the network and journal notes on one timeline, newest first.
+  const rows = [...timeline(day.data?.meals ?? [], queued), ...notes.map((note) => ({ type: 'note' as const, at: Date.parse(note.at), note }))].sort((a, b) => b.at - a.at);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -95,6 +102,7 @@ export default function Today() {
                 <Txt variant="title" numberOfLines={2}>
                   {date === today ? greeting(t, name) : dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
                 </Txt>
+                {day.data?.sleep ? <SleepLine night={day.data.sleep} /> : null}
               </View>
               {day.data && day.data.streak > 0 ? (
                 <Row gap={4} style={[{ backgroundColor: colors.surface, borderRadius: Radius.pill, paddingHorizontal: Space.md, height: 34 }, elevation]}>
@@ -113,6 +121,7 @@ export default function Today() {
             <>
               <Reveal index={2}>
                 <EnergyCard day={day.data} hero={hero} hideCalories={hideCalories} />
+                {queued.length ? <WaitingNote count={queued.length} /> : null}
               </Reveal>
               <Reveal index={3}>
                 <Txt variant="accent" tone="secondary" style={{ fontSize: 19, lineHeight: 26, paddingHorizontal: 6 }}>
@@ -127,7 +136,27 @@ export default function Today() {
                   <MoveCard day={day.data} isToday={date === today} />
                 </Reveal>
               ) : null}
+              {hasLifeCard(day.data, user.profile, date === today) ? (
+                <Reveal index={6}>
+                  <LifeCard day={day.data} isToday={date === today} />
+                </Reveal>
+              ) : null}
             </>
+          ) : offline ? (
+            // Without network the day can't load, but nothing is lost: say so calmly.
+            <Card style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
+                <CloudOff size={20} color={colors.text2} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Txt variant="label" style={{ fontSize: 16 }}>
+                  {t('outbox.offlineTitle')}
+                </Txt>
+                <Txt variant="caption" tone="secondary">
+                  {t('outbox.offlineBody')}
+                </Txt>
+              </View>
+            </Card>
           ) : day.error ? (
             <Card>
               <Txt tone="warning">{errorMessage(day.error, t('common.error'), t('common.offline'))}</Txt>
@@ -141,7 +170,7 @@ export default function Today() {
         </View>
 
         {/* Quick actions; the journal's tile sits on the thumb's side. */}
-        <Reveal index={6} style={{ marginTop: Space.lg, flexDirection: leftHanded ? 'row-reverse' : 'row', gap: Space.sm }}>
+        <Reveal index={7} style={{ marginTop: Space.lg, flexDirection: leftHanded ? 'row-reverse' : 'row', gap: Space.sm }}>
           {showCraving ? (
             <Pressy
               onPress={() => router.push('/craving')}
@@ -162,7 +191,7 @@ export default function Today() {
           <NoteAction date={date} compact={showCraving} />
         </Reveal>
 
-        <Reveal index={7}>
+        <Reveal index={8}>
           <SectionTitle
             right={
               notes.length ? (
@@ -179,7 +208,21 @@ export default function Today() {
             {pending.map((p) => (
               <PendingMealCard key={p.id} pending={p} onRetry={() => void retry(p)} onDismiss={() => dismiss(p.id)} />
             ))}
-            {timeline.map(({ meal, note }) => (meal ? <MealCard key={meal.id} meal={meal} hideCalories={hideCalories} /> : <JournalRow key={note.id} entry={note} />))}
+            {rows.map((row) =>
+              row.type === 'meal' ? (
+                <MealCard key={row.meal.id} meal={row.meal} hideCalories={hideCalories} />
+              ) : row.type === 'note' ? (
+                <JournalRow key={row.note.id} entry={row.note} />
+              ) : (
+                <QueuedMealCard
+                  key={row.entry.id}
+                  entry={row.entry}
+                  sending={sending === row.entry.id}
+                  onRetry={() => retryEntry(row.entry.id)}
+                  onDelete={() => void dropEntry(row.entry.id)}
+                />
+              ),
+            )}
             {empty ? (
               <Pressy
                 onPress={() => router.push({ pathname: '/capture', params: { date } })}
@@ -199,6 +242,22 @@ export default function Today() {
 
       <CaptureButton date={date} bottom={captureBottom} invite={empty} side={leftHanded ? 'left' : 'right'} />
     </View>
+  );
+}
+
+/** The totals only count meals the server confirmed: said quietly under the hero. */
+function WaitingNote({ count }: { count: number }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  return (
+    <Animated.View entering={FadeIn.duration(260)} exiting={FadeOut.duration(200)}>
+      <Row gap={6} style={{ justifyContent: 'center', marginTop: Space.md }}>
+        <CloudOff size={14} color={colors.text3} />
+        <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+          {count === 1 ? t('outbox.pendingOne') : t('outbox.pendingMany', { count })}
+        </Txt>
+      </Row>
+    </Animated.View>
   );
 }
 
