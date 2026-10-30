@@ -13,6 +13,7 @@ import { landingPage } from './landing';
 import { authRoutes, meRoutes } from './routes/account';
 import { bloodPressureRoutes } from './routes/blood-pressure';
 import { coachRoutes } from './routes/coach';
+import { glanceRoutes } from './routes/glance';
 import { goalRoutes } from './routes/goals';
 import { mealRoutes } from './routes/meals';
 import { trackingRoutes } from './routes/tracking';
@@ -61,6 +62,7 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/coach', coachRoutes(deps));
   app.route('/api/workouts', workoutRoutes(deps));
   app.route('/api/blood-pressure', bloodPressureRoutes(deps));
+  app.route('/api/glance', glanceRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 
   return app;

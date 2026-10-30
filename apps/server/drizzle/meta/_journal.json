@@ -29,6 +29,13 @@
       "when": 1793387997751,
       "tag": "0003_blood_pressure",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793391098213,
+      "tag": "0004_coach_meal_actions",
+      "breakpoints": true
     }
   ]
 }

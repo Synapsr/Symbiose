@@ -1,0 +1,1 @@
+ALTER TABLE `coach_messages` ADD `meal_actions` text;

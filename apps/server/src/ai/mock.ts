@@ -1,6 +1,6 @@
-import { BloodPressureCategorySchema, type BloodPressureCategory } from '@symbiose/shared';
+import { BloodPressureCategorySchema, type BloodPressureCategory, type CoachMealProposal } from '@symbiose/shared';
 
-import type { Ai, AnalyzedItem, MealAnalysis } from './types';
+import type { Ai, AnalyzedItem, CoachInput, MealAnalysis } from './types';
 import { heuristicPlan } from '../services/goals';
 
 const elevated = (category: BloodPressureCategory | null | undefined) =>
@@ -25,6 +25,41 @@ const DEFAULT_PLATE: AnalyzedItem[] = [
   { name: 'Riz basmati', emoji: '🍚', portion: '1 portion', grams: 180, confidence: 0.65, per100g: { kcal: 130, protein: 2.7, carbs: 28, sugar: 0.1, addedSugar: 0, fat: 0.3, satFat: 0.1, fiber: 0.4, sodium: 1 } },
   { name: 'Haricots verts', emoji: '🫛', portion: '1 poignée', grams: 100, confidence: 0.8, per100g: { kcal: 31, protein: 1.8, carbs: 4.3, sugar: 1.4, addedSugar: 0, fat: 0.2, satFat: 0, fiber: 3.4, sodium: 6 } },
 ];
+
+/** "à 16h30" → "16:30". */
+function mockTime(text: string): string | null {
+  const match = /\b(\d{1,2})\s*h\s*(\d{2})?\b/i.exec(text);
+  const hour = Number(match?.[1]);
+  return match && hour < 24 ? `${String(hour).padStart(2, '0')}:${match[2] ?? '00'}` : null;
+}
+
+/** "ajoute …" / "j'ai mangé …" adds, "modifie" / "corrige" edits the latest meal, "supprime" deletes it. */
+function mockMealAction(input: CoachInput): { reply: string; action: CoachMealProposal } | null {
+  const text = input.message.trim();
+  const latest = input.recentMeals.at(-1);
+  const base = { mealType: null, localDate: null, time: null };
+  if (/\b(supprime|efface|enl[eè]ve|delete|remove)\b/i.test(text)) {
+    if (!latest) return null;
+    return {
+      reply: 'Je te propose de retirer ce repas. Confirme dans la carte ci-dessous si c’est bien lui.',
+      action: { ...base, action: 'delete', mealId: latest.id, description: '', summary: `Supprimer : ${latest.title}, ${latest.time}` },
+    };
+  }
+  if (/\b(modifie|corrige|edit|fix)\b/i.test(text)) {
+    if (!latest) return null;
+    return {
+      reply: 'Bien vu, je corrige ce repas. Vérifie la carte et confirme.',
+      action: { ...base, action: 'edit', mealId: latest.id, description: text, time: mockTime(text), summary: `Modifier : ${latest.title}` },
+    };
+  }
+  const added = /^(?:ajoute(?:-moi)?|note|add|log|j['’]ai mangé|i ate)\s*:?\s*(.+)$/i.exec(text)?.[1];
+  if (!added) return null;
+  const time = mockTime(added);
+  return {
+    reply: 'Avec plaisir. Je l’ajoute dès que tu confirmes.',
+    action: { ...base, action: 'add', mealId: null, description: added, time, summary: `Ajouter : ${added.slice(0, 80)}` },
+  };
+}
 
 export function createMockAi(): Ai {
   return {
@@ -70,7 +105,10 @@ export function createMockAi(): Ai {
     async coach(input, onText) {
       const kcal = Math.round(input.today.totals.kcal);
       const sugar = Math.round(input.today.totals.addedSugar);
-      const reply = `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`;
+      const meal = mockMealAction(input);
+      const reply =
+        meal?.reply ??
+        `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`;
       for (const word of reply.split(/(?<= )/)) {
         onText?.(word);
         await new Promise((r) => setTimeout(r, 40));
@@ -80,6 +118,7 @@ export function createMockAi(): Ai {
         planChange: /objectif|goal/i.test(input.message)
           ? { intentions: `${input.plan?.intentions ?? ''} Je veux aussi manger plus de fibres.`.trim(), rationale: 'Ajouter un repère fibres aide à la satiété et réduit les envies de sucre.' }
           : null,
+        mealActions: meal ? [meal.action] : [],
       };
     },
 

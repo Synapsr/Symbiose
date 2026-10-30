@@ -91,6 +91,43 @@ const PLAN_CHANGE_TOOL: Anthropic.Beta.BetaTool = {
   eager_input_streaming: true,
 };
 
+const MealAction = z.object({
+  action: z.enum(['add', 'edit', 'delete']),
+  mealId: z.string().nullable(),
+  description: z.string(),
+  mealType: MealTypeOut.nullable(),
+  localDate: z.string().nullable(),
+  time: z.string().nullable(),
+  summary: z.string().min(1),
+});
+
+/** Called once per meal, after the reply; the app asks the person to confirm each one. */
+const MEAL_ACTION_TOOL: Anthropic.Beta.BetaTool = {
+  name: 'propose_meal_action',
+  description:
+    'Propose adding, editing or deleting a logged meal, only when the person asks for it or clearly says they ate something and want it noted. The app shows each proposal as a card and changes nothing until they confirm. One call per meal, at most 5 per reply.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['add', 'edit', 'delete'] },
+      mealId: { type: ['string', 'null'], description: 'edit and delete: the `id` of a meal listed in `recentMeals`, never invented. Null for add.' },
+      description: {
+        type: 'string',
+        description:
+          'add: what they ate, in their words, with quantities ("un yaourt nature avec une cuillère de miel"). edit: the correction in plain words ("la portion de riz était plutôt 150 g", "c’était du coca zéro"), or "" when only the type, day or time changes. delete: "".',
+      },
+      mealType: { anyOf: [{ type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] }, { type: 'null' }], description: 'When they said it or it is clear; null to infer it (add) or keep it (edit).' },
+      localDate: { anyOf: [{ type: 'string', format: 'date' }, { type: 'null' }], description: 'YYYY-MM-DD when the meal is on another day than today ("hier soir"); null for today (add) or to keep it (edit).' },
+      time: { type: ['string', 'null'], description: 'Local time as HH:mm when they said it or it is clear; null for now (add) or to keep it (edit).' },
+      summary: { type: 'string', description: 'One short line for the confirmation card, in their language, e.g. "Ajouter : yaourt nature + miel, 16 h".' },
+    },
+    required: ['action', 'mealId', 'description', 'mealType', 'localDate', 'time', 'summary'],
+    additionalProperties: false,
+  },
+  strict: true,
+  eager_input_streaming: true,
+};
+
 const CravingOut = z.object({ tip: z.string(), alternative: z.string() });
 
 type Effort = 'low' | 'medium' | 'high';
@@ -207,7 +244,8 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
 
     async coach(input, onText) {
       const history: Anthropic.Beta.BetaMessageParam[] = input.history.map((turn) => ({ role: turn.role, content: turn.content }));
-      const text = `${contextBlock(input, { today: input.today, last7Days: input.week, ...bloodPressureExtra(input.bloodPressure) })}\n\n${input.message}`;
+      const extra = { today: input.today, recentMeals: input.recentMeals, last7Days: input.week, ...bloodPressureExtra(input.bloodPressure) };
+      const text = `${contextBlock(input, extra)}\n\n${input.message}`;
       try {
         const stream = client.beta.messages.stream({
           model,
@@ -216,7 +254,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
           fallbacks: 'default',
           system: [{ type: 'text', text: COACH, cache_control: { type: 'ephemeral' } }],
           messages: [...history, { role: 'user', content: [{ type: 'text', text }] }],
-          tools: [PLAN_CHANGE_TOOL],
+          tools: [PLAN_CHANGE_TOOL, MEAL_ACTION_TOOL],
           tool_choice: { type: 'auto' },
           output_config: { effort: 'low' },
         });
@@ -230,11 +268,16 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
           .join('')
           .trim();
         // Eager tool input streaming skips server-side validation: validate here.
-        const call = message.content.find((block) => block.type === 'tool_use' && block.name === PLAN_CHANGE_TOOL.name);
-        const parsed = call?.type === 'tool_use' ? PlanChange.safeParse(call.input) : null;
-        const planChange = parsed?.success ? parsed.data : null;
-        if (!reply && !planChange) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
-        return { reply: reply || planChange!.rationale, planChange };
+        const inputs = (name: string) => message.content.flatMap((block) => (block.type === 'tool_use' && block.name === name ? [block.input] : []));
+        const parsed = PlanChange.safeParse(inputs(PLAN_CHANGE_TOOL.name)[0]);
+        const planChange = parsed.success ? parsed.data : null;
+        const mealActions = inputs(MEAL_ACTION_TOOL.name).flatMap((input) => {
+          const action = MealAction.safeParse(input);
+          return action.success ? [action.data] : [];
+        });
+        const fallback = planChange?.rationale ?? mealActions[0]?.summary;
+        if (!reply && !fallback) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
+        return { reply: reply || fallback!, planChange, mealActions };
       } catch (error) {
         throw mapError(error);
       }

@@ -1,12 +1,14 @@
 import type {
   ActivityWeek,
   BloodPressureCategory,
+  CoachMealProposal,
   DaySummary,
   FoodItem,
   GoalPlan,
   InsightsResponse,
   Locale,
   MealType,
+  NutrientKey,
   Nutrients,
   Profile,
   Review,
@@ -100,18 +102,24 @@ export interface CoachInput extends UserContext {
   message: string;
   bloodPressure: BloodPressureBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
-    meals: { time: string; title: string; kcal: number }[];
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };
+  /** Meals of the conversation's day and the 2 days before: the ones the coach may edit or delete. */
+  recentMeals: CoachMealBrief[];
   week: Pick<InsightsResponse, 'averages' | 'loggedDays' | 'adherence' | 'topSources' | 'byHour' | 'cravings' | 'weight'> & {
     activity: ActivityWeek;
     workouts: { date: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };
 }
 
+/** A logged meal as the coach sees it: kcal plus the nutrients the plan focuses on. */
+export type CoachMealBrief = { id: string; date: string; time: string; type: MealType; title: string; kcal: number } & Partial<Record<NutrientKey, number>>;
+
 export interface CoachOutput {
   reply: string;
   planChange: { intentions: string; rationale: string } | null;
+  /** Unchecked: the route keeps only the valid ones (known meal ids, at most 5). */
+  mealActions: CoachMealProposal[];
 }
 
 export interface CravingInput extends UserContext {

@@ -1,4 +1,4 @@
-import type { CoachSuggestion, FoodItem, GoalPlan, MealInsight, Profile, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
+import type { CoachMealAction, CoachSuggestion, FoodItem, GoalPlan, MealInsight, Profile, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
@@ -157,6 +157,8 @@ export const coachMessages = sqliteTable(
     role: text('role', { enum: ['user', 'assistant'] }).notNull(),
     content: text('content').notNull(),
     suggestion: text('suggestion', { mode: 'json' }).$type<CoachSuggestion>(),
+    /** Null on user messages and on replies saved before meal actions existed. */
+    mealActions: text('meal_actions', { mode: 'json' }).$type<CoachMealAction[]>(),
     createdAt: text('created_at').notNull(),
   },
   (t) => [index('coach_user_created').on(t.userId, t.createdAt)],

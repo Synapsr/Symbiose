@@ -504,11 +504,38 @@ export interface CoachSuggestion {
   rationale: string;
 }
 
+export const CoachMealActionKindSchema = z.enum(['add', 'edit', 'delete']);
+export type CoachMealActionKind = z.infer<typeof CoachMealActionKindSchema>;
+
+/** A meal change the coach proposes when asked; nothing happens until the person confirms it. */
+export interface CoachMealProposal {
+  action: CoachMealActionKind;
+  /** The meal to edit or delete; null for add. */
+  mealId: string | null;
+  /** add: what was eaten, in their words. edit: the correction ("" when only the type, date or time changes). delete: "". */
+  description: string;
+  mealType: MealType | null;
+  /** add: the day it was eaten (the conversation's day by default). edit: the new day, or null to keep it. */
+  localDate: string | null;
+  /** Local "HH:mm"; null for now (add) or to keep it (edit). */
+  time: string | null;
+  /** One short line shown on the card. */
+  summary: string;
+}
+
+export interface CoachMealAction extends CoachMealProposal {
+  status: 'proposed' | 'applied' | 'dismissed';
+  /** The meal created or edited once applied. */
+  resultMealId: string | null;
+}
+
 export interface CoachMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** A plan change, applied from the goals screen. */
   suggestion: CoachSuggestion | null;
+  mealActions: CoachMealAction[];
   createdAt: string;
 }
 
@@ -516,6 +543,17 @@ export const CoachInputSchema = z.object({
   text: z.string().trim().min(1).max(2000),
   localDate: isoDate,
 });
+
+export const ApplyCoachMealActionInputSchema = z.object({
+  /** The device's current local time: sets the time zone, and the time when the action has none. */
+  now: localDateTime.optional(),
+});
+
+export interface CoachMealActionResult {
+  message: CoachMessage;
+  /** The meal added or edited; null for a delete. */
+  meal: Meal | null;
+}
 
 // ---------------------------------------------------------------- Auth & server
 

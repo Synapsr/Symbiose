@@ -5,3 +5,4 @@ export * from './dates';
 export * from './meals';
 export * from './activity';
 export * from './health';
+export * from './glance';

@@ -9,19 +9,27 @@ import {
   type AuthResponse,
   type BloodPressureReading,
   type BloodPressureTrend,
+  type CoachMealActionResult,
+  type CoachMealProposal,
+  type CoachMessage,
   type DaySummary,
+  type Glance,
   type GoalsResponse,
   type InsightsResponse,
   type Meal,
   type Profile,
+  type User,
   type Workout,
 } from '@symbiose/shared';
+import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDisabledAi } from './ai/claude';
+import { createMockAi } from './ai/mock';
 import type { Ai, CoachInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from './ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
+import { coachMessages } from './db/schema';
 import type { Config } from './env';
 import { heuristicPlan, planFromDraft } from './services/goals';
 import { PhotoStore } from './services/photos';
@@ -93,7 +101,7 @@ const fakeAi: Ai = {
     const reply = `Tu as mangé ${input.today.totals.kcal} kcal.`;
     for (const part of ['Tu as mangé ', `${input.today.totals.kcal} kcal.`]) onText?.(part);
     const wantsChange = input.message.includes('objectifs');
-    return { reply, planChange: wantsChange ? { intentions: 'Moins de sucre et plus de fibres', rationale: 'Les fibres calment les envies.' } : null };
+    return { reply, planChange: wantsChange ? { intentions: 'Moins de sucre et plus de fibres', rationale: 'Les fibres calment les envies.' } : null, mealActions: [] };
   },
   async cravingTip() {
     return { tip: "Bois un verre d'eau.", alternative: 'Une pomme' };
@@ -136,7 +144,8 @@ function makeApp(ai: Ai, overrides: Partial<Config> = {}) {
     }
     return new Response('{}', { status: 404 });
   }) as typeof fetch;
-  return createApp({ db, ai, photos, config, fetch: fakeFetch });
+  // The database stays reachable for the tests that simulate stored data.
+  return Object.assign(createApp({ db, ai, photos, config, fetch: fakeFetch }), { db });
 }
 
 /** JSON request helpers for the suites that juggle several accounts. */
@@ -365,6 +374,23 @@ describe('Symbiose API', () => {
     expect(lib.body.favoriteMeals).toHaveLength(1);
   });
 
+  it('gives the watch and widgets their key numbers and meals to re-log', async () => {
+    const day = await request<DaySummary>('GET', `/api/days/${today}`);
+    const glance = await request<Glance>('GET', `/api/glance?date=${today}`);
+    expect(glance.status).toBe(200);
+    // A sugar plan at maintenance: added sugar is the hero, calories stay in the background.
+    expect(glance.body.hero).toMatchObject({ nutrient: 'addedSugar', unit: 'g', kind: 'max', target: 25, consumed: day.body.totals.addedSugar });
+    expect(glance.body.metrics.map((m) => m.nutrient)).toEqual(['addedSugar', 'sugar', 'kcal']);
+    expect(glance.body.meals).toBe(day.body.meals.length);
+    const titles = glance.body.relog.map((r) => r.title.toLowerCase());
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(glance.body.relog.length).toBeLessThanOrEqual(6);
+
+    const hidden = await request<Glance>('GET', `/api/glance?date=${today}&hideCalories=1`);
+    expect(hidden.body.metrics.map((m) => m.nutrient)).not.toContain('kcal');
+    expect((await request('GET', '/api/glance', undefined, false)).status).toBe(401);
+  });
+
   it('computes insights, reviews and coaching', async () => {
     const insights = await request<{ loggedDays: number; topSources: Record<string, { name: string }[]>; byHour: { nutrient: string } }>('GET', '/api/insights?days=7');
     expect(insights.status).toBe(200);
@@ -405,6 +431,7 @@ describe('Symbiose API', () => {
     const done = events.find((e) => e.event === 'done')!;
     expect(done.data.reply.content).toBe(deltas);
     expect(done.data.reply.suggestion.intentions).toContain('fibres');
+    expect(done.data.reply.mealActions).toEqual([]);
     const history = await request<unknown[]>('GET', '/api/coach/messages');
     expect(history.body).toHaveLength(6);
   });
@@ -466,7 +493,7 @@ describe('physical activity', () => {
       },
       async coach(input) {
         coachInputs.push(input);
-        return { reply: 'ok', planChange: null };
+        return { reply: 'ok', planChange: null, mealActions: [] };
       },
     },
     { allowSignup: true },
@@ -612,7 +639,7 @@ describe('blood pressure', () => {
       },
       async coach(input) {
         seen.coach.push(input);
-        return { reply: 'ok', planChange: null };
+        return { reply: 'ok', planChange: null, mealActions: [] };
       },
       async review(input) {
         seen.review.push(input);
@@ -733,5 +760,159 @@ describe('blood pressure', () => {
     // An explicit false turns it off.
     await request('PUT', '/api/me/profile', { ...profile, trackBloodPressure: false });
     expect((await request<InsightsResponse>('GET', '/api/insights?days=7')).body.bloodPressure).toBeNull();
+  });
+});
+
+describe('coach meal actions', () => {
+  const mock = createMockAi();
+  const coachInputs: CoachInput[] = [];
+  /** Replaces what the coach proposes, to test the server's own checks. */
+  let forged: CoachMealProposal | null = null;
+  const app = makeApp(
+    {
+      ...mock,
+      async coach(input, onText) {
+        coachInputs.push(input);
+        const output = await mock.coach(input, onText);
+        return forged ? { ...output, mealActions: [forged] } : output;
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const yesterday = addDays(today, -1);
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const now = at(today, '18:05');
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const ask = async (text: string) => (await request<{ reply: CoachMessage }>('POST', '/api/coach/messages', { text, localDate: today })).body.reply;
+  const apply = (message: CoachMessage, token = owner) => request<CoachMealActionResult>('POST', `/api/coach/messages/${message.id}/meal-actions/0/apply`, { now }, token);
+  const dismiss = (message: CoachMessage) => request<CoachMessage>('POST', `/api/coach/messages/${message.id}/meal-actions/0/dismiss`);
+  const mealsOn = async (date: string) => (await request<Meal[]>('GET', `/api/meals?date=${date}`)).body;
+  const manualMeal = (localDate: string, time: string, title: string) => ({
+    eatenAt: at(localDate, time),
+    localDate,
+    title,
+    items: [{ id: 'm1', name: title, grams: 100, source: 'manual', per100g: { kcal: 250, protein: 12, carbs: 30, sugar: 5, addedSugar: 2, fat: 8, satFat: 3, fiber: 2, sodium: 300 } }],
+  });
+
+  let breakfast: Meal;
+  let strangerMeal: Meal;
+  let addReply: CoachMessage;
+  let added: Meal;
+  let latestId = '';
+
+  beforeAll(async () => {
+    owner = await register('chef@example.com');
+    stranger = await register('neighbour@example.com');
+    for (const token of [owner, stranger]) expect((await request('PUT', '/api/me/profile', profile, token)).status).toBe(200);
+    await request('POST', '/api/meals', manualMeal(addDays(today, -3), '20:00', 'Raclette'));
+    breakfast = (await request<Meal>('POST', '/api/meals', manualMeal(yesterday, '08:10', 'Tartines'))).body;
+    strangerMeal = (await request<Meal>('POST', '/api/meals', manualMeal(today, '12:00', 'Pizza'), stranger)).body;
+  });
+
+  it('shows the coach the meals of the last 3 days with their ids and key numbers', async () => {
+    await ask('Que manger ce soir ?');
+    expect(coachInputs.at(-1)!.recentMeals).toEqual([{ id: breakfast.id, date: yesterday, time: '08:10', type: 'breakfast', title: 'Tartines', kcal: 250, protein: 12 }]);
+  });
+
+  it('proposes an add and logs the meal only once confirmed', async () => {
+    addReply = await ask('Ajoute un yaourt et une pomme à 16h');
+    expect(addReply.mealActions).toEqual([
+      { action: 'add', mealId: null, description: 'un yaourt et une pomme à 16h', mealType: null, localDate: today, time: '16:00', summary: 'Ajouter : un yaourt et une pomme à 16h', status: 'proposed', resultMealId: null },
+    ]);
+    expect(await mealsOn(today)).toEqual([]);
+
+    const res = await apply(addReply);
+    expect(res.status).toBe(200);
+    added = res.body.meal!;
+    expect(added.eatenAt).toBe(at(today, '16:00'));
+    expect(added.items.map((i) => i.name)).toEqual(['Pomme', 'Yaourt aux fruits']);
+    expect(res.body.message.mealActions[0]).toMatchObject({ status: 'applied', resultMealId: added.id });
+    expect((await mealsOn(today)).map((m) => m.id)).toEqual([added.id]);
+  });
+
+  it('applies an action only once, even when confirmed twice at the same time', async () => {
+    const again = await apply(addReply);
+    expect(again.status).toBe(200);
+    expect(again.body.meal?.id).toBe(added.id);
+
+    const reply = await ask('Ajoute une salade');
+    const [first, second] = await Promise.all([apply(reply), apply(reply)]);
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    latestId = (first.body.meal ?? second.body.meal)!.id;
+    expect((await mealsOn(today)).map((m) => m.id)).toEqual([added.id, latestId]);
+  });
+
+  it('carries meal actions in the streamed reply', async () => {
+    const res = await app.request('/api/coach/messages/stream', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${owner}` },
+      body: JSON.stringify({ text: 'J’ai mangé une pomme', localDate: today }),
+    });
+    const done = /event: done\ndata: (.*)/.exec(await res.text())?.[1];
+    expect((JSON.parse(done!) as { reply: CoachMessage }).reply.mealActions[0]).toMatchObject({ action: 'add', description: 'une pomme', status: 'proposed' });
+  });
+
+  it('edits the latest meal once confirmed', async () => {
+    const reply = await ask('Corrige : c’était du coca, vers 17h');
+    expect(reply.mealActions[0]).toMatchObject({ action: 'edit', mealId: latestId, time: '17:00' });
+    const res = await apply(reply);
+    expect(res.status).toBe(200);
+    expect(res.body.meal).toMatchObject({ id: latestId, eatenAt: at(today, '17:00') });
+    expect(res.body.meal?.items.map((i) => i.name)).toContain('Coca-Cola');
+    expect(res.body.message.mealActions[0]).toMatchObject({ status: 'applied', resultMealId: latestId });
+  });
+
+  it('deletes the latest meal once confirmed', async () => {
+    const reply = await ask('Supprime mon dernier repas');
+    expect(reply.mealActions[0]).toMatchObject({ action: 'delete', mealId: latestId, description: '' });
+    const res = await apply(reply);
+    expect(res.status).toBe(200);
+    expect(res.body.meal).toBeNull();
+    expect(res.body.message.mealActions[0]).toMatchObject({ status: 'applied', resultMealId: null });
+    expect((await request('GET', `/api/meals/${latestId}`)).status).toBe(404);
+  });
+
+  it('dismisses a proposal without touching the meals', async () => {
+    const reply = await ask('Ajoute un croissant');
+    const res = await dismiss(reply);
+    expect(res.status).toBe(200);
+    expect(res.body.mealActions[0]?.status).toBe('dismissed');
+    expect((await dismiss(reply)).status).toBe(200);
+    expect((await apply(reply)).status).toBe(409);
+    expect((await dismiss(addReply)).status).toBe(409);
+    expect((await mealsOn(today)).map((m) => m.id)).toEqual([added.id]);
+    const history = await request<CoachMessage[]>('GET', '/api/coach/messages');
+    expect(history.body.find((m) => m.id === reply.id)?.mealActions[0]?.status).toBe('dismissed');
+  });
+
+  it('never touches the meals or proposals of another account', async () => {
+    // The coach can only target the meals it was shown.
+    forged = { action: 'delete', mealId: strangerMeal.id, description: '', mealType: null, localDate: null, time: null, summary: 'Supprimer : Pizza' };
+    const refused = await ask('Supprime la pizza');
+    forged = null;
+    expect(refused.mealActions).toEqual([]);
+
+    // A stored proposal is checked again when confirmed.
+    const reply = await ask('Ajoute un café');
+    for (const action of ['edit', 'delete'] as const) {
+      const tampered = { ...reply.mealActions[0]!, action, mealId: strangerMeal.id, description: action === 'edit' ? 'sans sucre' : '' };
+      app.db.update(coachMessages).set({ mealActions: [tampered] }).where(eq(coachMessages.id, reply.id)).run();
+      expect((await apply(reply)).status).toBe(404);
+    }
+    expect((await request<Meal>('GET', `/api/meals/${strangerMeal.id}`, undefined, stranger)).body.title).toBe('Pizza');
+    // Nor can another account confirm someone else's proposal.
+    expect((await apply(reply, stranger)).status).toBe(404);
+  });
+
+  it('still lists messages saved before meal actions existed', async () => {
+    const me = await request<User>('GET', '/api/me');
+    app.db.insert(coachMessages).values({ id: 'legacy', userId: me.body.id, role: 'assistant', content: 'Ancien message', suggestion: null, createdAt: '2020-01-01T00:00:00.000Z' }).run();
+    const history = await request<CoachMessage[]>('GET', '/api/coach/messages');
+    expect(history.status).toBe(200);
+    expect(history.body[0]).toMatchObject({ id: 'legacy', suggestion: null, mealActions: [] });
   });
 });
