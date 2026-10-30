@@ -8,7 +8,10 @@ export const health: HealthBridge = {
   connect: async () => false,
   readDay: async () => ({ steps: null, activeKcal: null, restingKcal: null, weightKg: null }),
   readWeights: async () => [],
+  readProfile: async () => ({}),
+  readWorkouts: async () => [],
   writeMeal: async () => undefined,
 };
 
-export type { DayHealth, HealthBridge, WeightReading } from './types';
+export { HEALTH_SCOPES } from './types';
+export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';

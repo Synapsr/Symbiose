@@ -36,6 +36,8 @@
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
         "android.permission.health.READ_WEIGHT",
+        "android.permission.health.READ_HEIGHT",
+        "android.permission.health.READ_EXERCISE",
         "android.permission.health.WRITE_NUTRITION"
       ],
       "predictiveBackGestureEnabled": false
@@ -76,7 +78,7 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Symbiose reads your steps, active energy and weight from your Apple Watch to adapt your daily budget.",
+          "NSHealthShareUsageDescription": "Symbiose reads your steps, active energy, workouts, weight, height, sex and date of birth to fill in your profile and adapt your daily budget.",
           "NSHealthUpdateUsageDescription": "Symbiose saves the nutrition of the meals you log to Apple Health.",
           "background": false
         }

@@ -21,6 +21,8 @@ import type {
   UpdateMealInput,
   User,
   WeightInput,
+  Workout,
+  WorkoutInput,
 } from '@symbiose/shared';
 import { fetch as streamingFetch } from 'expo/fetch';
 
@@ -108,6 +110,13 @@ export function createApi(baseUrl: string, token: string) {
 
     putActivity: (input: ActivityInput) => call<DayActivity>('PUT', '/api/activity', input),
     putWeights: (input: WeightInput) => call<{ written: number }>('PUT', '/api/weights', input),
+
+    /** Bulk import from the health store; the server de-duplicates by `externalId`. */
+    putWorkouts: (workouts: WorkoutInput[]) => call<{ written: number }>('PUT', '/api/workouts', { workouts }),
+    /** Manual entry; the server estimates `activeKcal` when it's null. */
+    createWorkout: (input: WorkoutInput) => call<Workout>('POST', '/api/workouts', input),
+    deleteWorkout: (id: string) => call<void>('DELETE', `/api/workouts/${id}`),
+    workouts: (from: string, to: string) => call<Workout[]>('GET', `/api/workouts?from=${from}&to=${to}`),
 
     createCraving: (input: CravingInput) => call<{ craving: Craving; alternative: string }>('POST', '/api/cravings', input, 60_000),
     updateCraving: (id: string, outcome: CravingOutcome) => call<Craving>('PATCH', `/api/cravings/${id}`, { outcome }),

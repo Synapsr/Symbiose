@@ -6,6 +6,7 @@ import { Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActivityCard } from '@/components/insights/activity-card';
 import { DayBars, HourBars } from '@/components/insights/charts';
 import { WeightCard } from '@/components/insights/weight-card';
 import { Bar, Button, Card, Dot, Row, SectionTitle, Segmented, Skeleton, Txt } from '@/components/ui';
@@ -34,6 +35,8 @@ export default function Insights() {
   const primaryAdherence = data?.adherence.find((a) => a.nutrient === primary);
   // Weight comes first when the goals are about body weight.
   const weightFirst = Boolean(user.plan && user.plan.calorieMode !== 'maintain');
+  // Same for activity, which also matters for muscle.
+  const activityFirst = weightFirst || Boolean(user.plan?.tags.some((tag) => tag === 'lose_weight' || tag === 'gain_muscle'));
 
   return (
     <ScrollView
@@ -115,6 +118,7 @@ export default function Insights() {
           </Card>
 
           {weightFirst ? <WeightCard weight={data.weight} plan={user.plan} /> : null}
+          {activityFirst && data.activity ? <ActivityCard activity={data.activity} /> : null}
 
           {data.adherence.length ? (
             <>
@@ -191,6 +195,7 @@ export default function Insights() {
           ) : null}
 
           {!weightFirst ? <WeightCard weight={data.weight} plan={user.plan} /> : null}
+          {!activityFirst && data.activity ? <ActivityCard activity={data.activity} /> : null}
 
           <SectionTitle>{t('insights.review')}</SectionTitle>
           <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>

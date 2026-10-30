@@ -1,14 +1,67 @@
-import type { Meal } from '@symbiose/shared';
-import { aggregateRecord, getSdkStatus, initialize, insertRecords, readRecords, requestPermission, SdkAvailabilityStatus } from 'react-native-health-connect';
+import type { Meal, WorkoutInput, WorkoutType } from '@symbiose/shared';
+import {
+  aggregateRecord,
+  ExerciseType,
+  getSdkStatus,
+  initialize,
+  insertRecords,
+  readRecords,
+  requestPermission,
+  SdkAvailabilityStatus,
+  type RecordResult,
+} from 'react-native-health-connect';
 
-import { dayBounds, mealWindow, type HealthBridge } from './types';
+import { cleanProfile, dayBounds, mealWindow, toWorkoutInput, type HealthBridge } from './types';
 
 const MEAL_TYPE = { breakfast: 1, lunch: 2, dinner: 3, snack: 4 } as const;
+
+/** Health Connect exercise types → our nine simple types. Anything unlisted is "other". */
+const E = ExerciseType;
+const TYPES: [WorkoutType, number[]][] = [
+  ['walking', [E.WALKING, E.HIKING, E.SNOWSHOEING, E.WHEELCHAIR]],
+  ['running', [E.RUNNING, E.RUNNING_TREADMILL]],
+  ['cycling', [E.BIKING, E.BIKING_STATIONARY]],
+  [
+    'strength',
+    [
+      E.STRENGTH_TRAINING, E.WEIGHTLIFTING, E.CALISTHENICS, E.BACK_EXTENSION, E.BARBELL_SHOULDER_PRESS, E.BENCH_PRESS,
+      E.BENCH_SIT_UP, E.CRUNCH, E.DEADLIFT, E.DUMBBELL_CURL_LEFT_ARM, E.DUMBBELL_CURL_RIGHT_ARM, E.DUMBBELL_FRONT_RAISE,
+      E.DUMBBELL_LATERAL_RAISE, E.DUMBBELL_TRICEPS_EXTENSION_LEFT_ARM, E.DUMBBELL_TRICEPS_EXTENSION_RIGHT_ARM,
+      E.DUMBBELL_TRICEPS_EXTENSION_TWO_ARM, E.FORWARD_TWIST, E.LAT_PULL_DOWN, E.LUNGE, E.PLANK, E.SQUAT, E.UPPER_TWIST,
+    ],
+  ],
+  ['swimming', [E.SWIMMING_POOL, E.SWIMMING_OPEN_WATER]],
+  ['hiit', [E.HIGH_INTENSITY_INTERVAL_TRAINING, E.BOOT_CAMP, E.BURPEE, E.JUMPING_JACK, E.JUMP_ROPE, E.EXERCISE_CLASS]],
+  ['yoga', [E.YOGA, E.PILATES, E.STRETCHING, E.GUIDED_BREATHING]],
+  [
+    'sports',
+    [
+      E.SOCCER, E.BASKETBALL, E.TENNIS, E.BADMINTON, E.VOLLEYBALL, E.RUGBY, E.HANDBALL, E.ICE_HOCKEY, E.ROLLER_HOCKEY,
+      E.FOOTBALL_AMERICAN, E.FOOTBALL_AUSTRALIAN, E.BASEBALL, E.SOFTBALL, E.CRICKET, E.SQUASH, E.RACQUETBALL,
+      E.TABLE_TENNIS, E.GOLF, E.MARTIAL_ARTS, E.BOXING, E.FENCING, E.ROCK_CLIMBING, E.FRISBEE_DISC, E.WATER_POLO,
+      E.ICE_SKATING, E.SKATING, E.SKIING, E.SNOWBOARDING, E.SURFING, E.PADDLING, E.ROWING, E.SAILING, E.GYMNASTICS,
+    ],
+  ],
+];
+const TYPE_BY_EXERCISE = new Map<number, WorkoutType>(TYPES.flatMap(([type, list]) => list.map((e) => [e, type] as const)));
 
 let initialized = false;
 async function ensureInit(): Promise<boolean> {
   if (!initialized) initialized = await initialize();
   return initialized;
+}
+
+/** Active energy recorded during a session (Health Connect de-duplicates overlapping sources). */
+async function sessionKcal(session: RecordResult<'ExerciseSession'>): Promise<number | null> {
+  try {
+    const result = await aggregateRecord({
+      recordType: 'ActiveCaloriesBurned',
+      timeRangeFilter: { operator: 'between', startTime: session.startTime, endTime: session.endTime },
+    });
+    return result.ACTIVE_CALORIES_TOTAL.inKilocalories || null;
+  } catch {
+    return null;
+  }
 }
 
 export const health: HealthBridge = {
@@ -29,6 +82,8 @@ export const health: HealthBridge = {
       { accessType: 'read', recordType: 'Steps' },
       { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
       { accessType: 'read', recordType: 'Weight' },
+      { accessType: 'read', recordType: 'Height' },
+      { accessType: 'read', recordType: 'ExerciseSession' },
       { accessType: 'write', recordType: 'Nutrition' },
     ]);
     return granted.length > 0;
@@ -64,6 +119,52 @@ export const health: HealthBridge = {
     return records.map((record) => ({ measuredAt: new Date(record.time), kg: record.weight.inKilograms }));
   },
 
+  /** Health Connect stores neither sex nor birth date: only height and weight. */
+  async readProfile() {
+    if (!(await ensureInit())) return {};
+    // Without the history permission, Health Connect only serves the 30 days before the grant; ask wide anyway.
+    const since = { operator: 'after' as const, startTime: new Date(Date.now() - 5 * 365 * 86_400_000).toISOString() };
+    const [height, weight] = await Promise.all([
+      readRecords('Height', { timeRangeFilter: since, ascendingOrder: false, pageSize: 1 }).catch(() => null),
+      readRecords('Weight', { timeRangeFilter: since, ascendingOrder: false, pageSize: 1 }).catch(() => null),
+    ]);
+    const meters = height?.records[0]?.height.inMeters;
+    return cleanProfile({ heightCm: meters ? meters * 100 : undefined, weightKg: weight?.records[0]?.weight.inKilograms });
+  },
+
+  async readWorkouts(from, to) {
+    await ensureInit();
+    const sessions: RecordResult<'ExerciseSession'>[] = [];
+    let pageToken: string | undefined;
+    do {
+      const page = await readRecords('ExerciseSession', {
+        timeRangeFilter: { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() },
+        ascendingOrder: true,
+        pageToken,
+      });
+      sessions.push(...page.records);
+      pageToken = page.pageToken || undefined;
+    } while (pageToken && sessions.length < 1000);
+
+    const inputs = await Promise.all(
+      sessions.map(async (session): Promise<WorkoutInput | null> => {
+        const id = session.metadata?.id;
+        if (!id) return null;
+        const start = new Date(session.startTime);
+        return toWorkoutInput({
+          externalId: id,
+          type: TYPE_BY_EXERCISE.get(session.exerciseType) ?? 'other',
+          start,
+          durationSec: (new Date(session.endTime).getTime() - start.getTime()) / 1000,
+          activeKcal: await sessionKcal(session),
+          distanceM: null,
+          source: 'health_connect',
+        });
+      }),
+    );
+    return inputs.filter((w): w is WorkoutInput => w !== null);
+  },
+
   async writeMeal(meal: Meal) {
     await ensureInit();
     const { start, end } = mealWindow(meal);
@@ -89,4 +190,5 @@ export const health: HealthBridge = {
   },
 };
 
-export type { DayHealth, HealthBridge, WeightReading } from './types';
+export { HEALTH_SCOPES } from './types';
+export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';

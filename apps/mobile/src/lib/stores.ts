@@ -11,7 +11,10 @@ interface SettingsState {
   healthEnabled: boolean;
   lastHealthSync: number;
   lastWeightSync: number;
-  set: (patch: Partial<Pick<SettingsState, 'hideCalories' | 'healthEnabled' | 'lastHealthSync' | 'lastWeightSync'>>) => void;
+  lastWorkoutSync: number;
+  /** Version of the health permissions granted (see `HEALTH_SCOPES`). */
+  healthScopes: number;
+  set: (patch: Partial<Pick<SettingsState, 'hideCalories' | 'healthEnabled' | 'lastHealthSync' | 'lastWeightSync' | 'lastWorkoutSync' | 'healthScopes'>>) => void;
   load: () => Promise<void>;
 }
 
@@ -23,10 +26,12 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   healthEnabled: false,
   lastHealthSync: 0,
   lastWeightSync: 0,
+  lastWorkoutSync: 0,
+  healthScopes: 0,
   set: (patch) => {
     set(patch);
-    const { hideCalories, healthEnabled, lastWeightSync } = get();
-    void storage.set(SETTINGS_KEY, JSON.stringify({ hideCalories, healthEnabled, lastWeightSync })).catch(() => undefined);
+    const { hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, healthScopes } = get();
+    void storage.set(SETTINGS_KEY, JSON.stringify({ hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, healthScopes })).catch(() => undefined);
   },
   load: async () => {
     try {

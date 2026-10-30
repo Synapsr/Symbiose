@@ -78,6 +78,10 @@ function AppNavigator() {
               name="craving"
               options={{ presentation: 'formSheet', sheetAllowedDetents: [0.8, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }}
             />
+            <Stack.Screen
+              name="workout"
+              options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }}
+            />
           </Stack.Protected>
         </Stack>
         <ToastHost />

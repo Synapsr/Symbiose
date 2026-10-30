@@ -10,7 +10,7 @@ import { Card, Dot, Pressy, Row, SectionTitle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { health } from '@/lib/health';
+import { health, HEALTH_SCOPES } from '@/lib/health';
 import { useHealthSync, useToday } from '@/lib/hooks';
 import { useApi, useSession, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
@@ -37,7 +37,7 @@ export default function Me() {
   const toggleHealth = async (on: boolean) => {
     if (on) {
       const granted = await health.connect().catch(() => false);
-      settings.set({ healthEnabled: granted });
+      settings.set(granted ? { healthEnabled: true, healthScopes: HEALTH_SCOPES } : { healthEnabled: false });
       if (granted) {
         haptics.success();
         void syncHealth(true);

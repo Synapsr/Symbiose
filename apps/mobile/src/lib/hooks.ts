@@ -8,7 +8,7 @@ import { useI18n } from '@/i18n';
 
 import { ApiError } from './api';
 import { haptics } from './haptics';
-import { health } from './health';
+import { health, HEALTH_SCOPES } from './health';
 import { useApi } from './session';
 import { usePending, useSettings, useToast, type PendingMeal } from './stores';
 
@@ -108,9 +108,13 @@ export function useMealLogger() {
   return { log, retry: run, dismiss: remove };
 }
 
+// Today and Me both mount the sync hook: one run at a time is enough.
+let syncing = false;
+
 /**
- * Pulls today's activity (steps, active energy, weight) from the watch via
- * the phone's health store and sends it to the server, at most every 10 min.
+ * Pulls today's activity (steps, active energy, weight) and recent workouts
+ * from the watch via the phone's health store and sends them to the server,
+ * at most every 10 min (weights every 6 h, workouts every hour).
  */
 export function useHealthSync(today: string) {
   const api = useApi();
@@ -120,26 +124,44 @@ export function useHealthSync(today: string) {
 
   const sync = useCallback(
     async (force = false) => {
-      if (!enabled || !health.source) return;
-      const { lastHealthSync } = useSettings.getState();
+      if (!enabled || !health.source || syncing) return;
+      const { lastHealthSync, healthScopes } = useSettings.getState();
       if (!force && Date.now() - lastHealthSync < 10 * 60_000) return;
+      syncing = true;
       try {
-        const day = await health.readDay(new Date());
-        await api.putActivity({ localDate: today, ...day, source: health.source });
-        setSettings({ lastHealthSync: Date.now() });
-        void queryClient.invalidateQueries({ queryKey: ['day', today] });
-      } catch {
-        // Health data is a bonus: never block the app on it.
+        // Connected with an older version: ask once for the new types (workouts, height…).
+        if (healthScopes < HEALTH_SCOPES) {
+          await health.connect().catch(() => false);
+          setSettings({ healthScopes: HEALTH_SCOPES });
+        }
+        await syncDay();
+        await syncWeights();
+        await syncWorkouts();
+      } finally {
+        syncing = false;
       }
+
+      async function syncDay() {
+        try {
+          const day = await health.readDay(new Date());
+          await api.putActivity({ localDate: today, ...day, source: health.source! });
+          setSettings({ lastHealthSync: Date.now() });
+          void queryClient.invalidateQueries({ queryKey: ['day', today] });
+        } catch {
+          // Health data is a bonus: never block the app on it.
+        }
+      }
+
       // Weight history: 90 days the first time, then the last two weeks, every 6 hours at most.
-      const { lastWeightSync } = useSettings.getState();
-      if (force || Date.now() - lastWeightSync > 6 * 3_600_000) {
+      async function syncWeights() {
+        const { lastWeightSync } = useSettings.getState();
+        if (!force && Date.now() - lastWeightSync < 6 * 3_600_000) return;
         try {
           const since = new Date(Date.now() - (lastWeightSync ? 14 : 90) * 86_400_000);
           const readings = await health.readWeights(since, new Date());
           if (readings.length) {
             await api.putWeights({
-              source: health.source,
+              source: health.source!,
               samples: readings.map((r) => ({ measuredAt: r.measuredAt.toISOString(), localDate: toLocalDate(r.measuredAt), kg: r.kg })),
             });
             void queryClient.invalidateQueries({ queryKey: ['insights'] });
@@ -148,6 +170,24 @@ export function useHealthSync(today: string) {
           setSettings({ lastWeightSync: Date.now() });
         } catch {
           // Same: weight is a bonus.
+        }
+      }
+
+      // Workouts: 30 days the first time, then the last week, every hour at most. The server de-duplicates.
+      async function syncWorkouts() {
+        const { lastWorkoutSync } = useSettings.getState();
+        if (!force && Date.now() - lastWorkoutSync < 3_600_000) return;
+        try {
+          const since = new Date(Date.now() - (lastWorkoutSync ? 7 : 30) * 86_400_000);
+          const workouts = await health.readWorkouts(since, new Date());
+          for (let i = 0; i < workouts.length; i += 500) await api.putWorkouts(workouts.slice(i, i + 500));
+          setSettings({ lastWorkoutSync: Date.now() });
+          if (workouts.length) {
+            void queryClient.invalidateQueries({ queryKey: ['day'] });
+            void queryClient.invalidateQueries({ queryKey: ['insights'] });
+          }
+        } catch {
+          // Same: workouts are a bonus.
         }
       }
     },
@@ -163,4 +203,13 @@ export function useHealthSync(today: string) {
   }, [sync]);
 
   return sync;
+}
+
+/** Invalidates everything a workout change can affect. */
+export function useRefreshAfterWorkout() {
+  const queryClient = useQueryClient();
+  return useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['day'] });
+    void queryClient.invalidateQueries({ queryKey: ['insights'] });
+  }, [queryClient]);
 }

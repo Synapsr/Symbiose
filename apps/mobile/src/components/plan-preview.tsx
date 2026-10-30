@@ -1,5 +1,5 @@
-import type { EnergyBreakdown, GoalPlan, NutrientKey, Targets } from '@symbiose/shared';
-import { Check, Leaf, Watch } from 'lucide-react-native';
+import { activityGoalsFor, type EnergyBreakdown, type GoalPlan, type NutrientKey, type Targets } from '@symbiose/shared';
+import { Check, Dumbbell, Footprints, Leaf, SportShoe, Watch } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { Card, Dot, Row, Txt } from '@/components/ui';
@@ -22,6 +22,14 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
         : t('plan.maintain');
 
   const shown: NutrientKey[] = [...new Set<NutrientKey>([...plan.focus.filter((k) => k !== 'kcal'), ...plan.rules.map((r) => r.nutrient), 'protein'])].slice(0, 5);
+  // Movement guardrails: the plan's own, or the goal-based defaults.
+  const activity = activityGoalsFor(plan);
+  const moves = [
+    activity.weeklyActiveMinutes > 0 ? { key: 'minutes', icon: SportShoe, text: t('plan.activity.minutes', { count: formatNumber(activity.weeklyActiveMinutes, locale) }) } : null,
+    activity.dailySteps ? { key: 'steps', icon: Footprints, text: t('plan.activity.steps', { count: formatNumber(activity.dailySteps, locale) }) } : null,
+    activity.weeklyStrengthSessions ? { key: 'strength', icon: Dumbbell, text: t('plan.activity.strength', { count: activity.weeklyStrengthSessions }) } : null,
+  ].filter((m) => m !== null);
+
   const kindLabel = (k: NutrientKey) => t(targets[k].kind === 'max' ? 'plan.kind.max' : targets[k].kind === 'min' ? 'plan.kind.min' : 'plan.kind.target');
 
   return (
@@ -98,6 +106,22 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
                   </Txt>
                 ) : null}
               </View>
+            </Row>
+          ))}
+        </Card>
+      ) : null}
+
+      {moves.length ? (
+        <Card style={{ gap: Space.md }}>
+          <Txt variant="overline" tone="secondary">
+            {t('plan.activity')}
+          </Txt>
+          {moves.map(({ key, icon: Icon, text }) => (
+            <Row key={key} gap={Space.md}>
+              <Icon size={18} color={colors.accent} />
+              <Txt variant="label" style={{ flex: 1 }}>
+                {text}
+              </Txt>
             </Row>
           ))}
         </Card>

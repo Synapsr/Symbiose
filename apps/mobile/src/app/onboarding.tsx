@@ -1,6 +1,6 @@
 import type { ActivityLevel, GoalsResponse, Profile, Sex } from '@symbiose/shared';
 import { useMutation } from '@tanstack/react-query';
-import { ChevronLeft, Sparkles, Watch } from 'lucide-react-native';
+import { ChevronLeft, Flame, HeartPulse, Ruler, Sparkles, Watch } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -9,21 +9,27 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GoalComposer } from '@/components/goal-composer';
 import { PlanPreview } from '@/components/plan-preview';
 import { ActivityPicker, BodyFields, parseBody, SexPicker, type BodyValues } from '@/components/profile-fields';
-import { Button, Field, IconButton, Row, Txt } from '@/components/ui';
+import { Button, Field, IconButton, Reveal, Row, Txt } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { deviceLocale, useI18n } from '@/i18n';
 import { haptics } from '@/lib/haptics';
-import { health } from '@/lib/health';
+import { health, HEALTH_SCOPES, type HealthProfile } from '@/lib/health';
 import { errorMessage } from '@/lib/hooks';
 import { useApi, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
-type Step = 'name' | 'sex' | 'body' | 'activity' | 'goals' | 'plan' | 'health';
+type Step = 'name' | 'health' | 'sex' | 'body' | 'activity' | 'goals' | 'plan';
+
+const BENEFITS = [
+  { icon: Ruler, key: 'onb.health.b1' },
+  { icon: Flame, key: 'onb.health.b2' },
+  { icon: HeartPulse, key: 'onb.health.b3' },
+] as const;
 
 export default function Onboarding() {
-  const { t } = useI18n();
-  const { colors } = useTheme();
+  const { t, locale } = useI18n();
+  const { colors, elevation } = useTheme();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const user = useUser();
@@ -34,7 +40,10 @@ export default function Onboarding() {
   useEffect(() => {
     void health.isAvailable().then(setHealthAvailable).catch(() => setHealthAvailable(false));
   }, []);
-  const steps: Step[] = ['name', 'sex', 'body', 'activity', 'goals', 'plan', ...(healthAvailable ? (['health'] as const) : [])];
+  // Sex already known from the health store: no need to ask.
+  const [sexFromHealth, setSexFromHealth] = useState(false);
+  const [bodyFromHealth, setBodyFromHealth] = useState(false);
+  const steps: Step[] = ['name', ...(healthAvailable ? (['health'] as const) : []), ...(sexFromHealth ? [] : (['sex'] as const)), 'body', 'activity', 'goals', 'plan'];
 
   const [step, setStep] = useState<Step>(user.profile ? 'goals' : 'name');
   const [name, setName] = useState(user.profile?.name ?? user.name);
@@ -55,6 +64,29 @@ export default function Onboarding() {
     setError(null);
     setStep(next);
   };
+  const afterName = healthAvailable ? 'health' : 'sex';
+
+  // Health first: one permission sheet, then the profile fills itself.
+  const connectHealth = useMutation({
+    mutationFn: async (): Promise<HealthProfile> => {
+      const granted = await health.connect().catch(() => false);
+      if (!granted) return {};
+      setSettings({ healthEnabled: true, healthScopes: HEALTH_SCOPES });
+      return health.readProfile().catch(() => ({}));
+    },
+    onSuccess: (found) => {
+      if (found.sex) setSex(found.sex);
+      setSexFromHealth(Boolean(found.sex));
+      setBody((current) => ({
+        birthYear: found.birthYear ? String(found.birthYear) : current.birthYear,
+        heightCm: found.heightCm ? String(found.heightCm) : current.heightCm,
+        weightKg: found.weightKg ? String(found.weightKg).replace('.', locale === 'fr' ? ',' : '.') : current.weightKg,
+      }));
+      setBodyFromHealth(Boolean(found.birthYear || found.heightCm || found.weightKg));
+      if (found.sex || found.birthYear || found.heightCm || found.weightKg) haptics.success();
+      go(found.sex ? 'body' : 'sex');
+    },
+  });
 
   const saveProfile = useMutation({
     mutationFn: (level: ActivityLevel) => {
@@ -99,16 +131,17 @@ export default function Onboarding() {
     onError: (e) => setError(errorMessage(e, t('common.error'), t('common.offline'))),
   });
 
-  const connectHealth = async () => {
-    const granted = await health.connect().catch(() => false);
-    if (granted) setSettings({ healthEnabled: true });
-    finish.mutate();
-  };
-
   const primary = (() => {
     switch (step) {
       case 'name':
-        return { title: t('common.continue'), onPress: () => go('sex'), disabled: !name.trim() };
+        return { title: t('common.continue'), onPress: () => go(afterName), disabled: !name.trim() };
+      case 'health':
+        return {
+          title: t('onb.health.connect'),
+          onPress: () => connectHealth.mutate(),
+          loading: connectHealth.isPending,
+          icon: <Watch size={18} color={colors.onInverted} />,
+        };
       case 'sex':
         return { title: t('common.continue'), onPress: () => go('body'), disabled: !sex };
       case 'body':
@@ -124,13 +157,7 @@ export default function Onboarding() {
           icon: <Sparkles size={18} color={colors.onInverted} />,
         };
       case 'plan':
-        return {
-          title: t('onb.plan.start'),
-          onPress: () => (healthAvailable ? go('health') : finish.mutate()),
-          loading: finish.isPending,
-        };
-      case 'health':
-        return { title: t('onb.health.connect'), onPress: connectHealth, loading: finish.isPending, icon: <Watch size={18} color={colors.onInverted} /> };
+        return { title: t('onb.plan.start'), onPress: () => finish.mutate(), loading: finish.isPending };
     }
   })();
 
@@ -155,8 +182,33 @@ export default function Onboarding() {
           {step === 'name' ? (
             <>
               <Txt variant="title">{t('onb.name.title')}</Txt>
-              <Field value={name} onChangeText={setName} placeholder={t('onb.name.placeholder')} autoFocus autoComplete="given-name" onSubmitEditing={() => name.trim() && go('sex')} />
+              <Field value={name} onChangeText={setName} placeholder={t('onb.name.placeholder')} autoFocus autoComplete="given-name" onSubmitEditing={() => name.trim() && go(afterName)} />
             </>
+          ) : null}
+          {step === 'health' ? (
+            <View style={{ gap: Space.xxl }}>
+              <View style={{ gap: Space.lg, alignItems: 'flex-start' }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+                  <Watch size={34} color={colors.accent} />
+                </View>
+                <Txt variant="title">{t('onb.health.title')}</Txt>
+              </View>
+              <View style={{ gap: Space.lg }}>
+                {BENEFITS.map(({ icon: Icon, key }, i) => (
+                  <Reveal key={key} index={i + 1}>
+                    <Row gap={Space.md}>
+                      <View style={[{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }, elevation]}>
+                        <Icon size={18} color={colors.text} />
+                      </View>
+                      <Txt style={{ flex: 1 }}>{t(key, { store: health.storeName })}</Txt>
+                    </Row>
+                  </Reveal>
+                ))}
+              </View>
+              <Txt variant="caption" tone="tertiary">
+                {t('onb.health.note')}
+              </Txt>
+            </View>
           ) : null}
           {step === 'sex' ? (
             <>
@@ -172,7 +224,17 @@ export default function Onboarding() {
           ) : null}
           {step === 'body' ? (
             <>
-              <Txt variant="title">{t('onb.body.title')}</Txt>
+              <View style={{ gap: Space.sm }}>
+                <Txt variant="title">{t('onb.body.title')}</Txt>
+                {bodyFromHealth ? (
+                  <Row gap={6}>
+                    <HeartPulse size={14} color={colors.accent} />
+                    <Txt variant="caption" tone="accent">
+                      {t('onb.body.fromHealth', { store: health.storeName })}
+                    </Txt>
+                  </Row>
+                ) : null}
+              </View>
               <BodyFields value={body} onChange={setBody} />
             </>
           ) : null}
@@ -199,15 +261,6 @@ export default function Onboarding() {
           {step === 'plan' && draft?.plan && draft.targets && draft.energy ? (
             <PlanPreview plan={draft.plan} targets={draft.targets} energy={draft.energy} aiGenerated={draft.aiGenerated} />
           ) : null}
-          {step === 'health' ? (
-            <View style={{ gap: Space.lg, alignItems: 'flex-start' }}>
-              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-                <Watch size={34} color={colors.accent} />
-              </View>
-              <Txt variant="title">{t('onb.health.title')}</Txt>
-              <Txt tone="secondary">{t('onb.health.subtitle', { store: health.storeName })}</Txt>
-            </View>
-          ) : null}
         </Animated.View>
       </ScrollView>
 
@@ -219,7 +272,7 @@ export default function Onboarding() {
         ) : null}
         {step !== 'sex' && !(step === 'goals' && makePlan.isPending) ? <Button {...primary} /> : null}
         {step === 'plan' ? <Button title={t('onb.plan.adjust')} variant="ghost" onPress={() => go('goals')} /> : null}
-        {step === 'health' ? <Button title={t('common.later')} variant="ghost" onPress={() => finish.mutate()} /> : null}
+        {step === 'health' ? <Button title={t('common.later')} variant="ghost" onPress={() => go(sexFromHealth ? 'body' : 'sex')} disabled={connectHealth.isPending} /> : null}
       </View>
     </KeyboardAvoidingView>
   );

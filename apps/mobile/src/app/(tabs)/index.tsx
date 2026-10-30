@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EnergyCard, heroNutrient, NutrientBars } from '@/components/today/energy-card';
 import { MealCard, PendingMealCard } from '@/components/today/meal-card';
+import { MoveCard } from '@/components/today/move-card';
 import { WeekStrip } from '@/components/today/week-strip';
 import { Card, Pressy, Reveal, Row, SectionTitle, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
@@ -107,6 +108,11 @@ export default function Today() {
               <Reveal index={4}>
                 <NutrientBars day={day.data} plan={user.plan} hero={hero} />
               </Reveal>
+              {day.data.activityWeek ? (
+                <Reveal index={5}>
+                  <MoveCard day={day.data} isToday={date === today} />
+                </Reveal>
+              ) : null}
             </>
           ) : day.error ? (
             <Card>
@@ -121,7 +127,7 @@ export default function Today() {
         </View>
 
         {showCraving ? (
-          <Reveal index={5}>
+          <Reveal index={6}>
             <Pressy
               onPress={() => router.push('/craving')}
               style={{ marginTop: Space.lg, flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.accentSoft }}>
@@ -140,7 +146,7 @@ export default function Today() {
           </Reveal>
         ) : null}
 
-        <Reveal index={6}>
+        <Reveal index={7}>
           <SectionTitle>{t('today.meals')}</SectionTitle>
           <View style={{ gap: Space.sm }}>
             {pending.map((p) => (

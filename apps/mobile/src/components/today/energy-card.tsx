@@ -1,5 +1,5 @@
 import type { DaySummary, GoalPlan, NutrientKey, NutrientProgress } from '@symbiose/shared';
-import { Flame, Footprints, Watch } from 'lucide-react-native';
+import { Flame, Watch } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AnimatedNumber, Bar, Card, Dot, Glow, Ring, Row, Txt } from '@/components/ui';
@@ -91,29 +91,20 @@ function KcalLine({ progress }: { progress: NutrientProgress }) {
   );
 }
 
+/** Energy burned today, from the watch or the day's sessions. Steps live in the Movement card. */
 function ActivityLine({ day, hideCalories }: { day: DaySummary; hideCalories: boolean }) {
   const { locale, t } = useI18n();
   const { colors } = useTheme();
-  const a = day.activity;
-  if (!a || (a.activeKcal === null && a.steps === null)) return null;
+  const activeKcal = day.activity?.activeKcal ?? (day.energy.source === 'activity' ? day.energy.activeKcal : null);
+  if (activeKcal === null || hideCalories) return null;
   return (
     <Row gap={Space.lg}>
-      {a.steps !== null ? (
-        <Row gap={5}>
-          <Footprints size={14} color={colors.text2} />
-          <Txt variant="caption" tone="secondary">
-            {t('today.steps', { count: formatNumber(a.steps, locale) })}
-          </Txt>
-        </Row>
-      ) : null}
-      {a.activeKcal !== null && !hideCalories ? (
-        <Row gap={5}>
-          <Flame size={14} color={colors.warning} />
-          <Txt variant="caption" tone="secondary">
-            {formatNumber(a.activeKcal, locale)} kcal {t('today.burned').toLowerCase()}
-          </Txt>
-        </Row>
-      ) : null}
+      <Row gap={5}>
+        <Flame size={14} color={colors.warning} />
+        <Txt variant="caption" tone="secondary">
+          {formatNumber(activeKcal, locale)} kcal {t('today.burned').toLowerCase()}
+        </Txt>
+      </Row>
       {day.energy.source === 'activity' ? <Watch size={14} color={colors.accent} /> : null}
     </Row>
   );
