@@ -26,6 +26,7 @@ import type { Db } from '../db';
 import { activity, cravings, meals, type ActivityRow, type CravingRow } from '../db/schema';
 import { toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
+import { weightTrend } from './weights';
 
 export function toActivity(row: ActivityRow): DayActivity {
   return {
@@ -143,6 +144,9 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     .all();
 
   const activityByDay = new Map(activityRows.map((row) => [row.localDate, row]));
+  // Weight is shown over at least 30 days: a week is too short to see a trend.
+  const weight = weightTrend(db, userId, to, Math.max(dateRange(from, to).length, 30));
+  const weightByDay = new Map(weight.points.map((p) => [p.date, p.kg]));
   const mealsByDay = new Map<string, typeof rangeMeals>();
   for (const meal of rangeMeals) mealsByDay.set(meal.localDate, [...(mealsByDay.get(meal.localDate) ?? []), meal]);
 
@@ -165,7 +169,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       totals,
       kcalTarget: targets.kcal.value,
       activeKcal: act?.activeKcal ?? null,
-      weightKg: act?.weightKg ?? null,
+      weightKg: weightByDay.get(date) ?? null,
     });
     if (!logged) continue;
     for (const key of watched) {
@@ -237,6 +241,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       resisted: rangeCravings.filter((c) => c.outcome === 'resisted').length,
       topWhat: [...whatCounts.values()].sort((a, b) => b.count - a.count).slice(0, 3).map((w) => w.label),
     },
+    weight,
     streak: streakFor(db, userId, to),
   };
 }

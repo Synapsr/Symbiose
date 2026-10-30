@@ -1,6 +1,7 @@
 import {
   getMostRecentQuantitySample,
   isHealthDataAvailableAsync,
+  queryQuantitySamples,
   queryStatisticsForQuantity,
   requestAuthorization,
   saveQuantitySample,
@@ -58,6 +59,16 @@ export const health: HealthBridge = {
     return { steps, activeKcal, restingKcal, weightKg: weight?.quantity ?? null };
   },
 
+  async readWeights(from, to) {
+    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierBodyMass', {
+      filter: { date: { startDate: from, endDate: to } },
+      ascending: true,
+      limit: 0,
+      unit: 'kg',
+    });
+    return samples.map((sample) => ({ measuredAt: sample.startDate, kg: sample.quantity }));
+  },
+
   async writeMeal(meal: Meal) {
     const { start, end } = mealWindow(meal);
     const t = meal.totals;
@@ -75,4 +86,4 @@ export const health: HealthBridge = {
   },
 };
 
-export type { DayHealth, HealthBridge } from './types';
+export type { DayHealth, HealthBridge, WeightReading } from './types';

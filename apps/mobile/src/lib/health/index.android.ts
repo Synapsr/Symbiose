@@ -55,6 +55,15 @@ export const health: HealthBridge = {
     };
   },
 
+  async readWeights(from, to) {
+    await ensureInit();
+    const { records } = await readRecords('Weight', {
+      timeRangeFilter: { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() },
+      ascendingOrder: true,
+    });
+    return records.map((record) => ({ measuredAt: new Date(record.time), kg: record.weight.inKilograms }));
+  },
+
   async writeMeal(meal: Meal) {
     await ensureInit();
     const { start, end } = mealWindow(meal);
@@ -80,4 +89,4 @@ export const health: HealthBridge = {
   },
 };
 
-export type { DayHealth, HealthBridge } from './types';
+export type { DayHealth, HealthBridge, WeightReading } from './types';

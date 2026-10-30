@@ -8,6 +8,11 @@ export interface DayHealth {
   weightKg: number | null;
 }
 
+export interface WeightReading {
+  measuredAt: Date;
+  kg: number;
+}
+
 /**
  * Bridge to the phone's health store, which aggregates the watch's data:
  * Apple Health on iOS (Apple Watch), Health Connect on Android (Wear OS,
@@ -21,6 +26,8 @@ export interface HealthBridge {
   /** Asks for read (activity, weight) and write (nutrition) permissions. */
   connect(): Promise<boolean>;
   readDay(day: Date): Promise<DayHealth>;
+  /** Every body-weight reading between two dates (from a connected scale or typed into Health). */
+  readWeights(from: Date, to: Date): Promise<WeightReading[]>;
   writeMeal(meal: Meal): Promise<void>;
 }
 

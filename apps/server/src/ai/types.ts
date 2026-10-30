@@ -10,6 +10,7 @@ import type {
   Review,
   Targets,
   Verdict,
+  WeightTrend,
 } from '@symbiose/shared';
 
 /** What the AI knows about the person when it reasons about a meal. */
@@ -57,6 +58,7 @@ export interface PlanDraftInput {
   profile: Profile;
   intentions: string;
   previousPlan: GoalPlan | null;
+  weight: WeightTrend;
 }
 
 export type PlanDraft = Omit<GoalPlan, 'intentions' | 'overrides'>;
@@ -70,7 +72,7 @@ export interface CoachInput extends UserContext {
   history: CoachTurn[];
   message: string;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & { meals: { time: string; title: string; kcal: number }[] };
-  week: Pick<InsightsResponse, 'averages' | 'loggedDays' | 'adherence' | 'topSources' | 'byHour' | 'cravings'>;
+  week: Pick<InsightsResponse, 'averages' | 'loggedDays' | 'adherence' | 'topSources' | 'byHour' | 'cravings' | 'weight'>;
 }
 
 export interface CoachOutput {

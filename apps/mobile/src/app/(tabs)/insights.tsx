@@ -6,12 +6,13 @@ import { Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DayBars, HourBars, Sparkline } from '@/components/insights/charts';
+import { DayBars, HourBars } from '@/components/insights/charts';
+import { WeightCard } from '@/components/insights/weight-card';
 import { Bar, Button, Card, Dot, Row, SectionTitle, Segmented, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount, formatNumber, weekdayInitial } from '@/lib/format';
 import { errorMessage, useToday } from '@/lib/hooks';
-import { useApi } from '@/lib/session';
+import { useApi, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
@@ -20,6 +21,7 @@ export default function Insights() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const user = useUser();
   const today = useToday();
   const hideCalories = useSettings((s) => s.hideCalories);
   const [range, setRange] = useState<'7' | '30'>('7');
@@ -30,7 +32,8 @@ export default function Insights() {
 
   const primary = data?.focus[0] ?? 'kcal';
   const primaryAdherence = data?.adherence.find((a) => a.nutrient === primary);
-  const weights = data?.days.map((d) => d.weightKg).filter((w): w is number => w !== null) ?? [];
+  // Weight comes first when the goals are about body weight.
+  const weightFirst = Boolean(user.plan && user.plan.calorieMode !== 'maintain');
 
   return (
     <ScrollView
@@ -111,6 +114,8 @@ export default function Insights() {
             ) : null}
           </Card>
 
+          {weightFirst ? <WeightCard weight={data.weight} plan={user.plan} /> : null}
+
           {data.adherence.length ? (
             <>
               <SectionTitle>{t('insights.adherence')}</SectionTitle>
@@ -171,30 +176,21 @@ export default function Insights() {
             </>
           ) : null}
 
-          <Row gap={Space.md} style={{ alignItems: 'stretch' }}>
-            {data.cravings.total > 0 ? (
-              <Card style={{ flex: 1, gap: 4 }}>
-                <Txt variant="overline" tone="secondary">
-                  {t('insights.cravings')}
+          {data.cravings.total > 0 ? (
+            <Card style={{ gap: 4 }}>
+              <Txt variant="overline" tone="secondary">
+                {t('insights.cravings')}
+              </Txt>
+              <Txt variant="number">{t('insights.cravingsBody', { resisted: data.cravings.resisted, total: data.cravings.total })}</Txt>
+              {data.cravings.topWhat.length ? (
+                <Txt variant="caption" tone="tertiary">
+                  {data.cravings.topWhat.join(' · ')}
                 </Txt>
-                <Txt variant="number">{t('insights.cravingsBody', { resisted: data.cravings.resisted, total: data.cravings.total })}</Txt>
-                {data.cravings.topWhat.length ? (
-                  <Txt variant="caption" tone="tertiary">
-                    {data.cravings.topWhat.join(' · ')}
-                  </Txt>
-                ) : null}
-              </Card>
-            ) : null}
-            {weights.length >= 2 ? (
-              <Card style={{ flex: 1, gap: 4 }}>
-                <Txt variant="overline" tone="secondary">
-                  {t('insights.weight')}
-                </Txt>
-                <Txt variant="number">{formatNumber(weights.at(-1)!, locale, 1)} kg</Txt>
-                <Sparkline values={weights} color={colors.accent} />
-              </Card>
-            ) : null}
-          </Row>
+              ) : null}
+            </Card>
+          ) : null}
+
+          {!weightFirst ? <WeightCard weight={data.weight} plan={user.plan} /> : null}
 
           <SectionTitle>{t('insights.review')}</SectionTitle>
           <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>

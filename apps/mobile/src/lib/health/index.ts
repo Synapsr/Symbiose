@@ -7,7 +7,8 @@ export const health: HealthBridge = {
   isAvailable: async () => false,
   connect: async () => false,
   readDay: async () => ({ steps: null, activeKcal: null, restingKcal: null, weightKg: null }),
+  readWeights: async () => [],
   writeMeal: async () => undefined,
 };
 
-export type { DayHealth, HealthBridge } from './types';
+export type { DayHealth, HealthBridge, WeightReading } from './types';

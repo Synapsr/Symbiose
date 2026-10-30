@@ -58,6 +58,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
       topSources: week.topSources,
       byHour: week.byHour,
       cravings: week.cravings,
+      weight: week.weight,
     },
   };
 }

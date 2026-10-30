@@ -9,6 +9,7 @@ import { HttpError } from '../errors';
 import { validate, type Deps } from '../http';
 import { heuristicPlan, planFromDraft } from '../services/goals';
 import { resolveUser } from '../services/users';
+import { weightTrend } from '../services/weights';
 
 export function goalRoutes({ db, ai, config }: Deps) {
   const app = new Hono<AuthEnv>();
@@ -28,7 +29,16 @@ export function goalRoutes({ db, ai, config }: Deps) {
     if (!profile) throw new HttpError(409, 'profile_required', 'Complete your profile first');
 
     const plan = ai.enabled
-      ? planFromDraft(await ai.draftPlan({ locale: profile.locale, profile, intentions, previousPlan: resolved.row.plan ?? null }), intentions)
+      ? planFromDraft(
+          await ai.draftPlan({
+            locale: profile.locale,
+            profile,
+            intentions,
+            previousPlan: resolved.row.plan ?? null,
+            weight: weightTrend(db, c.get('userId'), toLocalDate(), 90),
+          }),
+          intentions,
+        )
       : heuristicPlan(intentions, profile.locale);
     const { targets, energy } = computeTargets(profile, plan);
     return c.json<GoalsResponse & { aiGenerated: boolean }>({ plan, targets, energy, aiGenerated: ai.enabled });

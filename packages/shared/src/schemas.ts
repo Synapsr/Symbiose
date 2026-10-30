@@ -241,6 +241,41 @@ export interface DayActivity {
   updatedAt: string;
 }
 
+// ---------------------------------------------------------------- Weight
+
+export const WeightSourceSchema = z.enum(['healthkit', 'health_connect', 'manual']);
+
+/** Body weight readings (from a connected scale via the health store, or typed in). */
+export const WeightInputSchema = z.object({
+  samples: z
+    .array(
+      z.object({
+        /** ISO timestamp of the reading. */
+        measuredAt: z.string().min(10).max(40),
+        localDate: isoDate,
+        kg: z.number().min(25).max(400),
+      }),
+    )
+    .min(1)
+    .max(2000),
+  source: WeightSourceSchema,
+});
+export type WeightInput = z.input<typeof WeightInputSchema>;
+
+export interface WeightPoint {
+  date: string;
+  kg: number;
+}
+
+export interface WeightTrend {
+  /** One point per day with a reading, oldest first. */
+  points: WeightPoint[];
+  latest: WeightPoint | null;
+  /** Difference between the average of the last 7 days and of the first 7 days of the window. */
+  changeKg: number | null;
+  windowDays: number;
+}
+
 // ---------------------------------------------------------------- Cravings
 
 export const CravingInputSchema = z.object({
@@ -328,6 +363,7 @@ export interface InsightsResponse {
   /** For the primary focus nutrient: amount consumed per local hour (0..23). */
   byHour: { nutrient: NutrientKey; hours: number[] };
   cravings: { total: number; resisted: number; topWhat: string[] };
+  weight: WeightTrend;
   streak: number;
 }
 

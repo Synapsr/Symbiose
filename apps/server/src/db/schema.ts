@@ -62,6 +62,22 @@ export const activity = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
 );
 
+/** One body-weight reading per day (the most recent one of that day). */
+export const weights = sqliteTable(
+  'weights',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    localDate: text('local_date').notNull(),
+    kg: real('kg').notNull(),
+    measuredAt: text('measured_at').notNull(),
+    source: text('source').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
+);
+
 export const cravings = sqliteTable(
   'cravings',
   {
@@ -109,4 +125,5 @@ export type UserRow = typeof users.$inferSelect;
 export type MealRow = typeof meals.$inferSelect;
 export type CravingRow = typeof cravings.$inferSelect;
 export type ActivityRow = typeof activity.$inferSelect;
+export type WeightRow = typeof weights.$inferSelect;
 export type CoachMessageRow = typeof coachMessages.$inferSelect;

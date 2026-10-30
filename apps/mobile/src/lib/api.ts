@@ -20,6 +20,7 @@ import type {
   ServerInfo,
   UpdateMealInput,
   User,
+  WeightInput,
 } from '@symbiose/shared';
 import { fetch as streamingFetch } from 'expo/fetch';
 
@@ -106,6 +107,7 @@ export function createApi(baseUrl: string, token: string) {
     barcode: (code: string) => call<FoodItem>('GET', `/api/foods/barcode/${code}`),
 
     putActivity: (input: ActivityInput) => call<DayActivity>('PUT', '/api/activity', input),
+    putWeights: (input: WeightInput) => call<{ written: number }>('PUT', '/api/weights', input),
 
     createCraving: (input: CravingInput) => call<{ craving: Craving; alternative: string }>('POST', '/api/cravings', input, 60_000),
     updateCraving: (id: string, outcome: CravingOutcome) => call<Craving>('PATCH', `/api/cravings/${id}`, { outcome }),

@@ -189,7 +189,8 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
 
     async draftPlan(input) {
       const ctx: UserContext = { locale: input.locale, profile: input.profile, plan: input.previousPlan, targets: null };
-      const text = `${contextBlock(ctx)}\n\nMy goals, in my own words:\n${input.intentions}`;
+      const weight = { latestKg: input.weight.latest?.kg ?? null, changeKgOver90Days: input.weight.changeKg, readings: input.weight.points.length };
+      const text = `${contextBlock(ctx, { weightTrend: weight })}\n\nMy goals, in my own words:\n${input.intentions}`;
       return run({ system: GOAL_PLANNER, content: [{ type: 'text', text }], schema: PlanOut, effort: 'medium' });
     },
 

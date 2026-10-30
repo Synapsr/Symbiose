@@ -5,7 +5,7 @@ import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, coachMessages, cravings, meals, users } from '../db/schema';
+import { activity, coachMessages, cravings, meals, users, weights } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { toActivity, toCraving } from '../services/day';
@@ -78,6 +78,7 @@ export function meRoutes({ db, config, photos }: Deps) {
       user,
       meals: db.select().from(meals).where(eq(meals.userId, userId)).all().map(toMeal),
       activity: db.select().from(activity).where(eq(activity.userId, userId)).all().map(toActivity),
+      weights: db.select().from(weights).where(eq(weights.userId, userId)).all(),
       cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
       coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),
     };

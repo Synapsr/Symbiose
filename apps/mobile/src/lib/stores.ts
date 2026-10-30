@@ -10,7 +10,8 @@ interface SettingsState {
   hideCalories: boolean;
   healthEnabled: boolean;
   lastHealthSync: number;
-  set: (patch: Partial<Pick<SettingsState, 'hideCalories' | 'healthEnabled' | 'lastHealthSync'>>) => void;
+  lastWeightSync: number;
+  set: (patch: Partial<Pick<SettingsState, 'hideCalories' | 'healthEnabled' | 'lastHealthSync' | 'lastWeightSync'>>) => void;
   load: () => Promise<void>;
 }
 
@@ -21,10 +22,11 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   hideCalories: false,
   healthEnabled: false,
   lastHealthSync: 0,
+  lastWeightSync: 0,
   set: (patch) => {
     set(patch);
-    const { hideCalories, healthEnabled } = get();
-    void storage.set(SETTINGS_KEY, JSON.stringify({ hideCalories, healthEnabled })).catch(() => undefined);
+    const { hideCalories, healthEnabled, lastWeightSync } = get();
+    void storage.set(SETTINGS_KEY, JSON.stringify({ hideCalories, healthEnabled, lastWeightSync })).catch(() => undefined);
   },
   load: async () => {
     try {

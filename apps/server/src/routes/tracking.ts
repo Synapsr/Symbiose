@@ -15,18 +15,21 @@ import {
   type InsightsResponse,
   type LibraryResponse,
   type Review,
+  type WeightTrend,
+  WeightInputSchema,
 } from '@symbiose/shared';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 
 import { requireAuth, type AuthEnv } from '../auth';
-import { activity, aiCache, cravings, users } from '../db/schema';
+import { activity, aiCache, cravings } from '../db/schema';
 import { HttpError, notFound } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary, library, toActivity, toCraving } from '../services/day';
 import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
+import { upsertWeights, weightTrend } from '../services/weights';
 
 const FALLBACK_TIPS = {
   fr: [
@@ -85,11 +88,21 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
       .returning()
       .get();
     // A fresh weight reading from a scale keeps targets accurate.
-    const user = resolveUser(db, userId).row;
-    if (input.weightKg && user.profile && input.localDate >= toLocalDate(new Date(Date.now() - 86_400_000))) {
-      db.update(users).set({ profile: { ...user.profile, weightKg: Math.round(input.weightKg * 10) / 10 } }).where(eq(users.id, userId)).run();
+    if (input.weightKg) {
+      upsertWeights(db, userId, { source: input.source, samples: [{ localDate: input.localDate, kg: input.weightKg, measuredAt: new Date().toISOString() }] });
     }
     return c.json<DayActivity>(toActivity(row));
+  });
+
+  /** Body-weight readings, typically the history from Apple Health / Health Connect. */
+  app.put('/weights', validate('json', WeightInputSchema), (c) => {
+    const written = upsertWeights(db, c.get('userId'), c.req.valid('json'));
+    return c.json({ written });
+  });
+
+  app.get('/weights', validate('query', z.object({ days: z.coerce.number().int().min(1).max(730).default(90), to: LocalDateSchema.optional() })), (c) => {
+    const { days, to = toLocalDate() } = c.req.valid('query');
+    return c.json<WeightTrend>(weightTrend(db, c.get('userId'), to, days));
   });
 
   app.post('/cravings', validate('json', CravingInputSchema), async (c) => {

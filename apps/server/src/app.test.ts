@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { toLocalDate, toLocalDateTime, type AuthResponse, type DaySummary, type GoalsResponse, type Meal, type Profile } from '@symbiose/shared';
+import { addDays, toLocalDate, toLocalDateTime, type AuthResponse, type DaySummary, type GoalsResponse, type Meal, type Profile } from '@symbiose/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDisabledAi } from './ai/claude';
@@ -287,6 +287,33 @@ describe('Symbiose API', () => {
 
     const me = await request<{ profile: Profile }>('GET', '/api/me');
     expect(me.body.profile.weightKg).toBe(74.2);
+  });
+
+  it('imports weight history from the health store and shows the trend', async () => {
+    const samples = [];
+    for (let i = 20; i >= 1; i--) {
+      const day = addDays(today, -i);
+      // Two readings on some days: the latest one of the day wins.
+      samples.push({ localDate: day, measuredAt: `${day}T07:00:00Z`, kg: 76 - (20 - i) * 0.1 });
+      if (i % 5 === 0) samples.push({ localDate: day, measuredAt: `${day}T21:00:00Z`, kg: 90 });
+    }
+    const res = await request<{ written: number }>('PUT', '/api/weights', { source: 'healthkit', samples });
+    expect(res.status).toBe(200);
+    expect(res.body.written).toBe(20);
+
+    // Today's reading came from the activity sync (74.2); it stays the latest.
+    const trend = await request<{ points: { date: string; kg: number }[]; latest: { kg: number }; changeKg: number }>('GET', '/api/weights?days=30');
+    expect(trend.body.points).toHaveLength(21);
+    expect(trend.body.latest.kg).toBe(74.2);
+    expect(trend.body.points.find((p) => p.date === addDays(today, -5))?.kg).toBe(90);
+    expect(trend.body.changeKg).toBeLessThan(0);
+
+    const me = await request<{ profile: Profile }>('GET', '/api/me');
+    expect(me.body.profile.weightKg).toBe(74.2);
+
+    const insights = await request<{ weight: { points: unknown[]; windowDays: number } }>('GET', '/api/insights?days=7');
+    expect(insights.body.weight.windowDays).toBe(30);
+    expect(insights.body.weight.points).toHaveLength(21);
   });
 
   it('duplicates meals and builds the quick-log library', async () => {

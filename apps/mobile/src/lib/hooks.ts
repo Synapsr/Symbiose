@@ -131,6 +131,25 @@ export function useHealthSync(today: string) {
       } catch {
         // Health data is a bonus: never block the app on it.
       }
+      // Weight history: 90 days the first time, then the last two weeks, every 6 hours at most.
+      const { lastWeightSync } = useSettings.getState();
+      if (force || Date.now() - lastWeightSync > 6 * 3_600_000) {
+        try {
+          const since = new Date(Date.now() - (lastWeightSync ? 14 : 90) * 86_400_000);
+          const readings = await health.readWeights(since, new Date());
+          if (readings.length) {
+            await api.putWeights({
+              source: health.source,
+              samples: readings.map((r) => ({ measuredAt: r.measuredAt.toISOString(), localDate: toLocalDate(r.measuredAt), kg: r.kg })),
+            });
+            void queryClient.invalidateQueries({ queryKey: ['insights'] });
+            void queryClient.invalidateQueries({ queryKey: ['me'] });
+          }
+          setSettings({ lastWeightSync: Date.now() });
+        } catch {
+          // Same: weight is a bonus.
+        }
+      }
     },
     [api, enabled, queryClient, setSettings, today],
   );
