@@ -35,6 +35,7 @@ Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Sc
 | Variable | Default | |
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | — | Enables photo/text analysis, plans, coach, reviews. Without it, the app still works (barcodes, manual logging, keyword-based plans). |
+| `ANTHROPIC_WORKSPACE_ID` | — | Only for API keys that aren't scoped to a workspace (Claude Console → Settings → Workspaces). |
 | `AI_MODEL` | `claude-opus-5-5` | Any Claude model id. |
 | `PUBLIC_URL` | derived from the request | URL encoded in the QR code (set it behind a reverse proxy). |
 | `ALLOW_SIGNUP` | `false` | Allow more accounts after the first one (family server). |

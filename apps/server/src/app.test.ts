@@ -93,6 +93,7 @@ function makeApp(ai: Ai, overrides: Partial<Config> = {}) {
     jwtSecret: 'test-secret',
     allowSignup: false,
     anthropicApiKey: null,
+    anthropicWorkspaceId: null,
     aiModel: 'fake',
     aiMock: false,
     corsOrigins: ['*'],
@@ -346,6 +347,6 @@ describe('without AI', () => {
       headers,
       body: JSON.stringify({ eatenAt: toLocalDateTime(), localDate: toLocalDate(), text: 'une pomme' }),
     });
-    expect(ai.status).toBe(503);
+    expect(ai.status).toBe(424);
   });
 });

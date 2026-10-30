@@ -16,7 +16,8 @@ import { Space, useTheme } from '@/theme';
 
 type ServerState = { status: 'idle' | 'checking' | 'error' } | { status: 'ok'; info: ServerInfo };
 
-const DEFAULT_SERVER = Platform.OS === 'web' ? 'http://localhost:3000' : '';
+// Builds can ship with a server pre-filled (EXPO_PUBLIC_SERVER_URL), e.g. for TestFlight.
+const DEFAULT_SERVER = process.env.EXPO_PUBLIC_SERVER_URL ?? (Platform.OS === 'web' ? 'http://localhost:3000' : '');
 
 export default function Welcome() {
   const { t } = useI18n();

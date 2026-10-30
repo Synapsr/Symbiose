@@ -14,7 +14,7 @@ const db = openDb(join(config.dataDir, 'symbiose.db'));
 const ai = config.aiMock
   ? createMockAi()
   : config.anthropicApiKey
-    ? createClaudeAi(config.anthropicApiKey, config.aiModel)
+    ? createClaudeAi(config.anthropicApiKey, config.aiModel, config.anthropicWorkspaceId)
     : createDisabledAi();
 const photos = new PhotoStore(db, join(config.dataDir, 'photos'));
 

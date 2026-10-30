@@ -105,8 +105,14 @@ function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): st
   return `<context>\n${JSON.stringify(payload, null, 1)}\n</context>`;
 }
 
-export function createClaudeAi(apiKey: string, model: string): Ai {
-  const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 120_000 });
+export function createClaudeAi(apiKey: string, model: string, workspaceId: string | null = null): Ai {
+  const client = new Anthropic({
+    apiKey,
+    maxRetries: 2,
+    timeout: 120_000,
+    // Keys that aren't scoped to a workspace must name one on every request.
+    defaultHeaders: workspaceId ? { 'anthropic-workspace-id': workspaceId } : undefined,
+  });
 
   async function run<S extends z.ZodType>(opts: {
     system: string;
@@ -130,7 +136,7 @@ export function createClaudeAi(apiKey: string, model: string): Ai {
         throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
       }
       if (response.stop_reason === 'max_tokens' || !response.parsed_output) {
-        throw new HttpError(502, 'ai_bad_output', 'The AI returned an incomplete answer, please retry');
+        throw new HttpError(424, 'ai_bad_output', 'The AI returned an incomplete answer, please retry');
       }
       return response.parsed_output as z.infer<S>;
     } catch (error) {
@@ -198,22 +204,24 @@ export function createClaudeAi(apiKey: string, model: string): Ai {
   };
 }
 
+// AI failures use 424 (failed dependency): proxies like Traefik replace 502/503
+// bodies with their own HTML pages, and the app needs the JSON error.
 function mapError(error: unknown): unknown {
   if (error instanceof HttpError) return error;
   if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) {
-    return new HttpError(503, 'ai_misconfigured', 'The server AI key is invalid');
+    return new HttpError(424, 'ai_misconfigured', 'The server AI key is invalid');
   }
   if (error instanceof Anthropic.RateLimitError) {
     return new HttpError(429, 'ai_rate_limited', 'The AI is busy, retry in a moment');
   }
   if (error instanceof Anthropic.BadRequestError) {
-    return new HttpError(502, 'ai_bad_request', error.message);
+    return new HttpError(424, 'ai_bad_request', error.message);
   }
   if (error instanceof Anthropic.APIConnectionError) {
-    return new HttpError(502, 'ai_unreachable', 'Could not reach the AI provider');
+    return new HttpError(424, 'ai_unreachable', 'Could not reach the AI provider');
   }
   if (error instanceof Anthropic.APIError) {
-    return new HttpError(502, 'ai_error', `AI provider error (${error.status ?? 'unknown'})`);
+    return new HttpError(424, 'ai_error', `AI provider error (${error.status ?? 'unknown'})`);
   }
   return error;
 }
@@ -221,7 +229,7 @@ function mapError(error: unknown): unknown {
 /** Used when no API key is configured: every AI feature answers 503. */
 export function createDisabledAi(): Ai {
   const fail = async (): Promise<never> => {
-    throw new HttpError(503, 'ai_disabled', 'AI is not configured on this server (set ANTHROPIC_API_KEY)');
+    throw new HttpError(424, 'ai_disabled', 'AI is not configured on this server (set ANTHROPIC_API_KEY)');
   };
   return {
     enabled: false,

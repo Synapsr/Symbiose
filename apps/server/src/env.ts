@@ -12,6 +12,8 @@ export interface Config {
   /** When false, only the very first account can be created. */
   allowSignup: boolean;
   anthropicApiKey: string | null;
+  /** Required by Anthropic keys that are not scoped to a workspace. */
+  anthropicWorkspaceId: string | null;
   aiModel: string;
   /** Development only: canned AI answers, no API key needed. */
   aiMock: boolean;
@@ -43,6 +45,7 @@ export function loadConfig(env = process.env): Config {
     jwtSecret: loadSecret(dataDir),
     allowSignup: bool(env.ALLOW_SIGNUP, false),
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
+    anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID || null,
     aiModel: env.AI_MODEL || 'claude-opus-5-5',
     aiMock: bool(env.AI_MOCK, false),
     corsOrigins: (env.CORS_ORIGINS ?? '*').split(',').map((s) => s.trim()).filter(Boolean),
