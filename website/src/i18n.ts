@@ -300,19 +300,23 @@ const fr = {
           'Apple Santé et Health Connect, historique de poids',
           'Commandes iPhone : bouton Action, Centre de contrôle',
           'Activité physique : séances de la montre, repères adaptés à ton plan',
+          'Suivi optionnel de la tension, lié à Santé dans les deux sens',
+          'Mode gaucher',
         ],
       },
       {
         status: 'wip',
         label: 'En cours',
-        items: ['Suivi optionnel de la tension, lié à Santé dans les deux sens', 'Mode gaucher'],
+        items: [
+          'Le coach ajoute, corrige ou retire un repas pour toi, après ta confirmation',
+          'App montre : ton chiffre clé en complication, remanger en un tap, dictée au poignet',
+          'Widgets et Live Activities',
+        ],
       },
       {
         status: 'next',
         label: 'Ensuite',
         items: [
-          'App montre : ton chiffre clé en complication, remanger en un tap, dictée au poignet',
-          'Widgets et Live Activities',
           'File hors ligne pour les repas pris sans réseau',
           'Base CIQUAL (ANSES) et fournisseurs d’IA au choix, modèles locaux compris',
           'Dépense énergétique adaptative, à partir de la tendance du poids',
@@ -662,19 +666,23 @@ const en: Dict = {
           'Apple Health and Health Connect, weight history',
           'iPhone controls: Action Button, Control Center',
           'Physical activity: workouts from your watch, guardrails adapted to your plan',
+          'Optional blood pressure tracking, synced both ways with Health',
+          'Left-handed mode',
         ],
       },
       {
         status: 'wip',
         label: 'In progress',
-        items: ['Optional blood pressure tracking, synced both ways with Health', 'Left-handed mode'],
+        items: [
+          'The coach adds, fixes or removes a meal for you, once you confirm',
+          'Watch app: your key number as a complication, one-tap re-log, voice logging from the wrist',
+          'Widgets and Live Activities',
+        ],
       },
       {
         status: 'next',
         label: 'Next',
         items: [
-          'Watch app: your key number as a complication, one-tap re-log, voice logging from the wrist',
-          'Widgets and Live Activities',
           'Offline queue for meals taken without network',
           'CIQUAL (ANSES) food data and pluggable AI providers, local models included',
           'Adaptive energy expenditure from your weight trend',
