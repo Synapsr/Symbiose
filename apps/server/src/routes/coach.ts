@@ -30,6 +30,7 @@ import { bloodPressureBrief } from '../services/blood-pressure';
 import { energyExpenditureBrief } from '../services/expenditure';
 import { journalBrief } from '../services/journal';
 import { lifeBrief } from '../services/life';
+import { moodNoteIds } from '../services/mood';
 import { proactiveTurn, toCoachMessage } from '../services/coach-messages';
 import { acceptMealActions, runMealAction } from '../services/meal-actions';
 import { toMeal } from '../services/meals';
@@ -93,7 +94,8 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     bloodPressure: bloodPressureBrief(db, userId, resolved.row.profile ?? null, localDate),
     energyExpenditure: energyExpenditureBrief(week.adaptiveEnergy),
     life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, localDate),
-    journal: journalBrief(db, userId, addDays(localDate, -(TRANSIT_WINDOW_DAYS - 1)), localDate),
+    // The last week's moods are in `life.mood`, with their words: the older « Ressenti » notes they come from aren't repeated.
+    journal: journalBrief(db, userId, addDays(localDate, -(TRANSIT_WINDOW_DAYS - 1)), localDate, moodNoteIds(db, userId, addDays(localDate, -6), localDate)),
     recovery: recoveryBrief(recoveryFor(db, userId, localDate, resolved.row.profile?.trackSleep ? nightOf(db, userId, localDate) : null)),
     today: {
       date: day.date,

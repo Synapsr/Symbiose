@@ -91,7 +91,8 @@ export interface JournalBrief {
 
 /**
  * Sleep, hydration and mood, for the modules the person turned on: a key is
- * absent when its module is off, so the AI never hears about it.
+ * absent when its module is off, so the AI never hears about it. Mood is also
+ * there once one was logged: a face in « + » is a mood, switch or not.
  */
 export interface LifeBrief {
   sleep?: {
@@ -114,7 +115,8 @@ export interface LifeBrief {
   mood?: {
     /** Check-in from 1 (very low) to 5 (very good). */
     today: { mood: number; note: string | null; time: string } | null;
-    last7: { date: string; mood: number }[];
+    /** With the day's word when there is one. */
+    last7: { date: string; mood: number; note?: string }[];
     average7: number | null;
     /** Very low moods that last: the only case where talking to someone is suggested. */
     persistentLow: boolean;
@@ -222,8 +224,10 @@ export interface CoachOutput {
 }
 
 export interface CravingInput extends UserContext {
+  /** Empty when they didn't say. */
   what: string;
-  intensity: number;
+  /** 1–3, null when they didn't say. */
+  intensity: number | null;
   localTime: string;
   activityToday: ActivityToday | null;
   life: LifeBrief;
@@ -284,7 +288,8 @@ export interface Ai {
   draftPlan(input: PlanDraftInput): Promise<PlanDraft>;
   /** Streams the reply text through `onText` as it is written. */
   coach(input: CoachInput, onText?: (delta: string) => void): Promise<CoachOutput>;
-  cravingTip(input: CravingInput): Promise<CravingOutput>;
+  /** The tip then the alternative, streamed through `onText` as one line each. */
+  cravingTip(input: CravingInput, onText?: (delta: string) => void, signal?: AbortSignal): Promise<CravingOutput>;
   review(input: ReviewInput): Promise<Review>;
   /** The morning check-in, 3 to 5 short lines, streamed through `onText`. */
   morning(input: MorningInput, onText?: (delta: string) => void): Promise<{ text: string }>;

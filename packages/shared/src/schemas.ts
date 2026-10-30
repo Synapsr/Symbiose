@@ -64,6 +64,7 @@ export const ProfileSchema = z.object({
   /** Opt-in life modules, off by default (see `life.ts`). */
   trackSleep: z.boolean().optional(),
   trackHydration: z.boolean().optional(),
+  /** The Humeur pill on Today, the daily ask. A mood logged from « + » counts either way. */
   trackMood: z.boolean().optional(),
   /** Everyday drinks goal chosen by hand, in ml; absent or null: the EFSA-based default (`hydrationGoalMl`). */
   waterGoalMl: z.number().int().min(1000).max(5000).nullable().optional(),
@@ -483,23 +484,46 @@ export interface BloodPressureTrend {
 
 // ---------------------------------------------------------------- Cravings
 
+/** 1 light, 2 strong, 3 irresistible. */
+export const CravingIntensitySchema = z.number().int().min(1).max(3);
+
+/**
+ * Saved the moment « J'ai une envie » is tapped: what and how strong are
+ * optional, and can be told afterwards. `tip: 'stream'` leaves the advice to
+ * POST /api/cravings/:id/tip/stream; older apps get it in the response.
+ */
 export const CravingInputSchema = z.object({
   at: localDateTime,
   localDate: isoDate,
-  what: z.string().trim().min(1).max(200),
-  intensity: z.number().int().min(1).max(3),
+  /** Empty when not said (yet). */
+  what: z.string().trim().max(200).default(''),
+  intensity: CravingIntensitySchema.nullable().default(null),
+  tip: z.enum(['inline', 'stream']).default('inline'),
 });
 export type CravingInput = z.input<typeof CravingInputSchema>;
 
 export const CravingOutcomeSchema = z.enum(['pending', 'resisted', 'gave_in']);
 export type CravingOutcome = z.infer<typeof CravingOutcomeSchema>;
 
+/** What the sheet learns after saving: the chip, the intensity, then the outcome. */
+export const CravingPatchSchema = z
+  .object({ what: z.string().trim().max(200), intensity: CravingIntensitySchema.nullable(), outcome: CravingOutcomeSchema })
+  .partial()
+  .refine((patch) => Object.values(patch).some((v) => v !== undefined), { message: 'Nothing to change' });
+export type CravingPatch = z.input<typeof CravingPatchSchema>;
+
+/** Overrides for the advice: the chip just tapped may not be saved yet. */
+export const CravingTipRequestSchema = z.object({ what: z.string().trim().max(200).optional(), intensity: CravingIntensitySchema.nullable().optional() });
+export type CravingTipRequest = z.input<typeof CravingTipRequestSchema>;
+
 export interface Craving {
   id: string;
   at: string;
   localDate: string;
+  /** Empty when not said. */
   what: string;
-  intensity: number;
+  /** Null when not said. */
+  intensity: number | null;
   outcome: CravingOutcome;
   tip: string | null;
   createdAt: string;
@@ -532,7 +556,7 @@ export interface DaySummary {
   sleep?: SleepNight | null;
   /** Null unless hydration is tracked. */
   hydration?: DayHydration | null;
-  /** The day's check-in; null when mood isn't tracked or nothing was checked in yet. */
+  /** The day's check-in, whatever the Humeur switch (it only adds the pill on Today); null when there is none. */
   mood?: MoodCheckIn | null;
 }
 
@@ -587,6 +611,7 @@ export interface InsightsResponse {
   /** Opt-in modules: null unless tracked. Sleep and hydration follow the window, mood covers 30 days at least. */
   sleep?: SleepTrend | null;
   hydration?: HydrationTrend | null;
+  /** Mood is there when tracked, and whenever one was logged (a face in « + » is a mood, switch or not). */
   mood?: MoodTrend | null;
   streak: number;
 }

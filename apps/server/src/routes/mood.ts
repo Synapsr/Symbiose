@@ -7,10 +7,13 @@ import { requireAuth, type AuthEnv } from '../auth';
 import { moods } from '../db/schema';
 import { notFound } from '../errors';
 import { validate, type Deps } from '../http';
-import { moodTrend, saveMood } from '../services/mood';
+import { checkInsBetween, moodTrend, saveMood } from '../services/mood';
 import { requireProfile, resolveUser } from '../services/users';
 
-/** Writes are accepted whatever the opt-in; insights and the AI only use them when it is on. */
+/**
+ * « Humeur »: one check-in a day. The switch only adds the pill on Today: a
+ * mood logged from « + » reaches insights and the coach whatever it says.
+ */
 export function moodRoutes({ db, config }: Deps) {
   const app = new Hono<AuthEnv>();
   app.use(requireAuth(config.jwtSecret));
@@ -21,6 +24,19 @@ export function moodRoutes({ db, config }: Deps) {
     requireProfile(resolved);
     return c.json<MoodTrend>(moodTrend(db, c.get('userId'), resolved.row.profile!, resolved.row.plan ?? null, to, days));
   });
+
+  /** The check-ins between two days, newest first, for « Historique ». */
+  app.get(
+    '/check-ins',
+    validate(
+      'query',
+      z.object({ from: LocalDateSchema, to: LocalDateSchema }).refine((q) => q.from <= q.to, { message: '`from` must not be after `to`', path: ['from'] }),
+    ),
+    (c) => {
+      const { from, to } = c.req.valid('query');
+      return c.json<MoodCheckIn[]>(checkInsBetween(db, c.get('userId'), from, to, 'newest'));
+    },
+  );
 
   /** The day's check-in; checking in again the same day replaces it. */
   app.put('/', validate('json', MoodInputSchema), (c) => c.json<MoodCheckIn>(saveMood(db, c.get('userId'), c.req.valid('json'))));

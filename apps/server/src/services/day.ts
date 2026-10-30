@@ -34,7 +34,7 @@ import { requireProfile, resolveUser } from './users';
 import { visibleTrend } from './blood-pressure';
 import { adaptiveEnergyHistory } from './expenditure';
 import { dayHydration, hydrationTrend } from './hydration';
-import { moodOf, moodTrend } from './mood';
+import { moodOf, visibleMoodTrend } from './mood';
 import { nightOf, sleepTrend } from './sleep';
 import { weightTrend } from './weights';
 import { activeMinutes, activityWeek, workoutsBetween, workoutsKcal } from './workouts';
@@ -131,7 +131,8 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
     streak: streakFor(db, userId, date),
     sleep: profile.trackSleep ? nightOf(db, userId, date) : null,
     hydration: profile.trackHydration ? dayHydration(db, userId, profile, date) : null,
-    mood: profile.trackMood ? moodOf(db, userId, date) : null,
+    // The day's check-in whatever the switch: « + » shows it, and Today lists it when the pill is off.
+    mood: moodOf(db, userId, date),
   };
 }
 
@@ -243,6 +244,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
 
   const whatCounts = new Map<string, { label: string; count: number }>();
   for (const c of rangeCravings) {
+    if (!c.what) continue;
     const k = foodKey(c.what);
     const entry = whatCounts.get(k) ?? { label: c.what, count: 0 };
     entry.count++;
@@ -301,7 +303,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     // Sleep and hydration follow the window; mood needs 30 days to say anything.
     sleep: profile.trackSleep ? sleepTrend(db, userId, from, to) : null,
     hydration: profile.trackHydration ? hydrationTrend(db, userId, profile, from, to) : null,
-    mood: profile.trackMood ? moodTrend(db, userId, profile, plan, to, trendDays) : null,
+    mood: visibleMoodTrend(db, userId, profile, plan, to, trendDays),
     streak: streakFor(db, userId, to),
   };
 }

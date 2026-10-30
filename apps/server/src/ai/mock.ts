@@ -136,8 +136,25 @@ export function createMockAi(): Ai {
       };
     },
 
-    async cravingTip() {
-      return { tip: 'Bois un grand verre d’eau, puis sors marcher 5 minutes : l’envie retombe souvent en 10 minutes.', alternative: 'Un carré de chocolat noir 85 % et une poignée d’amandes' };
+    async cravingTip(input, onText, signal) {
+      const what = input.what.toLowerCase();
+      const alternative = /sal|chips|apéro/.test(what)
+        ? 'Une poignée d’amandes ou quelques bâtonnets de carotte'
+        : /soda|boisson/.test(what)
+          ? 'Une eau pétillante avec une rondelle de citron'
+          : /grignot/.test(what)
+            ? 'Un yaourt nature avec quelques noix'
+            : 'Un carré de chocolat noir 85 % et une poignée d’amandes';
+      const tip = 'Bois un grand verre d’eau, puis sors marcher 5 minutes : l’envie retombe souvent en 10 minutes.';
+      // Typed out only when someone reads it as it comes.
+      if (onText) {
+        for (const word of `${tip}\n${alternative}`.split(/(?<=[ \n])/)) {
+          if (signal?.aborted) break;
+          onText(word);
+          await new Promise((r) => setTimeout(r, 30));
+        }
+      }
+      return { tip, alternative };
     },
 
     async morning(input, onText) {
