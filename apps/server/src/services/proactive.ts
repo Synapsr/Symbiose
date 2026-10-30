@@ -6,7 +6,6 @@ import {
   CRAVING_WINDOW_DAYS,
   cravingWindow,
   formatClock,
-  heroNutrient,
   localTime,
   mealTotals,
   MIN_WAKE_NIGHTS,
@@ -99,6 +98,7 @@ export function proactiveSchedule(db: Db, userId: string, date: string): Proacti
     date,
     settings,
     morning: { ...morningTimes(settings, usualWake), usualWake },
+    sleepNights: nights.filter((n) => n.localDate > addDays(date, -14)).length,
     cravings: usualCravingWindow(db, userId, date),
     // The week a Monday review covers ends the day before; up to today, what is logged so far.
     review: { monday, loggedDays: loggedDaysBetween(db, userId, addDays(monday, -7), date < monday ? date : addDays(monday, -1)) },
@@ -124,7 +124,8 @@ export function buildMorningInput(db: Db, userId: string, date: string, hideCalo
 
   const yesterday = addDays(date, -1);
   const day = daySummary(db, userId, yesterday);
-  const hero = heroNutrient(day.progress, plan, hideCalories);
+  // The goal's first focus, as Today shows it; calories only when they're not hidden.
+  const hero = (plan?.focus ?? []).find((key) => !(hideCalories && key === 'kcal')) ?? 'protein';
   const progress = day.progress.find((p) => p.nutrient === hero);
   return {
     ...resolved.context,

@@ -62,7 +62,8 @@ export function proactiveRoutes({ db, ai, config }: Deps) {
     const { localDate, ...patch } = c.req.valid('json');
     const row = getUserRow(db, userId);
     if (!row.profile) throw new HttpError(409, 'profile_required', 'Complete your profile first');
-    const proactive = ProactiveSettingsSchema.parse({ ...row.profile.proactive, ...patch });
+    const stored = row.profile.proactive;
+    const proactive = ProactiveSettingsSchema.parse({ ...stored, ...patch, offers: patch.offers ? { ...stored?.offers, ...patch.offers } : stored?.offers });
     db.update(users)
       .set({ profile: { ...row.profile, proactive } })
       .where(eq(users.id, userId))

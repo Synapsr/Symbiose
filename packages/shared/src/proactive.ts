@@ -98,7 +98,7 @@ export function cravingHeadsUpByDefault(plan: GoalPlan | null, cravingsLogged: n
   return targetsSugar(plan) || cravingsLogged > 0;
 }
 
-const DEFAULTS: ProactiveSettings = { enabled: false, morning: true, weekly: true, morningTime: null, quietStart: '22:00', quietEnd: '07:00' };
+const DEFAULTS: ProactiveSettings = { enabled: false, morning: true, weekly: true, morningTime: null, quietStart: '22:00', quietEnd: '07:00', maxPerDay: 1 };
 
 export function resolveProactive(settings: ProactiveSettingsInput | undefined, plan: GoalPlan | null, cravingsLogged: number): ResolvedProactive {
   const merged = { ...DEFAULTS, ...settings };
@@ -167,8 +167,10 @@ export function morningTimes(settings: Pick<ProactiveSettings, 'morningTime' | '
 // ---------------------------------------------------------------- Craving window
 
 export const CRAVING_WINDOW_DAYS = 28;
-/** Days with a logged craving needed before cravings alone set the window. */
-export const MIN_CRAVING_DAYS = 5;
+/** Days with a logged craving in the same slot before cravings alone set the window. */
+export const MIN_CRAVING_DAYS = 3;
+/** From this many craving days, the window can be more than a first hint. */
+const SURE_CRAVING_DAYS = 5;
 /** Logged days needed before sugary snacks alone set it. */
 export const MIN_SUGAR_LOGGED_DAYS = 7;
 /** Snacks with less added sugar than this don't count as a sugar reflex. */
@@ -225,10 +227,11 @@ const share = (part: number, total: number) => Math.round((part / total) * 100) 
 
 /**
  * When the sugar reflex usually strikes, from the last 28 days: the two-hour
- * slot that holds the logged cravings on at least 40 % of the craving days
- * (5 craving days at least), else the slot that holds 40 % of the added
- * sugar from snacks (7 logged days at least, sugary snacks on 4 days of the
- * slot). Null without such a clear pattern: no heads-up on a hunch.
+ * slot that holds the logged cravings on at least 3 days and 40 % of the
+ * craving days (a low confidence below 5 craving days), else the slot that
+ * holds 40 % of the added sugar from snacks (7 logged days at least, sugary
+ * snacks on 4 days of the slot). Null without such a clear pattern: no
+ * heads-up on a hunch.
  */
 export function cravingWindow(
   input: {
@@ -248,8 +251,9 @@ export function cravingWindow(
   if (cravingDays >= MIN_CRAVING_DAYS) {
     const best = busiestWindow(cravings);
     const part = best ? share(best.days, cravingDays) : 0;
-    if (best && best.days >= 3 && part >= 0.4) {
-      const confidence: ProactiveConfidence = part >= 0.6 && best.days >= 8 ? 'high' : part >= 0.5 && best.days >= 5 ? 'medium' : 'low';
+    if (best && best.days >= MIN_CRAVING_DAYS && part >= 0.4) {
+      const confidence: ProactiveConfidence =
+        cravingDays < SURE_CRAVING_DAYS ? 'low' : part >= 0.6 && best.days >= 8 ? 'high' : part >= 0.5 && best.days >= 5 ? 'medium' : 'low';
       return { ...windowFrom(best.inside), source: 'cravings', confidence, windowDays: best.days, share: part };
     }
   }
@@ -399,6 +403,8 @@ export interface ProactiveSchedule {
   date: string;
   settings: ResolvedProactive;
   morning: MorningTimes & { usualWake: UsualWake | null };
+  /** Nights recorded over the last 14 days, when sleep is tracked (0 otherwise). */
+  sleepNights: number;
   /** Null without a clear pattern yet. */
   cravings: CravingWindow | null;
   /** The coming Monday review: the days logged so far in the week it covers. */
@@ -409,6 +415,36 @@ export interface ProactiveSchedule {
 
 /** A review is worth a notification from 3 logged days. */
 export const MIN_REVIEW_DAYS = 3;
+/** The morning check-in is offered after 3 nights of sleep data. */
+export const MIN_OFFER_NIGHTS = 3;
+
+export type ProactiveOffer = 'morning' | 'cravings';
+
+/**
+ * What the coach line may offer, asked once each, only when it would help:
+ * the craving heads-up once a craving slot shows (3 cravings in the same
+ * band), the morning check-in after 3 nights of sleep data. Never what is
+ * already on, never what was answered.
+ */
+export function proactiveOffer(schedule: Pick<ProactiveSchedule, 'settings' | 'cravings' | 'sleepNights'>): ProactiveOffer | null {
+  const { settings } = schedule;
+  const offers = settings.offers ?? {};
+  if (offers.cravings === undefined && schedule.cravings && !(settings.enabled && settings.cravings)) return 'cravings';
+  if (offers.morning === undefined && schedule.sleepNights >= MIN_OFFER_NIGHTS && !(settings.enabled && settings.morning)) return 'morning';
+  return null;
+}
+
+/**
+ * The settings to save when the person answers an offer. « Oui » turns that
+ * one feature on, and only that one when the coach was off; « Non » is
+ * remembered so it is never asked again.
+ */
+export function answerOffer(settings: ResolvedProactive, offer: ProactiveOffer, yes: boolean): ProactiveSettingsPatch {
+  const offers = { ...settings.offers, [offer]: yes };
+  if (!yes) return { offers };
+  if (settings.enabled) return { offers, [offer]: true };
+  return offer === 'morning' ? { offers, enabled: true, morning: true, weekly: true, cravings: false } : { offers, enabled: true, cravings: true, morning: false, weekly: false };
+}
 
 export const ProactiveSettingsPatchSchema = z.object({
   enabled: z.boolean().optional(),
@@ -418,6 +454,9 @@ export const ProactiveSettingsPatchSchema = z.object({
   morningTime: ClockTimeSchema.nullable().optional(),
   quietStart: ClockTimeSchema.optional(),
   quietEnd: ClockTimeSchema.optional(),
+  maxPerDay: z.number().int().min(1).max(2).optional(),
+  /** Merged with the stored answers. */
+  offers: z.object({ morning: z.boolean().optional(), cravings: z.boolean().optional() }).optional(),
 });
 export type ProactiveSettingsPatch = z.input<typeof ProactiveSettingsPatchSchema>;
 

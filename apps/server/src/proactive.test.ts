@@ -119,7 +119,8 @@ describe('proactive coach', () => {
 
   it('stays off until switched on, with a calm default schedule', async () => {
     const s = await schedule();
-    expect(s.settings).toMatchObject({ enabled: false, morning: true, weekly: true, cravings: true, quietStart: '22:00', quietEnd: '07:00' });
+    expect(s.settings).toMatchObject({ enabled: false, morning: true, weekly: true, cravings: true, quietStart: '22:00', quietEnd: '07:00', maxPerDay: 1 });
+    expect(s.sleepNights).toBe(0);
     expect(s.morning).toMatchObject({ weekday: '07:30', weekend: '07:30', source: 'default', usualWake: null });
     expect(s.cravings).toBeNull();
     expect(s.today).toBeNull();
@@ -131,6 +132,11 @@ describe('proactive coach', () => {
     const s = (await request<ProactiveSchedule>('PUT', '/api/proactive/settings', { enabled: true, quietStart: '22:30', localDate: today })).body;
     expect(s.settings).toMatchObject({ enabled: true, morning: true, quietStart: '22:30', quietEnd: '07:00' });
     expect((await request('PUT', '/api/proactive/settings', { morningTime: '7:5' })).status).toBe(400);
+    expect((await request('PUT', '/api/proactive/settings', { maxPerDay: 3 })).status).toBe(400);
+    // Offer answers merge with the ones already given.
+    await request('PUT', '/api/proactive/settings', { offers: { cravings: false } });
+    const merged = (await request<ProactiveSchedule>('PUT', '/api/proactive/settings', { offers: { morning: true } })).body;
+    expect(merged.settings.offers).toEqual({ cravings: false, morning: true });
     await request('PUT', '/api/me/profile', profile);
     expect((await request<User>('GET', '/api/me')).body.profile?.proactive).toMatchObject({ enabled: true, quietStart: '22:30' });
     // The stranger's settings are theirs.
@@ -148,6 +154,7 @@ describe('proactive coach', () => {
       await request('POST', '/api/cravings', { at: at(date, daysAgo === 8 ? '21:00' : '16:10'), localDate: date, what: 'Chocolat', intensity: 2 });
     }
     const s = await schedule();
+    expect(s.sleepNights).toBe(10);
     expect(s.morning.usualWake?.nights).toBe(10);
     expect(s.morning.source).toBe('wake');
     expect(s.morning.weekday).toBe('07:20');

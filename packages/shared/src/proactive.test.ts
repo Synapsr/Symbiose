@@ -3,11 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { addDays } from './dates';
 import {
   afterQuietHours,
+  answerOffer,
   cravingWindow,
   firstLine,
   inQuietHours,
   morningTimes,
   nextMonday,
+  proactiveOffer,
   recoverySignal,
   resolveProactive,
   usualWakeTimes,
@@ -73,9 +75,10 @@ describe('craving window', () => {
   const craving = (daysAgo: number, time: string) => ({ at: at(addDays(today, -daysAgo), time), localDate: addDays(today, -daysAgo) });
   const snack = (daysAgo: number, time: string, addedSugar: number) => ({ ...craving(daysAgo, time), addedSugar });
 
-  it('needs 5 craving days', () => {
-    const cravings = [craving(1, '16:00'), craving(2, '16:10'), craving(3, '15:50'), craving(4, '16:20')];
-    expect(cravingWindow({ cravings, snacks: [], loggedDays: 4 }, today)).toBeNull();
+  it('needs 3 craving days in the same slot, and stays a first hint below 5', () => {
+    expect(cravingWindow({ cravings: [craving(1, '16:00'), craving(2, '16:10'), craving(2, '16:20')], snacks: [], loggedDays: 4 }, today)).toBeNull();
+    const three = cravingWindow({ cravings: [craving(1, '16:00'), craving(2, '16:10'), craving(3, '15:50')], snacks: [], loggedDays: 4 }, today);
+    expect(three).toMatchObject({ start: '15:55', notifyAt: '15:40', windowDays: 3, confidence: 'low' });
   });
 
   it('finds the usual slot and sends the heads-up 15 min before it', () => {
@@ -87,9 +90,9 @@ describe('craving window', () => {
   });
 
   it('counts days, not cravings, and forgets what is older than 28 days', () => {
-    const scattered = [craving(1, '09:00'), craving(2, '12:30'), craving(3, '16:00'), craving(4, '19:30'), craving(5, '21:30'), craving(6, '07:00')];
+    const scattered = [craving(1, '09:00'), craving(2, '12:30'), craving(3, '16:00'), craving(4, '19:30'), craving(5, '21:30'), craving(6, '07:00'), craving(7, '15:40')];
     expect(cravingWindow({ cravings: scattered, snacks: [], loggedDays: 10 }, today)).toBeNull();
-    const old = [30, 31, 32, 33, 34].map((d) => craving(d, '16:00'));
+    const old = [29, 30, 31, 32, 33, 34].map((d) => craving(d, '16:00'));
     expect(cravingWindow({ cravings: old, snacks: [], loggedDays: 10 }, today)).toBeNull();
   });
 
@@ -161,5 +164,28 @@ describe('settings and helpers', () => {
     expect(nextMonday('2026-10-30')).toBe('2026-11-02');
     expect(nextMonday('2026-11-02')).toBe('2026-11-02');
     expect(firstLine('  Nuit de 6 h 10.\nHier : 18 g.')).toBe('Nuit de 6 h 10.');
+  });
+});
+
+describe('offers', () => {
+  const window = { start: '16:00', end: '16:30', notifyAt: '15:45', source: 'cravings' as const, confidence: 'low' as const, windowDays: 3, share: 1 };
+  const off = resolveProactive(undefined, null, 0);
+
+  it('offers the craving heads-up first, then the morning check-in, each only once', () => {
+    expect(proactiveOffer({ settings: off, cravings: null, sleepNights: 2 })).toBeNull();
+    expect(proactiveOffer({ settings: off, cravings: null, sleepNights: 3 })).toBe('morning');
+    expect(proactiveOffer({ settings: off, cravings: window, sleepNights: 3 })).toBe('cravings');
+    const declined = resolveProactive({ offers: { cravings: false } }, null, 0);
+    expect(proactiveOffer({ settings: declined, cravings: window, sleepNights: 3 })).toBe('morning');
+    const on = resolveProactive({ enabled: true }, null, 3);
+    expect(proactiveOffer({ settings: on, cravings: window, sleepNights: 10 })).toBeNull();
+  });
+
+  it('turns on only what was accepted when the coach was off', () => {
+    expect(answerOffer(off, 'cravings', true)).toEqual({ offers: { cravings: true }, enabled: true, cravings: true, morning: false, weekly: false });
+    expect(answerOffer(off, 'morning', true)).toEqual({ offers: { morning: true }, enabled: true, morning: true, weekly: true, cravings: false });
+    expect(answerOffer(off, 'morning', false)).toEqual({ offers: { morning: false } });
+    const on = resolveProactive({ enabled: true, morning: true, cravings: false, offers: { morning: true } }, null, 0);
+    expect(answerOffer(on, 'cravings', true)).toEqual({ offers: { morning: true, cravings: true }, cravings: true });
   });
 });
