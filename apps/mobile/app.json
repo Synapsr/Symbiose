@@ -8,7 +8,11 @@
     "scheme": "symbiose",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": {
+        "light": "./assets/images/icon.png",
+        "dark": "./assets/images/icon-dark.png",
+        "tinted": "./assets/images/icon-tinted.png"
+      },
       "bundleIdentifier": "io.synapsr.symbiose",
       "supportsTablet": false,
       "infoPlist": {
@@ -16,7 +20,7 @@
         "NSPhotoLibraryUsageDescription": "Symbiose lets you pick a meal photo from your library.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "1",
+      "buildNumber": "2",
       "appleTeamId": "3RZSUHDN87"
     },
     "android": {
@@ -47,9 +51,10 @@
         {
           "backgroundColor": "#F5F4F0",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
+          "imageWidth": 120,
           "dark": {
-            "backgroundColor": "#0A0A0B"
+            "backgroundColor": "#0A0A0B",
+            "image": "./assets/images/splash-icon-dark.png"
           }
         }
       ],
