@@ -4,17 +4,21 @@ import {
   getDateOfBirthAsync,
   getMostRecentQuantitySample,
   isHealthDataAvailableAsync,
+  queryCorrelationSamples,
   queryQuantitySamples,
   queryStatisticsForQuantity,
   queryWorkoutSamples,
   requestAuthorization,
+  saveCorrelationSample,
   saveQuantitySample,
   WorkoutActivityType,
+  type CorrelationSampleTyped,
+  type QuantitySample,
   type WorkoutProxyTyped,
 } from '@kingstinct/react-native-healthkit';
-import type { Meal, Sex, WorkoutInput, WorkoutType } from '@symbiose/shared';
+import type { BloodPressureReadingInput, Meal, Sex, WorkoutInput, WorkoutType } from '@symbiose/shared';
 
-import { cleanProfile, dayBounds, mealWindow, toWorkoutInput, type HealthBridge } from './types';
+import { cleanProfile, dayBounds, mealWindow, OWN_READING_KEY, toBloodPressureInput, toWorkoutInput, type HealthBridge } from './types';
 
 const READ = [
   'HKQuantityTypeIdentifierStepCount',
@@ -26,6 +30,14 @@ const READ = [
   'HKCharacteristicTypeIdentifierDateOfBirth',
   'HKWorkoutTypeIdentifier',
 ] as const;
+
+/**
+ * Blood pressure is a correlation, but HealthKit only grants its parts:
+ * asking for HKCorrelationTypeIdentifierBloodPressure itself throws.
+ * Heart rate gives the pulse the cuff wrote next to the reading.
+ */
+const BP_READ = ['HKQuantityTypeIdentifierBloodPressureSystolic', 'HKQuantityTypeIdentifierBloodPressureDiastolic', 'HKQuantityTypeIdentifierHeartRate'] as const;
+const BP_WRITE = ['HKQuantityTypeIdentifierBloodPressureSystolic', 'HKQuantityTypeIdentifierBloodPressureDiastolic'] as const;
 
 const WRITE = [
   'HKQuantityTypeIdentifierDietaryEnergyConsumed',
@@ -78,6 +90,25 @@ async function sum(identifier: 'HKQuantityTypeIdentifierStepCount' | 'HKQuantity
   return typeof value === 'number' ? Math.round(value) : null;
 }
 
+const MMHG_PER_KPA = 7.50062;
+
+function mmHg(sample: QuantitySample | undefined): number | null {
+  if (!sample) return null;
+  return sample.unit === 'kPa' ? sample.quantity * MMHG_PER_KPA : sample.quantity;
+}
+
+/** The pulse a cuff saved with the reading: a heart-rate sample from the same app, within two minutes. */
+async function pulseNear(correlation: CorrelationSampleTyped): Promise<number | null> {
+  const at = correlation.startDate.getTime();
+  const samples = await queryQuantitySamples('HKQuantityTypeIdentifierHeartRate', {
+    filter: { date: { startDate: new Date(at - 120_000), endDate: new Date(at + 120_000) } },
+    limit: 0,
+    unit: 'count/min',
+  }).catch(() => []);
+  const bundle = correlation.sourceRevision.source.bundleIdentifier;
+  return samples.find((s) => s.sourceRevision.source.bundleIdentifier === bundle)?.quantity ?? null;
+}
+
 /** `totalEnergyBurned` is deprecated since iOS 18; newer workouts may only carry it as a statistic. */
 async function workoutKcal(workout: WorkoutProxyTyped): Promise<number | null> {
   const total = workout.totalEnergyBurned?.quantity;
@@ -88,12 +119,13 @@ async function workoutKcal(workout: WorkoutProxyTyped): Promise<number | null> {
 
 export const health: HealthBridge = {
   source: 'healthkit',
-  storeName: 'Apple Santé',
+  storeName: { fr: 'Apple Santé', en: 'Apple Health' },
 
   isAvailable: () => isHealthDataAvailableAsync(),
 
-  async connect() {
-    return requestAuthorization({ toRead: READ, toShare: WRITE });
+  async connect(options) {
+    if (!options?.bloodPressure) return requestAuthorization({ toRead: READ, toShare: WRITE });
+    return requestAuthorization({ toRead: [...READ, ...BP_READ], toShare: [...WRITE, ...BP_WRITE] });
   },
 
   async readDay(day) {
@@ -149,6 +181,41 @@ export const health: HealthBridge = {
     return inputs.filter((w): w is WorkoutInput => w !== null);
   },
 
+  async readBloodPressure(from, to) {
+    const correlations = await queryCorrelationSamples('HKCorrelationTypeIdentifierBloodPressure', {
+      filter: { date: { startDate: from, endDate: to } },
+      limit: 0,
+      ascending: true,
+    });
+    const readings = await Promise.all(
+      correlations
+        // Readings Symbiose wrote itself are already on the server.
+        .filter((c) => !(c.metadata as Record<string, unknown> | undefined)?.[OWN_READING_KEY])
+        .map(async (correlation): Promise<BloodPressureReadingInput | null> => {
+          const parts = correlation.objects.filter((o): o is QuantitySample => 'quantityType' in o);
+          const systolic = mmHg(parts.find((p) => p.quantityType === 'HKQuantityTypeIdentifierBloodPressureSystolic'));
+          const diastolic = mmHg(parts.find((p) => p.quantityType === 'HKQuantityTypeIdentifierBloodPressureDiastolic'));
+          if (systolic === null || diastolic === null) return null;
+          return toBloodPressureInput({ externalId: correlation.uuid, measuredAt: correlation.startDate, systolic, diastolic, pulse: await pulseNear(correlation) });
+        }),
+    );
+    return readings.filter((r): r is BloodPressureReadingInput => r !== null);
+  },
+
+  async writeBloodPressure(reading) {
+    const at = reading.measuredAt;
+    await saveCorrelationSample(
+      'HKCorrelationTypeIdentifierBloodPressure',
+      [
+        { quantityType: 'HKQuantityTypeIdentifierBloodPressureSystolic', quantity: reading.systolic, unit: 'mmHg', startDate: at, endDate: at },
+        { quantityType: 'HKQuantityTypeIdentifierBloodPressureDiastolic', quantity: reading.diastolic, unit: 'mmHg', startDate: at, endDate: at },
+      ],
+      at,
+      at,
+      { [OWN_READING_KEY]: reading.id },
+    );
+  },
+
   async writeMeal(meal: Meal) {
     const { start, end } = mealWindow(meal);
     const t = meal.totals;
@@ -166,5 +233,5 @@ export const health: HealthBridge = {
   },
 };
 
-export { HEALTH_SCOPES } from './types';
+export { BP_SCOPES, HEALTH_SCOPES, inferWalkIntensity } from './types';
 export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';

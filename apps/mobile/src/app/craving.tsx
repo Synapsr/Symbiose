@@ -98,7 +98,7 @@ export default function CravingSheet() {
             <Row gap={Space.sm}>
               <Sparkles size={18} color={colors.accent} />
               <Txt variant="overline" tone="accent">
-                {t('craving.help')}
+                {t('craving.tip')}
               </Txt>
             </Row>
             <Txt style={{ fontSize: 18, lineHeight: 25 }}>{result.craving.tip}</Txt>

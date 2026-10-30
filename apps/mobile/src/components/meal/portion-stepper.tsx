@@ -1,7 +1,7 @@
 import { Minus, Plus } from 'lucide-react-native';
 import { TextInput, View } from 'react-native';
 
-import { Chip, IconButton, Row, Txt } from '@/components/ui';
+import { Chip, IconButton, Row, Txt, webInput } from '@/components/ui';
 import { Radius, Space, useTheme } from '@/theme';
 
 const step = (grams: number) => (grams < 50 ? 5 : grams < 300 ? 10 : 25);
@@ -20,7 +20,7 @@ export function PortionStepper({ grams, base, onChange }: { grams: number; base:
             onChangeText={(text) => set(Number(text.replace(/[^0-9]/g, '')) || 0)}
             keyboardType="number-pad"
             selectTextOnFocus
-            style={{ fontSize: 32, fontWeight: '800', color: colors.text, minWidth: 70, textAlign: 'center', fontVariant: ['tabular-nums'], padding: 0 }}
+            style={[{ fontSize: 32, fontWeight: '800', color: colors.text, minWidth: 70, textAlign: 'center', fontVariant: ['tabular-nums'], padding: 0 }, webInput]}
           />
           <Txt tone="secondary">g</Txt>
         </Row>

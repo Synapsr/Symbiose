@@ -12,6 +12,7 @@ import { formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useRefreshAfterWorkout } from '@/lib/hooks';
 import { useApi } from '@/lib/session';
+import { useSettings } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
 /** Movement at a glance: the week's active minutes, the goal's extras (steps, strength) and the day's sessions. */
@@ -22,10 +23,11 @@ export function MoveCard({ day, isToday }: { day: DaySummary; isToday: boolean }
   const { goals } = week;
   const steps = day.activity?.steps ?? null;
   const reached = goals.weeklyActiveMinutes > 0 && week.activeMinutes >= goals.weeklyActiveMinutes;
+  const leftHanded = useSettings((s) => s.leftHanded);
 
   return (
     <Card style={{ gap: Space.lg }}>
-      <Row gap={Space.md}>
+      <Row gap={Space.md} style={leftHanded ? { flexDirection: 'row-reverse' } : null}>
         <Ring progress={goals.weeklyActiveMinutes > 0 ? week.activeMinutes / goals.weeklyActiveMinutes : 0} size={52} stroke={6} color={colors.accent}>
           <SwapIcon on={reached} onIcon={<Check size={20} color={colors.accent} strokeWidth={2.5} />} offIcon={<SportShoe size={18} color={colors.accent} />} />
         </Ring>

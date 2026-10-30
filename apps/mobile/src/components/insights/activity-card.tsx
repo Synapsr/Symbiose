@@ -19,8 +19,9 @@ export function ActivityCard({ activity }: { activity: InsightsActivity }) {
 
   const stepDays = activity.days.filter((d) => d.steps !== null);
   const avgSteps = stepDays.length ? Math.round(stepDays.reduce((sum, d) => sum + (d.steps ?? 0), 0) / stepDays.length) : null;
-  const hasData = activity.totalMinutes > 0 || avgSteps !== null;
+  const hasSessions = activity.totalMinutes > 0;
   const cravings = activity.cravingsOnActiveDays;
+  const stepsReached = Boolean(goals.dailySteps && avgSteps !== null && avgSteps >= goals.dailySteps);
 
   return (
     <Card style={{ gap: Space.lg }}>
@@ -31,30 +32,48 @@ export function ActivityCard({ activity }: { activity: InsightsActivity }) {
             {t('insights.activity')}
           </Txt>
         </Row>
-        <Row gap={6} style={{ alignItems: 'baseline' }}>
-          <Txt variant="display" style={{ fontSize: 36 }}>
-            {formatNumber(weekly, locale)}
-          </Txt>
-          <Txt tone="secondary">{t('insights.activityPerWeek')}</Txt>
-        </Row>
-        <Txt variant="label" tone={reached ? 'accent' : 'secondary'}>
-          {reached ? `${t('insights.activityReached', { goal: goals.weeklyActiveMinutes })} ✓` : t('insights.activityGoal', { goal: goals.weeklyActiveMinutes })}
-        </Txt>
+        {hasSessions ? (
+          <>
+            <Row gap={6} style={{ alignItems: 'baseline' }}>
+              <Txt variant="display" style={{ fontSize: 36 }}>
+                {formatNumber(weekly, locale)}
+              </Txt>
+              <Txt tone="secondary">{t('insights.activityPerWeek')}</Txt>
+            </Row>
+            <Txt variant="label" tone={reached ? 'accent' : 'secondary'}>
+              {reached ? `${t('insights.activityReached', { goal: goals.weeklyActiveMinutes })} ✓` : t('insights.activityGoal', { goal: goals.weeklyActiveMinutes })}
+            </Txt>
+          </>
+        ) : avgSteps !== null ? (
+          // No session yet, but the steps are there: lead with what was done, not with a zero.
+          <>
+            <Row gap={6} style={{ alignItems: 'baseline' }}>
+              <Txt variant="display" style={{ fontSize: 36 }}>
+                {formatNumber(avgSteps, locale)}
+              </Txt>
+              <Txt tone="secondary">{t('insights.activityStepsPerDay')}</Txt>
+            </Row>
+            {goals.dailySteps ? (
+              <Txt variant="label" tone={stepsReached ? 'accent' : 'secondary'}>
+                {t('insights.activityStepsGoalShort', { goal: formatNumber(goals.dailySteps, locale) })}
+                {stepsReached ? ' ✓' : ''}
+              </Txt>
+            ) : null}
+          </>
+        ) : null}
       </View>
 
-      {!hasData ? (
-        <Txt tone="secondary">{t('insights.activityEmpty')}</Txt>
+      {!hasSessions ? (
+        <Txt tone="secondary">{avgSteps !== null ? t('insights.activityNoSession') : t('insights.activityEmpty')}</Txt>
       ) : (
         <>
-          {activity.totalMinutes > 0 ? (
-            <DayBars
-              values={activity.days.map((d) => (d.activeMinutes > 0 ? d.activeMinutes : null))}
-              labels={activity.days.map((d) => weekdayInitial(d.date, locale))}
-              target={goals.weeklyActiveMinutes / 7}
-              kind="min"
-              color={colors.accent}
-            />
-          ) : null}
+          <DayBars
+            values={activity.days.map((d) => (d.activeMinutes > 0 ? d.activeMinutes : null))}
+            labels={activity.days.map((d) => weekdayInitial(d.date, locale))}
+            target={goals.weeklyActiveMinutes / 7}
+            kind="min"
+            color={colors.accent}
+          />
 
           {avgSteps !== null ? (
             <Row gap={6}>

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { TextInput, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
 
-import { Button, Card, IconButton, Row, Txt } from '@/components/ui';
+import { Button, Card, IconButton, Row, Txt, webInput } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -129,7 +129,7 @@ export function WeightCard({ weight, plan }: { weight: WeightTrend; plan: GoalPl
             placeholderTextColor={colors.text3}
             keyboardType="decimal-pad"
             autoFocus
-            style={{ flex: 1, height: 48, borderRadius: Radius.md, backgroundColor: colors.surface2, paddingHorizontal: Space.lg, fontSize: 18, color: colors.text }}
+            style={[{ flex: 1, height: 48, borderRadius: Radius.md, backgroundColor: colors.surface2, paddingHorizontal: Space.lg, fontSize: 18, color: colors.text }, webInput]}
           />
           <Button title={t('common.save')} size="md" onPress={() => save.mutate(kg)} disabled={!valid} loading={save.isPending} />
         </Row>

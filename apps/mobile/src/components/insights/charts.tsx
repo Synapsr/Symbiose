@@ -56,6 +56,8 @@ export function DayBars({
   );
 }
 
+const HOUR_LABELS = [0, 6, 12, 18, 23];
+
 /** 24 bars, one per hour; the peak is highlighted. */
 export function HourBars({ hours, color }: { hours: number[]; color: string }) {
   const { colors } = useTheme();
@@ -68,13 +70,19 @@ export function HourBars({ hours, color }: { hours: number[]; color: string }) {
           <View key={hour} style={{ flex: 1, height: Math.max(2, (value / max) * 90), borderRadius: 3, backgroundColor: hour === peak && value > 0 ? color : value > 0 ? `${color}66` : colors.surface2 }} />
         ))}
       </View>
-      <Row style={{ justifyContent: 'space-between' }}>
-        {['0h', '6h', '12h', '18h', '23h'].map((label) => (
-          <Txt key={label} variant="caption" tone="tertiary" style={{ fontSize: 11 }}>
-            {label}
-          </Txt>
+      {/* Same 24 slots as the bars, so each label sits under its own hour. */}
+      <View style={{ flexDirection: 'row', gap: 2, height: 16 }}>
+        {hours.map((_, hour) => (
+          <View key={hour} style={{ flex: 1 }}>
+            {HOUR_LABELS.includes(hour) ? (
+              // Wider than its slot: centred on the bar, free to overflow it.
+              <Txt variant="caption" tone="tertiary" style={{ position: 'absolute', left: '50%', width: 40, marginLeft: -20, textAlign: 'center', fontSize: 11 }}>
+                {hour}h
+              </Txt>
+            ) : null}
+          </View>
         ))}
-      </Row>
+      </View>
     </View>
   );
 }

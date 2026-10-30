@@ -20,6 +20,8 @@ import { usePending, useSettings } from '@/lib/stores';
 import { dayVoice, greeting } from '@/lib/voice';
 import { Radius, Space, useTheme } from '@/theme';
 
+const CAPTURE_SIZE = 68;
+
 export default function Today() {
   const { t, locale, nutrient } = useI18n();
   const { colors, elevation } = useTheme();
@@ -34,6 +36,9 @@ export default function Today() {
   const pending = allPending.filter((p) => p.input.localDate === date);
   const { retry, dismiss } = useMealLogger();
   const syncHealth = useHealthSync(today);
+  const leftHanded = useSettings((s) => s.leftHanded);
+  // The floating camera button: the scroll ends far enough below it that nothing stays hidden underneath.
+  const captureBottom = insets.bottom + (Platform.OS === 'web' ? 96 : Space.lg);
 
   const showCraving = Boolean(user.plan?.rules.some((r) => r.kind === 'max')) && date === today;
   const hero = day.data ? heroNutrient(day.data, user.plan, hideCalories) : 'kcal';
@@ -61,7 +66,7 @@ export default function Today() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingBottom: insets.bottom + (Platform.OS === 'web' ? 130 : 120), paddingHorizontal: Space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }}
+        contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingBottom: captureBottom + CAPTURE_SIZE + Space.xxxl, paddingHorizontal: Space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }}
         refreshControl={
           <RefreshControl
             refreshing={day.isRefetching}
@@ -132,7 +137,7 @@ export default function Today() {
               onPress={() => router.push('/craving')}
               style={{ marginTop: Space.lg, flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.accentSoft }}>
               <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
-                <Sparkles size={18} color="#FFFFFF" />
+                <Sparkles size={18} color={colors.onAccent} />
               </View>
               <View style={{ flex: 1 }}>
                 <Txt variant="label" style={{ fontSize: 16 }}>
@@ -173,13 +178,13 @@ export default function Today() {
         </Reveal>
       </ScrollView>
 
-      <CaptureButton date={date} bottom={insets.bottom + (Platform.OS === 'web' ? 96 : Space.lg)} invite={empty} />
+      <CaptureButton date={date} bottom={captureBottom} invite={empty} side={leftHanded ? 'left' : 'right'} />
     </View>
   );
 }
 
 /** The one button that matters: tap to snap a meal, long-press to type it. A soft ripple invites the first photo of the day. */
-function CaptureButton({ date, bottom, invite }: { date: string; bottom: number; invite: boolean }) {
+function CaptureButton({ date, bottom, invite, side }: { date: string; bottom: number; invite: boolean; side: 'left' | 'right' }) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const halo = useSharedValue(0);
@@ -189,8 +194,11 @@ function CaptureButton({ date, bottom, invite }: { date: string; bottom: number;
   const haloStyle = useAnimatedStyle(() => ({ opacity: (1 - halo.value) * 0.3, transform: [{ scale: 1 + halo.value * 0.5 }] }));
 
   return (
-    <View style={{ position: 'absolute', right: Space.xl, bottom, width: 68, height: 68 }}>
-      <Animated.View pointerEvents="none" style={[{ position: 'absolute', width: 68, height: 68, borderRadius: 34, backgroundColor: colors.inverted }, haloStyle]} />
+    <View style={{ position: 'absolute', [side]: Space.xl, bottom, width: CAPTURE_SIZE, height: CAPTURE_SIZE }}>
+      <Animated.View
+        pointerEvents="none"
+        style={[{ position: 'absolute', width: CAPTURE_SIZE, height: CAPTURE_SIZE, borderRadius: CAPTURE_SIZE / 2, backgroundColor: colors.inverted }, haloStyle]}
+      />
       <Pressy
         haptic={false}
         accessibilityRole="button"
@@ -203,7 +211,15 @@ function CaptureButton({ date, bottom, invite }: { date: string; bottom: number;
           haptics.impact();
           router.push({ pathname: '/capture', params: { date, mode: 'text' } });
         }}
-        style={{ width: 68, height: 68, borderRadius: 34, backgroundColor: colors.inverted, alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 28px rgba(0,0,0,0.25)' }}>
+        style={{
+          width: CAPTURE_SIZE,
+          height: CAPTURE_SIZE,
+          borderRadius: CAPTURE_SIZE / 2,
+          backgroundColor: colors.inverted,
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 10px 28px rgba(0,0,0,0.25)',
+        }}>
         <Camera size={28} color={colors.onInverted} />
       </Pressy>
     </View>

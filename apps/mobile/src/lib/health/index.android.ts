@@ -1,4 +1,4 @@
-import type { Meal, WorkoutInput, WorkoutType } from '@symbiose/shared';
+import type { BloodPressureReadingInput, Meal, WorkoutInput, WorkoutType } from '@symbiose/shared';
 import {
   aggregateRecord,
   ExerciseType,
@@ -8,10 +8,13 @@ import {
   readRecords,
   requestPermission,
   SdkAvailabilityStatus,
+  type Permission,
   type RecordResult,
+  type ReadRecordsOptions,
+  type RecordType,
 } from 'react-native-health-connect';
 
-import { cleanProfile, dayBounds, mealWindow, toWorkoutInput, type HealthBridge } from './types';
+import { cleanProfile, dayBounds, mealWindow, OWN_RECORD_PREFIX, toBloodPressureInput, toWorkoutInput, type HealthBridge } from './types';
 
 const MEAL_TYPE = { breakfast: 1, lunch: 2, dinner: 3, snack: 4 } as const;
 
@@ -45,6 +48,18 @@ const TYPES: [WorkoutType, number[]][] = [
 ];
 const TYPE_BY_EXERCISE = new Map<number, WorkoutType>(TYPES.flatMap(([type, list]) => list.map((e) => [e, type] as const)));
 
+/** Every page of a read (Health Connect pages at 1000 records by default). */
+async function readAll<T extends RecordType>(recordType: T, timeRangeFilter: ReadRecordsOptions['timeRangeFilter']): Promise<RecordResult<T>[]> {
+  const records: RecordResult<T>[] = [];
+  let pageToken: string | undefined;
+  do {
+    const page = await readRecords(recordType, { timeRangeFilter, ascendingOrder: true, pageToken });
+    records.push(...page.records);
+    pageToken = page.pageToken || undefined;
+  } while (pageToken && records.length < 5000);
+  return records;
+}
+
 let initialized = false;
 async function ensureInit(): Promise<boolean> {
   if (!initialized) initialized = await initialize();
@@ -66,7 +81,7 @@ async function sessionKcal(session: RecordResult<'ExerciseSession'>): Promise<nu
 
 export const health: HealthBridge = {
   source: 'health_connect',
-  storeName: 'Health Connect',
+  storeName: { fr: 'Health Connect', en: 'Health Connect' },
 
   async isAvailable() {
     try {
@@ -76,16 +91,20 @@ export const health: HealthBridge = {
     }
   },
 
-  async connect() {
+  async connect(options) {
     if (!(await ensureInit())) return false;
-    const granted = await requestPermission([
+    const permissions: Permission[] = [
       { accessType: 'read', recordType: 'Steps' },
       { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
       { accessType: 'read', recordType: 'Weight' },
       { accessType: 'read', recordType: 'Height' },
       { accessType: 'read', recordType: 'ExerciseSession' },
       { accessType: 'write', recordType: 'Nutrition' },
-    ]);
+    ];
+    if (options?.bloodPressure) {
+      permissions.push({ accessType: 'read', recordType: 'BloodPressure' }, { accessType: 'write', recordType: 'BloodPressure' });
+    }
+    const granted = await requestPermission(permissions);
     return granted.length > 0;
   },
 
@@ -134,17 +153,7 @@ export const health: HealthBridge = {
 
   async readWorkouts(from, to) {
     await ensureInit();
-    const sessions: RecordResult<'ExerciseSession'>[] = [];
-    let pageToken: string | undefined;
-    do {
-      const page = await readRecords('ExerciseSession', {
-        timeRangeFilter: { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() },
-        ascendingOrder: true,
-        pageToken,
-      });
-      sessions.push(...page.records);
-      pageToken = page.pageToken || undefined;
-    } while (pageToken && sessions.length < 1000);
+    const sessions = await readAll('ExerciseSession', { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() });
 
     const inputs = await Promise.all(
       sessions.map(async (session): Promise<WorkoutInput | null> => {
@@ -163,6 +172,39 @@ export const health: HealthBridge = {
       }),
     );
     return inputs.filter((w): w is WorkoutInput => w !== null);
+  },
+
+  async readBloodPressure(from, to) {
+    await ensureInit();
+    const records = await readAll('BloodPressure', { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() });
+    return records
+      // Readings Symbiose wrote itself are already on the server.
+      .filter((record) => record.metadata?.id && !record.metadata.clientRecordId?.startsWith(OWN_RECORD_PREFIX))
+      .map((record) =>
+        toBloodPressureInput({
+          externalId: record.metadata!.id!,
+          measuredAt: new Date(record.time),
+          systolic: record.systolic.inMillimetersOfMercury,
+          diastolic: record.diastolic.inMillimetersOfMercury,
+          pulse: null,
+        }),
+      )
+      .filter((r): r is BloodPressureReadingInput => r !== null);
+  },
+
+  async writeBloodPressure(reading) {
+    await ensureInit();
+    await insertRecords([
+      {
+        recordType: 'BloodPressure',
+        time: reading.measuredAt.toISOString(),
+        systolic: { value: reading.systolic, unit: 'millimetersOfMercury' },
+        diastolic: { value: reading.diastolic, unit: 'millimetersOfMercury' },
+        bodyPosition: 0,
+        measurementLocation: 0,
+        metadata: { clientRecordId: `${OWN_RECORD_PREFIX}${reading.id}` },
+      },
+    ]);
   },
 
   async writeMeal(meal: Meal) {
@@ -190,5 +232,5 @@ export const health: HealthBridge = {
   },
 };
 
-export { HEALTH_SCOPES } from './types';
+export { BP_SCOPES, HEALTH_SCOPES, inferWalkIntensity } from './types';
 export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';

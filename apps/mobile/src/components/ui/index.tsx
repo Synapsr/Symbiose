@@ -191,7 +191,7 @@ export function Button({
   const { colors } = useTheme();
   const inactive = disabled && !loading;
   const bg = inactive ? colors.surface2 : { primary: colors.inverted, secondary: colors.surface2, ghost: 'transparent', accent: colors.accent, danger: colors.surface2 }[variant];
-  const fg = inactive ? colors.text3 : { primary: colors.onInverted, secondary: colors.text, ghost: colors.text2, accent: '#FFFFFF', danger: colors.danger }[variant];
+  const fg = inactive ? colors.text3 : { primary: colors.onInverted, secondary: colors.text, ghost: colors.text2, accent: colors.onAccent, danger: colors.danger }[variant];
   return (
     <Pressy
       onPress={onPress}
@@ -294,6 +294,15 @@ export function Segmented<T extends string>({ options, value, onChange }: { opti
 
 // ---------------------------------------------------------------- Inputs
 
+/**
+ * Web text fields draw no browser focus ring: Chrome paints `outline-style: auto`
+ * whatever the width, so the style is set too. Fields show focus their own way.
+ */
+export const webInput = Platform.OS === 'web' ? ({ outlineWidth: 0, outlineStyle: 'solid' } as const) : null;
+
+/** A web textarea defaults to two rows: start at one, like on native. */
+export const webSingleRow = Platform.OS === 'web' ? { numberOfLines: 1 } : null;
+
 export function Field({ label, style, onFocus, onBlur, ...props }: TextInputProps & { label?: string }) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
@@ -326,7 +335,7 @@ export function Field({ label, style, onFocus, onBlur, ...props }: TextInputProp
             fontSize: 17,
             color: colors.text,
           },
-          Platform.OS === 'web' ? { outlineWidth: 0, outlineColor: 'transparent' } : null,
+          webInput,
           props.multiline && { paddingTop: 16, paddingBottom: 16, minHeight: 120, textAlignVertical: 'top' },
           style,
         ]}

@@ -10,7 +10,7 @@ import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSeq
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PortionStepper } from '@/components/meal/portion-stepper';
-import { Button, IconButton, Pressy, Row, Txt } from '@/components/ui';
+import { Button, IconButton, Pressy, Row, Txt, webInput } from '@/components/ui';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
@@ -19,7 +19,7 @@ import { haptics } from '@/lib/haptics';
 import { useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
 import { preparePhoto } from '@/lib/image';
 import { useApi } from '@/lib/session';
-import { useToast } from '@/lib/stores';
+import { useSettings, useToast } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
 type Mode = 'photo' | 'barcode' | 'text';
@@ -50,6 +50,7 @@ export default function Capture() {
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const leftHanded = useSettings((s) => s.leftHanded);
   // A quick white flash confirms the shot, like a real shutter.
   const flash = useSharedValue(0);
   const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
@@ -193,13 +194,14 @@ export default function Capture() {
                 placeholder={t('capture.note')}
                 placeholderTextColor={DIM}
                 autoFocus
-                style={{ height: 48, borderRadius: Radius.pill, backgroundColor: 'rgba(0,0,0,0.55)', color: WHITE, paddingHorizontal: Space.xl, fontSize: 16 }}
+                style={[{ height: 48, borderRadius: Radius.pill, backgroundColor: 'rgba(0,0,0,0.55)', color: WHITE, paddingHorizontal: Space.xl, fontSize: 16 }, webInput]}
               />
             </Animated.View>
           ) : null}
 
           {mode === 'photo' ? (
-            <Row style={{ width: '100%', paddingHorizontal: Space.xxxl, justifyContent: 'space-between' }}>
+            // Left-handed: the note (used most) moves under the left thumb, the gallery to the right.
+            <Row style={{ width: '100%', paddingHorizontal: Space.xxxl, justifyContent: 'space-between', flexDirection: leftHanded ? 'row-reverse' : 'row' }}>
               <IconButton label={t('capture.gallery')} variant="glass" size={52} icon={<Images size={22} color={WHITE} />} onPress={pickFromGallery} />
               <Pressy
                 accessibilityRole="button"
@@ -290,7 +292,7 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
             placeholderTextColor="rgba(255,255,255,0.35)"
             multiline
             autoFocus
-            style={[{ minHeight: 110, color: WHITE, fontSize: 20, lineHeight: 27, textAlignVertical: 'top' }, Platform.OS === 'web' ? { outlineWidth: 0, outlineColor: 'transparent' } : null]}
+            style={[{ minHeight: 110, color: WHITE, fontSize: 20, lineHeight: 27, textAlignVertical: 'top' }, webInput]}
           />
           <Row style={{ justifyContent: 'flex-end' }}>
             <Pressy

@@ -1,7 +1,8 @@
 import { ageFromBirthYear } from '@symbiose/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ChevronRight, CodeXml, Download, EyeOff, LogOut, Server, Target, Trash2, User, Watch } from 'lucide-react-native';
+import { ChevronRight, CodeXml, Download, EyeOff, Hand, HeartPulse, LogOut, Server, Target, Trash2, User, Watch } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,9 +11,9 @@ import { Card, Dot, Pressy, Row, SectionTitle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { health, HEALTH_SCOPES } from '@/lib/health';
+import { BP_SCOPES, health, HEALTH_SCOPES } from '@/lib/health';
 import { useHealthSync, useToday } from '@/lib/hooks';
-import { useApi, useSession, useUser } from '@/lib/session';
+import { useApi, useSession, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
@@ -33,11 +34,14 @@ export default function Me() {
 
   const profile = user.profile!;
   const plan = user.plan!;
+  const setUser = useSetUser();
+  const queryClient = useQueryClient();
+  const trackBp = profile.trackBloodPressure === true;
 
   const toggleHealth = async (on: boolean) => {
     if (on) {
-      const granted = await health.connect().catch(() => false);
-      settings.set(granted ? { healthEnabled: true, healthScopes: HEALTH_SCOPES } : { healthEnabled: false });
+      const granted = await health.connect({ bloodPressure: trackBp }).catch(() => false);
+      settings.set(granted ? { healthEnabled: true, healthScopes: HEALTH_SCOPES, ...(trackBp ? { bpScopes: BP_SCOPES } : null) } : { healthEnabled: false });
       if (granted) {
         haptics.success();
         void syncHealth(true);
@@ -46,6 +50,20 @@ export default function Me() {
       settings.set({ healthEnabled: false });
     }
   };
+
+  // Opt-in: saved on the profile (the server and the coach use it), then the health store is asked for the readings.
+  const toggleBp = useMutation({
+    mutationFn: (on: boolean) => api.saveProfile({ ...profile, trackBloodPressure: on }),
+    onSuccess: async (saved, on) => {
+      setUser(saved);
+      void queryClient.invalidateQueries({ queryKey: ['insights'] });
+      if (on && settings.healthEnabled && health.source) {
+        const granted = await health.connect({ bloodPressure: true }).catch(() => false);
+        if (granted) settings.set({ bpScopes: BP_SCOPES, lastBpSync: 0 });
+      }
+    },
+    onError: () => haptics.warning(),
+  });
 
   const confirmDelete = () => {
     const run = async () => {
@@ -112,9 +130,16 @@ export default function Me() {
       <Card padded={false} style={{ marginTop: -Space.sm }}>
         <Item
           icon={<Watch size={20} color={colors.accent} />}
-          title={healthAvailable ? health.storeName : t('me.health')}
-          subtitle={healthAvailable ? (settings.healthEnabled ? t('me.healthOn', { store: health.storeName }) : t('me.healthOff')) : t('me.healthUnavailable')}
+          title={healthAvailable ? health.storeName[locale] : t('me.health')}
+          subtitle={healthAvailable ? (settings.healthEnabled ? t('me.healthOn', { store: health.storeName[locale] }) : t('me.healthOff')) : t('me.healthUnavailable')}
           right={healthAvailable ? <Switch value={settings.healthEnabled} onValueChange={(v) => void toggleHealth(v)} /> : null}
+        />
+        <Divider />
+        <Item
+          icon={<HeartPulse size={20} color={colors.text} />}
+          title={t('me.trackBp')}
+          subtitle={t('me.trackBpHint')}
+          right={<Switch value={toggleBp.isPending ? toggleBp.variables : trackBp} disabled={toggleBp.isPending} onValueChange={(v) => toggleBp.mutate(v)} />}
         />
       </Card>
 
@@ -129,6 +154,13 @@ export default function Me() {
           title={t('me.hideCalories')}
           subtitle={t('me.hideCaloriesHint')}
           right={<Switch value={settings.hideCalories} onValueChange={(v) => settings.set({ hideCalories: v })} />}
+        />
+        <Divider />
+        <Item
+          icon={<Hand size={20} color={colors.text} style={{ transform: [{ scaleX: -1 }] }} />}
+          title={t('me.leftHanded')}
+          subtitle={t('me.leftHandedHint')}
+          right={<Switch value={settings.leftHanded} onValueChange={(v) => settings.set({ leftHanded: v })} />}
         />
       </Card>
 

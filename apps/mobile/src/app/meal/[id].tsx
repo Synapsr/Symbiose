@@ -8,7 +8,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, TextInpu
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ItemRow } from '@/components/meal/item-row';
-import { Bar, Card, Chip, Dot, IconButton, Pressy, Row, SectionTitle, SwapIcon, Txt } from '@/components/ui';
+import { Bar, Card, Chip, Dot, IconButton, Pressy, Row, SectionTitle, SwapIcon, Txt, webInput, webSingleRow } from '@/components/ui';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { formatAmount, formatNumber } from '@/lib/format';
@@ -272,7 +272,8 @@ function MealEditor({ meal }: { meal: Meal }) {
               placeholderTextColor={colors.text3}
               multiline
               editable={!busy}
-              style={{ flex: 1, minHeight: 44, maxHeight: 120, color: colors.text, fontSize: 16, paddingTop: 12, paddingBottom: 12 }}
+              {...webSingleRow}
+              style={[{ flex: 1, minHeight: 44, maxHeight: 120, color: colors.text, fontSize: 16, lineHeight: 20, paddingTop: 12, paddingBottom: 12 }, webInput]}
             />
             <IconButton
               label={t('detail.fix')}

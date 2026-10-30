@@ -1,6 +1,10 @@
 import type {
   ActivityInput,
   AuthResponse,
+  BloodPressureInput,
+  BloodPressureReading,
+  BloodPressureReadingInput,
+  BloodPressureTrend,
   CoachMessage,
   CreateMealInput,
   Craving,
@@ -117,6 +121,12 @@ export function createApi(baseUrl: string, token: string) {
     createWorkout: (input: WorkoutInput) => call<Workout>('POST', '/api/workouts', input),
     deleteWorkout: (id: string) => call<void>('DELETE', `/api/workouts/${id}`),
     workouts: (from: string, to: string) => call<Workout[]>('GET', `/api/workouts?from=${from}&to=${to}`),
+
+    /** Opt-in blood pressure: import (de-duplicated by `externalId`), manual entry, trend. */
+    bloodPressure: (days = 90) => call<BloodPressureTrend>('GET', `/api/blood-pressure?days=${days}`),
+    putBloodPressure: (input: BloodPressureInput) => call<{ written: number }>('PUT', '/api/blood-pressure', input),
+    createBloodPressure: (reading: BloodPressureReadingInput) => call<BloodPressureReading>('POST', '/api/blood-pressure', reading),
+    deleteBloodPressure: (id: string) => call<void>('DELETE', `/api/blood-pressure/${id}`),
 
     createCraving: (input: CravingInput) => call<{ craving: Craving; alternative: string }>('POST', '/api/cravings', input, 60_000),
     updateCraving: (id: string, outcome: CravingOutcome) => call<Craving>('PATCH', `/api/cravings/${id}`, { outcome }),

@@ -7,7 +7,7 @@ import { FlatList, Keyboard, KeyboardAvoidingView, Platform, TextInput, View } f
 import Animated, { FadeIn, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Chip, IconButton, Row, Txt } from '@/components/ui';
+import { Button, Chip, IconButton, Row, Txt, webInput, webSingleRow } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { haptics } from '@/lib/haptics';
@@ -135,7 +135,9 @@ export default function Coach() {
             placeholder={t('coach.placeholder')}
             placeholderTextColor={colors.text3}
             multiline
-            style={[{ flex: 1, minHeight: 44, maxHeight: 140, color: colors.text, fontSize: 16, paddingTop: 12, paddingBottom: 12 }, Platform.OS === 'web' ? { outlineWidth: 0 } : null]}
+            // One row when empty, so the placeholder lines up with the send button.
+            {...webSingleRow}
+            style={[{ flex: 1, minHeight: 44, maxHeight: 140, color: colors.text, fontSize: 16, lineHeight: 20, paddingTop: 12, paddingBottom: 12 }, webInput]}
           />
           <IconButton label={t('capture.send')} variant="inverted" icon={<ArrowUp size={20} color={colors.onInverted} />} onPress={() => void submit(text)} />
         </View>

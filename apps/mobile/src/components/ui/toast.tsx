@@ -2,7 +2,7 @@ import { Platform } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useToast } from '@/lib/stores';
+import { useSettings, useToast } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
 import { Pressy, Txt } from './index';
@@ -13,7 +13,10 @@ export function ToastHost() {
   const hide = useToast((s) => s.hide);
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const leftHanded = useSettings((s) => s.leftHanded);
   if (!toast) return null;
+  // The undo button sits on the thumb's side.
+  const actionPad = toast.action ? 6 : Space.xl;
   return (
     <Animated.View
       key={toast.id}
@@ -34,14 +37,14 @@ export function ToastHost() {
           hide();
         }}
         style={{
-          flexDirection: 'row',
+          flexDirection: leftHanded ? 'row-reverse' : 'row',
           alignItems: 'center',
           gap: Space.md,
           maxWidth: '100%',
           backgroundColor: colors.inverted,
           borderRadius: Radius.pill,
-          paddingLeft: Space.xl,
-          paddingRight: toast.action ? 6 : Space.xl,
+          paddingLeft: leftHanded ? actionPad : Space.xl,
+          paddingRight: leftHanded ? Space.xl : actionPad,
           paddingVertical: 6,
           minHeight: 48,
           boxShadow: '0 8px 24px rgba(0,0,0,0.18)',

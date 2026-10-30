@@ -8,8 +8,8 @@ import { useI18n } from '@/i18n';
 
 import { ApiError } from './api';
 import { haptics } from './haptics';
-import { health, HEALTH_SCOPES } from './health';
-import { useApi } from './session';
+import { BP_SCOPES, health, HEALTH_SCOPES, inferWalkIntensity } from './health';
+import { useApi, useUser } from './session';
 import { usePending, useSettings, useToast, type PendingMeal } from './stores';
 
 /** Today's local date, refreshed when the app returns to the foreground. */
@@ -111,40 +111,53 @@ export function useMealLogger() {
 // Today and Me both mount the sync hook: one run at a time is enough.
 let syncing = false;
 
+const HOUR = 3_600_000;
+const DAY = 86_400_000;
+
 /**
- * Pulls today's activity (steps, active energy, weight) and recent workouts
- * from the watch via the phone's health store and sends them to the server,
- * at most every 10 min (weights every 6 h, workouts every hour).
+ * Pulls the watch's data from the phone's health store and sends it to the
+ * server, each kind at its own pace: today's activity every 10 min, workouts
+ * every hour, weights and (when tracked) blood pressure every 6 hours.
  */
 export function useHealthSync(today: string) {
   const api = useApi();
   const queryClient = useQueryClient();
+  const user = useUser();
   const enabled = useSettings((s) => s.healthEnabled);
   const setSettings = useSettings((s) => s.set);
+  const trackBp = user.profile?.trackBloodPressure === true;
+  const weightKg = user.profile?.weightKg ?? null;
 
   const sync = useCallback(
     async (force = false) => {
       if (!enabled || !health.source || syncing) return;
-      const { lastHealthSync, healthScopes } = useSettings.getState();
-      if (!force && Date.now() - lastHealthSync < 10 * 60_000) return;
+      const source = health.source;
+      const due = (last: number, every: number) => force || Date.now() - last >= every;
       syncing = true;
       try {
-        // Connected with an older version: ask once for the new types (workouts, height…).
-        if (healthScopes < HEALTH_SCOPES) {
-          await health.connect().catch(() => false);
-          setSettings({ healthScopes: HEALTH_SCOPES });
-        }
+        await askForNewTypes();
         await syncDay();
         await syncWeights();
         await syncWorkouts();
+        await syncBloodPressure();
       } finally {
         syncing = false;
       }
 
+      // Connected with an older version, or just started tracking blood pressure: ask once for the new types.
+      async function askForNewTypes() {
+        const { healthScopes, bpScopes } = useSettings.getState();
+        const needBp = trackBp && bpScopes < BP_SCOPES;
+        if (healthScopes >= HEALTH_SCOPES && !needBp) return;
+        await health.connect({ bloodPressure: trackBp }).catch(() => false);
+        setSettings({ healthScopes: HEALTH_SCOPES, ...(trackBp ? { bpScopes: BP_SCOPES } : null) });
+      }
+
       async function syncDay() {
+        if (!due(useSettings.getState().lastHealthSync, 10 * 60_000)) return;
         try {
           const day = await health.readDay(new Date());
-          await api.putActivity({ localDate: today, ...day, source: health.source! });
+          await api.putActivity({ localDate: today, ...day, source });
           setSettings({ lastHealthSync: Date.now() });
           void queryClient.invalidateQueries({ queryKey: ['day', today] });
         } catch {
@@ -152,16 +165,16 @@ export function useHealthSync(today: string) {
         }
       }
 
-      // Weight history: 90 days the first time, then the last two weeks, every 6 hours at most.
+      // Weight history: 90 days the first time, then the last two weeks.
       async function syncWeights() {
         const { lastWeightSync } = useSettings.getState();
-        if (!force && Date.now() - lastWeightSync < 6 * 3_600_000) return;
+        if (!due(lastWeightSync, 6 * HOUR)) return;
         try {
-          const since = new Date(Date.now() - (lastWeightSync ? 14 : 90) * 86_400_000);
+          const since = new Date(Date.now() - (lastWeightSync ? 14 : 90) * DAY);
           const readings = await health.readWeights(since, new Date());
           if (readings.length) {
             await api.putWeights({
-              source: health.source!,
+              source,
               samples: readings.map((r) => ({ measuredAt: r.measuredAt.toISOString(), localDate: toLocalDate(r.measuredAt), kg: r.kg })),
             });
             void queryClient.invalidateQueries({ queryKey: ['insights'] });
@@ -173,13 +186,13 @@ export function useHealthSync(today: string) {
         }
       }
 
-      // Workouts: 30 days the first time, then the last week, every hour at most. The server de-duplicates.
+      // Workouts: 30 days the first time, then the last week. The server de-duplicates (and updates) by id.
       async function syncWorkouts() {
         const { lastWorkoutSync } = useSettings.getState();
-        if (!force && Date.now() - lastWorkoutSync < 3_600_000) return;
+        if (!due(lastWorkoutSync, HOUR)) return;
         try {
-          const since = new Date(Date.now() - (lastWorkoutSync ? 7 : 30) * 86_400_000);
-          const workouts = await health.readWorkouts(since, new Date());
+          const since = new Date(Date.now() - (lastWorkoutSync ? 7 : 30) * DAY);
+          const workouts = (await health.readWorkouts(since, new Date())).map((w) => inferWalkIntensity(w, weightKg));
           for (let i = 0; i < workouts.length; i += 500) await api.putWorkouts(workouts.slice(i, i + 500));
           setSettings({ lastWorkoutSync: Date.now() });
           if (workouts.length) {
@@ -190,8 +203,23 @@ export function useHealthSync(today: string) {
           // Same: workouts are a bonus.
         }
       }
+
+      // Blood pressure, only for people who opted in: 90 days the first time, then the last two weeks.
+      async function syncBloodPressure() {
+        const { lastBpSync } = useSettings.getState();
+        if (!trackBp || !due(lastBpSync, 6 * HOUR)) return;
+        try {
+          const since = new Date(Date.now() - (lastBpSync ? 14 : 90) * DAY);
+          const readings = await health.readBloodPressure(since, new Date());
+          for (let i = 0; i < readings.length; i += 1000) await api.putBloodPressure({ readings: readings.slice(i, i + 1000), source });
+          setSettings({ lastBpSync: Date.now() });
+          if (readings.length) void queryClient.invalidateQueries({ queryKey: ['insights'] });
+        } catch {
+          // Same.
+        }
+      }
     },
-    [api, enabled, queryClient, setSettings, today],
+    [api, enabled, queryClient, setSettings, today, trackBp, weightKg],
   );
 
   useEffect(() => {

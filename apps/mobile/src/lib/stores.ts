@@ -12,9 +12,14 @@ interface SettingsState {
   lastHealthSync: number;
   lastWeightSync: number;
   lastWorkoutSync: number;
+  lastBpSync: number;
   /** Version of the health permissions granted (see `HEALTH_SCOPES`). */
   healthScopes: number;
-  set: (patch: Partial<Pick<SettingsState, 'hideCalories' | 'healthEnabled' | 'lastHealthSync' | 'lastWeightSync' | 'lastWorkoutSync' | 'healthScopes'>>) => void;
+  /** Version of the blood pressure permissions granted (see `BP_SCOPES`). */
+  bpScopes: number;
+  /** Mirrors the thumb-reach controls (camera button, capture tools, toast action) to the left. */
+  leftHanded: boolean;
+  set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
 
@@ -27,11 +32,15 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   lastHealthSync: 0,
   lastWeightSync: 0,
   lastWorkoutSync: 0,
+  lastBpSync: 0,
   healthScopes: 0,
+  bpScopes: 0,
+  leftHanded: false,
   set: (patch) => {
     set(patch);
-    const { hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, healthScopes } = get();
-    void storage.set(SETTINGS_KEY, JSON.stringify({ hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, healthScopes })).catch(() => undefined);
+    const { hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, lastBpSync, healthScopes, bpScopes, leftHanded } = get();
+    const persisted = { hideCalories, healthEnabled, lastWeightSync, lastWorkoutSync, lastBpSync, healthScopes, bpScopes, leftHanded };
+    void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },
   load: async () => {
     try {

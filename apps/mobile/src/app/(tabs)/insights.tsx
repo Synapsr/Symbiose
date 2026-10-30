@@ -1,15 +1,17 @@
 import type { NutrientKey } from '@symbiose/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Flame, Sparkles } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Camera, Flame, Sparkles } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActivityCard } from '@/components/insights/activity-card';
+import { BloodPressureCard } from '@/components/insights/blood-pressure-card';
 import { DayBars, HourBars } from '@/components/insights/charts';
 import { WeightCard } from '@/components/insights/weight-card';
-import { Bar, Button, Card, Dot, Row, SectionTitle, Segmented, Skeleton, Txt } from '@/components/ui';
+import { Bar, Button, Card, Dot, Pressy, Row, SectionTitle, Segmented, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount, formatNumber, weekdayInitial } from '@/lib/format';
 import { errorMessage, useToday } from '@/lib/hooks';
@@ -37,6 +39,16 @@ export default function Insights() {
   const weightFirst = Boolean(user.plan && user.plan.calorieMode !== 'maintain');
   // Same for activity, which also matters for muscle.
   const activityFirst = weightFirst || Boolean(user.plan?.tags.some((tag) => tag === 'lose_weight' || tag === 'gain_muscle'));
+  const trackBp = user.profile?.trackBloodPressure === true;
+  // Body cards don't need meals: they show even before the first one is logged.
+  const body = data ? (
+    <>
+      <WeightCard weight={data.weight} plan={user.plan} />
+      {trackBp ? <BloodPressureCard trend={data.bloodPressure ?? null} /> : null}
+    </>
+  ) : null;
+  const activityCard = data?.activity ? <ActivityCard activity={data.activity} /> : null;
+  const logged = Boolean(data && data.loggedDays > 0);
 
   return (
     <ScrollView
@@ -68,59 +80,65 @@ export default function Insights() {
             <Skeleton width="100%" height={160} radius={Radius.xl} />
           </View>
         )
-      ) : data.loggedDays === 0 ? (
-        <Card style={{ alignItems: 'center', gap: Space.sm, paddingVertical: Space.xxxl }}>
-          <Txt style={{ fontSize: 36 }}>📈</Txt>
-          <Txt tone="secondary" style={{ textAlign: 'center' }}>
-            {t('insights.empty')}
-          </Txt>
-        </Card>
       ) : (
         <Animated.View entering={FadeIn} style={{ gap: Space.lg }}>
-          <Card style={{ gap: Space.lg }}>
-            <View style={{ gap: 2 }}>
-              <Row gap={6}>
-                <Dot color={primary === 'kcal' ? colors.accent : NUTRIENT_COLORS[primary]} />
-                <Txt variant="label" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {nutrient(primary)} · {t('insights.average').toLowerCase()}
-                </Txt>
-              </Row>
-              <Txt variant="display" style={{ fontSize: 40 }}>
-                {formatAmount(primary, data.averages[primary], locale)}
+          {!logged ? (
+            <Pressy
+              onPress={() => router.push('/capture')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md, paddingHorizontal: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.surface2 }}>
+              <Camera size={16} color={colors.text2} />
+              <Txt variant="caption" tone="secondary" style={{ flex: 1 }}>
+                {t('insights.empty')}
               </Txt>
-              <Row gap={Space.md}>
+            </Pressy>
+          ) : null}
+
+          {logged ? (
+            <Card style={{ gap: Space.lg }}>
+              <View style={{ gap: 2 }}>
+                <Row gap={6}>
+                  <Dot color={primary === 'kcal' ? colors.accent : NUTRIENT_COLORS[primary]} />
+                  <Txt variant="label" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {nutrient(primary)} · {t('insights.average').toLowerCase()}
+                  </Txt>
+                </Row>
+                <Txt variant="display" style={{ fontSize: 40 }}>
+                  {formatAmount(primary, data.averages[primary], locale)}
+                </Txt>
+                <Row gap={Space.md}>
+                  <Txt variant="caption" tone="secondary">
+                    {t('insights.logged', { count: data.loggedDays })}
+                  </Txt>
+                  {data.streak > 0 ? (
+                    <Row gap={4}>
+                      <Flame size={13} color={colors.warning} fill={colors.warning} />
+                      <Txt variant="caption" tone="secondary">
+                        {t('today.streak', { count: data.streak })}
+                      </Txt>
+                    </Row>
+                  ) : null}
+                </Row>
+              </View>
+              <DayBars
+                values={data.days.map((d) => (d.logged ? d.totals[primary] : null))}
+                labels={data.days.map((d) => weekdayInitial(d.date, locale))}
+                target={primaryAdherence?.target ?? (primary === 'kcal' ? (data.days.at(-1)?.kcalTarget ?? 2000) : 0)}
+                kind={primaryAdherence?.kind ?? 'target'}
+                color={primary === 'kcal' ? colors.accent : NUTRIENT_COLORS[primary]}
+              />
+              {!hideCalories && primary !== 'kcal' ? (
                 <Txt variant="caption" tone="secondary">
-                  {t('insights.logged', { count: data.loggedDays })}
+                  {formatNumber(data.averages.kcal, locale)} kcal · {formatAmount('protein', data.averages.protein, locale)} {nutrient('protein').toLowerCase()} · {formatAmount('fiber', data.averages.fiber, locale)}{' '}
+                  {nutrient('fiber').toLowerCase()}
                 </Txt>
-                {data.streak > 0 ? (
-                  <Row gap={4}>
-                    <Flame size={13} color={colors.warning} fill={colors.warning} />
-                    <Txt variant="caption" tone="secondary">
-                      {t('today.streak', { count: data.streak })}
-                    </Txt>
-                  </Row>
-                ) : null}
-              </Row>
-            </View>
-            <DayBars
-              values={data.days.map((d) => (d.logged ? d.totals[primary] : null))}
-              labels={data.days.map((d) => weekdayInitial(d.date, locale))}
-              target={primaryAdherence?.target ?? (primary === 'kcal' ? (data.days.at(-1)?.kcalTarget ?? 2000) : 0)}
-              kind={primaryAdherence?.kind ?? 'target'}
-              color={primary === 'kcal' ? colors.accent : NUTRIENT_COLORS[primary]}
-            />
-            {!hideCalories && primary !== 'kcal' ? (
-              <Txt variant="caption" tone="secondary">
-                {formatNumber(data.averages.kcal, locale)} kcal · {formatAmount('protein', data.averages.protein, locale)} {nutrient('protein').toLowerCase()} · {formatAmount('fiber', data.averages.fiber, locale)}{' '}
-                {nutrient('fiber').toLowerCase()}
-              </Txt>
-            ) : null}
-          </Card>
+              ) : null}
+            </Card>
+          ) : null}
 
-          {weightFirst ? <WeightCard weight={data.weight} plan={user.plan} /> : null}
-          {activityFirst && data.activity ? <ActivityCard activity={data.activity} /> : null}
+          {weightFirst ? body : null}
+          {activityFirst ? activityCard : null}
 
-          {data.adherence.length ? (
+          {logged && data.adherence.length ? (
             <>
               <SectionTitle>{t('insights.adherence')}</SectionTitle>
               <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>
@@ -144,7 +162,7 @@ export default function Insights() {
             </>
           ) : null}
 
-          {(Object.entries(data.topSources) as [NutrientKey, (typeof data.topSources)[NutrientKey]][]).map(([key, sources]) =>
+          {logged && (Object.entries(data.topSources) as [NutrientKey, (typeof data.topSources)[NutrientKey]][]).map(([key, sources]) =>
             sources && sources.length ? (
               <View key={key}>
                 <SectionTitle>
@@ -169,7 +187,7 @@ export default function Insights() {
             ) : null,
           )}
 
-          {data.byHour.hours.some((h) => h > 0) ? (
+          {logged && data.byHour.hours.some((h) => h > 0) ? (
             <>
               <SectionTitle>
                 {t('insights.when')} · {nutrient(data.byHour.nutrient).toLowerCase()}
@@ -194,36 +212,40 @@ export default function Insights() {
             </Card>
           ) : null}
 
-          {!weightFirst ? <WeightCard weight={data.weight} plan={user.plan} /> : null}
-          {!activityFirst && data.activity ? <ActivityCard activity={data.activity} /> : null}
+          {!weightFirst ? body : null}
+          {!activityFirst ? activityCard : null}
 
-          <SectionTitle>{t('insights.review')}</SectionTitle>
-          <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>
-            {review.data ? (
-              <Animated.View entering={FadeIn} style={{ gap: Space.lg }}>
-                <Txt variant="heading" style={{ lineHeight: 26 }}>
-                  {review.data.headline}
-                </Txt>
-                <ReviewList title={t('insights.wins')} items={review.data.wins} color={colors.accent} />
-                <ReviewList title={t('insights.patterns')} items={review.data.patterns} color={colors.warning} />
-                <ReviewList title={t('insights.next')} items={review.data.nextSteps} color={NUTRIENT_COLORS.fat} />
-              </Animated.View>
-            ) : (
-              <>
-                {review.error ? (
-                  <Txt variant="caption" tone="warning">
-                    {errorMessage(review.error, t('common.error'), t('common.offline'))}
-                  </Txt>
-                ) : null}
-                <Button
-                  title={review.isPending ? t('insights.reviewing') : t('insights.reviewCta')}
-                  icon={<Sparkles size={18} color={colors.onInverted} />}
-                  loading={review.isPending}
-                  onPress={() => review.mutate()}
-                />
-              </>
-            )}
-          </Card>
+          {logged ? (
+            <>
+              <SectionTitle>{t('insights.review')}</SectionTitle>
+              <Card style={{ gap: Space.lg, marginTop: -Space.sm }}>
+                {review.data ? (
+                  <Animated.View entering={FadeIn} style={{ gap: Space.lg }}>
+                    <Txt variant="heading" style={{ lineHeight: 26 }}>
+                      {review.data.headline}
+                    </Txt>
+                    <ReviewList title={t('insights.wins')} items={review.data.wins} color={colors.accent} />
+                    <ReviewList title={t('insights.patterns')} items={review.data.patterns} color={colors.warning} />
+                    <ReviewList title={t('insights.next')} items={review.data.nextSteps} color={NUTRIENT_COLORS.fat} />
+                  </Animated.View>
+                ) : (
+                  <>
+                    {review.error ? (
+                      <Txt variant="caption" tone="warning">
+                        {errorMessage(review.error, t('common.error'), t('common.offline'))}
+                      </Txt>
+                    ) : null}
+                    <Button
+                      title={review.isPending ? t('insights.reviewing') : t('insights.reviewCta')}
+                      icon={<Sparkles size={18} color={colors.onInverted} />}
+                      loading={review.isPending}
+                      onPress={() => review.mutate()}
+                    />
+                  </>
+                )}
+              </Card>
+            </>
+          ) : null}
         </Animated.View>
       )}
     </ScrollView>

@@ -200,7 +200,7 @@ export default function Onboarding() {
                       <View style={[{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' }, elevation]}>
                         <Icon size={18} color={colors.text} />
                       </View>
-                      <Txt style={{ flex: 1 }}>{t(key, { store: health.storeName })}</Txt>
+                      <Txt style={{ flex: 1 }}>{t(key, { store: health.storeName[locale] })}</Txt>
                     </Row>
                   </Reveal>
                 ))}
@@ -230,7 +230,7 @@ export default function Onboarding() {
                   <Row gap={6}>
                     <HeartPulse size={14} color={colors.accent} />
                     <Txt variant="caption" tone="accent">
-                      {t('onb.body.fromHealth', { store: health.storeName })}
+                      {t('onb.body.fromHealth', { store: health.storeName[locale] })}
                     </Txt>
                   </Row>
                 ) : null}

@@ -38,6 +38,8 @@
         "android.permission.health.READ_WEIGHT",
         "android.permission.health.READ_HEIGHT",
         "android.permission.health.READ_EXERCISE",
+        "android.permission.health.READ_BLOOD_PRESSURE",
+        "android.permission.health.WRITE_BLOOD_PRESSURE",
         "android.permission.health.WRITE_NUTRITION"
       ],
       "predictiveBackGestureEnabled": false
@@ -78,8 +80,8 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Symbiose reads your steps, active energy, workouts, weight, height, sex and date of birth to fill in your profile and adapt your daily budget.",
-          "NSHealthUpdateUsageDescription": "Symbiose saves the nutrition of the meals you log to Apple Health.",
+          "NSHealthShareUsageDescription": "Symbiose reads your steps, active energy, workouts, weight, height, sex and date of birth to fill in your profile and adapt your daily budget, and your blood pressure if you choose to track it.",
+          "NSHealthUpdateUsageDescription": "Symbiose saves the nutrition of the meals you log, and the blood pressure readings you type in, to Apple Health.",
           "background": false
         }
       ],

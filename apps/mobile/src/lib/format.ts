@@ -1,10 +1,19 @@
 import { addDays, NUTRIENT_META, roundNutrient, toLocalDate, type Locale, type NutrientKey } from '@symbiose/shared';
 
+const formatters = new Map<string, Intl.NumberFormat>();
+
+/**
+ * "1 880", "2,5". French groups thousands with a narrow no-break space
+ * (U+202F) that Fraunces barely draws, so it becomes a regular no-break space.
+ */
 export function formatNumber(value: number, locale: Locale, decimals = 0): string {
-  return new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', {
-    maximumFractionDigits: decimals,
-    minimumFractionDigits: 0,
-  }).format(value);
+  const key = `${locale}:${decimals}`;
+  let formatter = formatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { maximumFractionDigits: decimals, minimumFractionDigits: 0 });
+    formatters.set(key, formatter);
+  }
+  return formatter.format(value).replace(/\u202F/g, '\u00A0');
 }
 
 /** "12 g", "1 240 kcal", "830 mg". */

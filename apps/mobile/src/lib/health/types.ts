@@ -1,4 +1,14 @@
-import { toLocalDate, toLocalDateTime, type Meal, type Sex, type WorkoutInput, type WorkoutType } from '@symbiose/shared';
+import {
+  toLocalDate,
+  toLocalDateTime,
+  type BloodPressureReadingInput,
+  type Locale,
+  type Meal,
+  type Sex,
+  type WorkoutInput,
+  type WorkoutIntensity,
+  type WorkoutType,
+} from '@symbiose/shared';
 
 export interface DayHealth {
   steps: number | null;
@@ -27,6 +37,21 @@ export interface HealthProfile {
  */
 export const HEALTH_SCOPES = 2;
 
+/** Same idea for the opt-in blood pressure types, asked only to people who track it. */
+export const BP_SCOPES = 1;
+
+/** Marks the readings Symbiose writes to the store, so they're not imported back as duplicates. */
+export const OWN_READING_KEY = 'SymbioseReadingId';
+export const OWN_RECORD_PREFIX = 'symbiose-bp-';
+
+/** A manual reading saved on the server, to copy into the health store. */
+export interface BloodPressureWrite {
+  id: string;
+  measuredAt: Date;
+  systolic: number;
+  diastolic: number;
+}
+
 /**
  * Bridge to the phone's health store, which aggregates the watch's data:
  * Apple Health on iOS (Apple Watch), Health Connect on Android (Wear OS,
@@ -34,11 +59,14 @@ export const HEALTH_SCOPES = 2;
  */
 export interface HealthBridge {
   source: 'healthkit' | 'health_connect' | null;
-  /** Display name of the store. */
-  storeName: string;
+  /** Display name of the store, per app language. */
+  storeName: Record<Locale, string>;
   isAvailable(): Promise<boolean>;
-  /** Asks for read (activity, workouts, body) and write (nutrition) permissions. */
-  connect(): Promise<boolean>;
+  /**
+   * Asks for read (activity, workouts, body) and write (nutrition) permissions,
+   * plus blood pressure when the person tracks it.
+   */
+  connect(options?: { bloodPressure?: boolean }): Promise<boolean>;
   readDay(day: Date): Promise<DayHealth>;
   /** Every body-weight reading between two dates (from a connected scale or typed into Health). */
   readWeights(from: Date, to: Date): Promise<WeightReading[]>;
@@ -46,6 +74,9 @@ export interface HealthBridge {
   readProfile(): Promise<HealthProfile>;
   /** Workout sessions that started between two dates, ready for `PUT /api/workouts`. */
   readWorkouts(from: Date, to: Date): Promise<WorkoutInput[]>;
+  /** Blood pressure readings between two dates, without the ones Symbiose wrote itself. */
+  readBloodPressure(from: Date, to: Date): Promise<BloodPressureReadingInput[]>;
+  writeBloodPressure(reading: BloodPressureWrite): Promise<void>;
   writeMeal(meal: Meal): Promise<void>;
 }
 
@@ -101,4 +132,40 @@ export function toWorkoutInput(session: {
     avgHeartRate: null,
     source: session.source,
   };
+}
+
+/** One reading from the store, in our shape. Returns null for implausible or swapped values. */
+export function toBloodPressureInput(reading: { externalId: string; measuredAt: Date; systolic: number; diastolic: number; pulse: number | null }): BloodPressureReadingInput | null {
+  const systolic = Math.round(reading.systolic);
+  const diastolic = Math.round(reading.diastolic);
+  if (!(systolic >= 60 && systolic <= 260 && diastolic >= 30 && diastolic <= 160 && diastolic < systolic)) return null;
+  const pulse = reading.pulse !== null && reading.pulse >= 30 && reading.pulse <= 220 ? Math.round(reading.pulse) : null;
+  return {
+    externalId: reading.externalId.slice(0, 120),
+    measuredAt: toLocalDateTime(reading.measuredAt),
+    localDate: toLocalDate(reading.measuredAt),
+    systolic,
+    diastolic,
+    pulse,
+  };
+}
+
+/**
+ * Watches don't say how hard a walk was. Infer it so that an easy stroll
+ * doesn't count as active: from the pace when there's a distance, otherwise
+ * from the energy per kilo and hour (METs, as in `estimateWorkoutKcal`).
+ */
+export function inferWalkIntensity(workout: WorkoutInput, weightKg: number | null): WorkoutInput {
+  if (workout.type !== 'walking' || workout.intensity) return workout;
+  const hours = workout.durationMin / 60;
+  let intensity: WorkoutIntensity | null = null;
+  if (workout.distanceKm && hours > 0) {
+    const kmh = workout.distanceKm / hours;
+    intensity = kmh < 4 ? 'light' : kmh >= 6.5 ? 'vigorous' : 'moderate';
+  } else if (workout.activeKcal && weightKg && hours > 0) {
+    // Walking METs are 2.8 (light), 3.5 (moderate) and 5 (vigorous): split halfway.
+    const met = workout.activeKcal / (weightKg * hours) + 1;
+    intensity = met < 3.15 ? 'light' : met >= 4.25 ? 'vigorous' : 'moderate';
+  }
+  return intensity ? { ...workout, intensity } : workout;
 }

@@ -11,6 +11,8 @@ const light = {
   border: 'rgba(0,0,0,0.07)',
   accent: '#1F8A5B',
   accentSoft: '#E1F0E7',
+  /** Text and icons on an accent background. */
+  onAccent: '#FFFFFF',
   warning: '#E8890C',
   warningSoft: '#FCEFD9',
   danger: '#E5484D',
@@ -29,6 +31,7 @@ const dark: typeof light = {
   border: 'rgba(255,255,255,0.08)',
   accent: '#3DD68C',
   accentSoft: '#12301F',
+  onAccent: '#0A0A0B',
   warning: '#FFB224',
   warningSoft: '#3A2A0E',
   danger: '#FF6369',
