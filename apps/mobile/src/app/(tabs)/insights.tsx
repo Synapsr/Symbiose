@@ -1,9 +1,9 @@
-import { goalNutrient, type InsightsResponse } from '@symbiose/shared';
+import { goalNutrient, type InsightsResponse, type NutrientKey } from '@symbiose/shared';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Camera } from 'lucide-react-native';
+import { Camera, ChartNoAxesColumn } from 'lucide-react-native';
 import { useState } from 'react';
-import { Platform, RefreshControl, ScrollView } from 'react-native';
+import { Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -16,8 +16,9 @@ import { moodDaysIn, MoodTrendRow } from '@/components/insights/mood-card';
 import { ReviewCard } from '@/components/insights/review-card';
 import { SleepTrendRow } from '@/components/insights/sleep-card';
 import { SourcesCard } from '@/components/insights/sources-card';
-import { Pressy, Row, Segmented, Skeleton, Txt } from '@/components/ui';
+import { Button, Card, Row, Segmented, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
+import { formatAmount } from '@/lib/format';
 import { errorMessage, useToday } from '@/lib/hooks';
 import { useApi, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
@@ -83,6 +84,28 @@ export default function Insights() {
   );
 }
 
+/** Nothing logged over the period yet: what will show up here, the goal it will follow, and the way to start. */
+function FirstDays({ hero }: { hero: NutrientKey }) {
+  const { t, locale, nutrient } = useI18n();
+  const { colors } = useTheme();
+  const rule = useUser().plan?.rules.find((r) => r.nutrient === hero);
+  return (
+    <Card style={{ gap: Space.lg, alignItems: 'flex-start' }}>
+      <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+        <ChartNoAxesColumn size={22} color={colors.accent} />
+      </View>
+      <View style={{ gap: Space.sm }}>
+        <Txt variant="heading">{t('insights.firstTitle')}</Txt>
+        <Txt tone="secondary">
+          {t('review.first')}
+          {rule ? ` ${t('insights.firstRule', { rule: `${nutrient(hero)} ${rule.kind === 'max' ? '≤' : '≥'} ${formatAmount(hero, rule.value, locale)}` })}` : ''}
+        </Txt>
+      </View>
+      <Button title={t('insights.firstCta')} size="md" icon={<Camera size={18} color={colors.onInverted} />} onPress={() => router.push('/capture')} />
+    </Card>
+  );
+}
+
 function Cards({ data, hideCalories, today }: { data: InsightsResponse; hideCalories: boolean; today: string }) {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -105,18 +128,7 @@ function Cards({ data, hideCalories, today }: { data: InsightsResponse; hideCalo
 
   return (
     <Animated.View entering={FadeIn.duration(260)} style={{ gap: Space.lg }}>
-      {logged ? (
-        <GoalCard data={data} hero={hero} hideCalories={hideCalories} />
-      ) : (
-        <Pressy
-          onPress={() => router.push('/capture')}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md, paddingHorizontal: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.surface2 }}>
-          <Camera size={16} color={colors.text2} />
-          <Txt variant="caption" tone="secondary" style={{ flex: 1, fontSize: 14 }}>
-            {t('insights.empty')}
-          </Txt>
-        </Pressy>
-      )}
+      {logged ? <GoalCard data={data} hero={hero} hideCalories={hideCalories} /> : <FirstDays hero={hero} />}
 
       {logged ? <SourcesCard data={data} hero={hero} /> : null}
 

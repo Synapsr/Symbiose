@@ -166,7 +166,7 @@ function CurrentPlan({ plan, targets, goalKcal, onChange }: { plan: GoalPlan; ta
     return kind === 'max' ? 'plan.kind.max' : kind === 'min' ? 'plan.kind.min' : 'plan.kind.target';
   };
   const activityRows: { key: keyof ActivityGoals; icon: ReactNode; label: string; unit: string; value: number | null }[] = [
-    { key: 'weeklyActiveMinutes', icon: <SportShoe size={18} color={colors.accent} />, label: t('plan.activity'), unit: t('goals.unit.minutes'), value: activity.weeklyActiveMinutes },
+    { key: 'weeklyActiveMinutes', icon: <SportShoe size={18} color={colors.accent} />, label: t('goals.activeTime'), unit: t('goals.unit.minutes'), value: activity.weeklyActiveMinutes },
     { key: 'dailySteps', icon: <Footprints size={18} color={colors.accent} />, label: t('goals.steps'), unit: t('goals.unit.steps'), value: activity.dailySteps },
     { key: 'weeklyStrengthSessions', icon: <Dumbbell size={18} color={colors.accent} />, label: t('goals.strength'), unit: t('goals.unit.strength'), value: activity.weeklyStrengthSessions },
   ];

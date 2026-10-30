@@ -90,18 +90,20 @@ export function ReviewCard({ today, hideCalories }: { today: string; hideCalorie
             </Pressy>
           ) : null}
         </Row>
-        <Animated.View key={review.headline} entering={FadeIn.duration(320)} style={{ gap: Space.md, opacity: refreshing ? 0.55 : 1 }}>
-          <Txt variant="accent" style={{ fontSize: 22, lineHeight: 28 }}>
-            {review.headline}
-          </Txt>
-          {bullets.map((bullet) =>
-            bullet.text ? (
-              <Row key={bullet.key} gap={Space.md} style={{ alignItems: 'flex-start' }}>
-                <View style={{ marginTop: 2 }}>{bullet.icon}</View>
-                <Txt style={{ flex: 1, fontSize: 15, lineHeight: 21 }}>{bullet.text}</Txt>
-              </Row>
-            ) : null,
-          )}
+        <Animated.View key={review.headline} entering={FadeIn.duration(320)}>
+          <View style={{ gap: Space.md, opacity: refreshing ? 0.55 : 1 }}>
+            <Txt variant="accent" style={{ fontSize: 22, lineHeight: 28 }}>
+              {review.headline}
+            </Txt>
+            {bullets.map((bullet) =>
+              bullet.text ? (
+                <Row key={bullet.key} gap={Space.md} style={{ alignItems: 'flex-start' }}>
+                  <View style={{ marginTop: 2 }}>{bullet.icon}</View>
+                  <Txt style={{ flex: 1, fontSize: 15, lineHeight: 21 }}>{bullet.text}</Txt>
+                </Row>
+              ) : null,
+            )}
+          </View>
         </Animated.View>
         <Pressy
           onPress={() => router.push({ pathname: '/coach', params: { prompt: t('review.prompt', { headline: review.headline }) } })}
@@ -121,6 +123,8 @@ export function ReviewCard({ today, hideCalories }: { today: string; hideCalorie
 
   // No review yet: one calm line about the week, and the way to write it.
   const week = state.data?.week;
+  // Nothing logged this week: the screen's own first-days card says it all.
+  if (week && week.loggedDays === 0 && !write.isPending && !write.error) return null;
   const summary = (() => {
     if (!week || week.loggedDays === 0) return t('review.first');
     const a = week.adherence;

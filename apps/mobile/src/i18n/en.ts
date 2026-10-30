@@ -514,6 +514,9 @@ export const en: Record<TranslationKey, string> = {
   'insights.tab.cravings': 'Cravings',
   'insights.peak': 'Mostly around {hour}:00',
   'insights.cravingsTop': 'Mostly: {list}',
+  'insights.firstTitle': 'Your trends come with your meals',
+  'insights.firstRule': 'It will follow your guardrail: {rule}.',
+  'insights.firstCta': 'Snap a meal',
   'insights.body': 'Body',
   'insights.life': 'Your life',
   'insights.noData': 'No data yet',
@@ -563,6 +566,7 @@ export const en: Record<TranslationKey, string> = {
   'goals.unit.minutes': 'min / week',
   'goals.unit.steps': 'steps / day',
   'goals.unit.strength': 'strength sessions / week',
+  'goals.activeTime': 'Active time',
   'goals.steps': 'Steps',
   'goals.strength': 'Strength',
 };

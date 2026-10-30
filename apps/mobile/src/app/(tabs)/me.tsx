@@ -255,11 +255,12 @@ export default function Me() {
       <Card padded={false} style={{ marginTop: -Space.sm }}>
         <HydrationItem profile={profile} right={moduleSwitch('trackHydration')} onGoal={(waterGoalMl) => saveProfile.mutate({ waterGoalMl })} />
         <Divider />
-        <Item icon={<Moon size={20} color={colors.text} />} title={t('me.trackSleep')} subtitle={store ? t('me.trackSleepHint', { store }) : t('me.trackSleepHintNoStore')} right={moduleSwitch('trackSleep')} />
+        {/* The why of a module helps to switch it on; once it's on, the row stays short. */}
+        <Item icon={<Moon size={20} color={colors.text} />} title={t('me.trackSleep')} subtitle={profile.trackSleep ? undefined : store ? t('me.trackSleepHint', { store }) : t('me.trackSleepHintNoStore')} right={moduleSwitch('trackSleep')} />
         <Divider />
-        <Item icon={<FaceSlightlySmiling size={20} color={colors.text} />} title={t('me.trackMood')} subtitle={t('me.trackMoodHint')} right={moduleSwitch('trackMood')} />
+        <Item icon={<FaceSlightlySmiling size={20} color={colors.text} />} title={t('me.trackMood')} subtitle={profile.trackMood ? undefined : t('me.trackMoodHint')} right={moduleSwitch('trackMood')} />
         <Divider />
-        <Item icon={<HeartPulse size={20} color={colors.text} />} title={t('me.trackBp')} subtitle={t('me.trackBpHint')} right={moduleSwitch('trackBloodPressure')} />
+        <Item icon={<HeartPulse size={20} color={colors.text} />} title={t('me.trackBp')} subtitle={profile.trackBloodPressure ? undefined : t('me.trackBpHint')} right={moduleSwitch('trackBloodPressure')} />
       </Card>
 
       {/* Coach: <SectionTitle>{t('me.coach')}</SectionTitle> then <CoachSettings /> from '@/components/settings/coach-settings' (proactive-coach branch). */}
@@ -476,7 +477,7 @@ function Item({
     <Row gap={Space.lg} style={{ paddingHorizontal: Space.xl, paddingVertical: Space.lg, minHeight: 60 }}>
       <View style={{ width: 24, alignItems: 'center' }}>{icon}</View>
       <View style={{ flex: 1, gap: 2 }}>
-        <Txt variant="label" style={{ fontSize: 16 }} tone={danger ? 'danger' : 'primary'} numberOfLines={1}>
+        <Txt variant="label" style={{ fontSize: 16 }} tone={danger ? 'danger' : 'primary'} numberOfLines={2}>
           {title}
         </Txt>
         {subtitle ? (

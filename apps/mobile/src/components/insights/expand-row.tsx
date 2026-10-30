@@ -6,6 +6,8 @@ import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, wi
 import { Pressy, Txt } from '@/components/ui';
 import { Radius, Space, useTheme } from '@/theme';
 
+const ICON = 34;
+
 /**
  * One line of a compact card: an icon, the number that matters, a short caption and a mini chart.
  * A tap opens the details underneath (when there are some); the chevron turns with it.
@@ -40,26 +42,29 @@ export function ExpandRow({
   const expandable = Boolean(children);
 
   const row = (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingVertical: Space.md }}>
-      <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
-      <View style={{ flex: 1, gap: 1 }}>
-        <Txt variant="caption" tone="secondary" numberOfLines={1}>
-          {label}
-        </Txt>
-        <Txt variant="label" numberOfLines={1} style={{ fontSize: 16, fontVariant: ['tabular-nums'] }}>
-          {value}
-        </Txt>
-        {caption ? (
-          <Txt variant="caption" color={captionColor ?? colors.text2} numberOfLines={2} style={{ fontVariant: ['tabular-nums'] }}>
-            {caption}
+    <View style={{ paddingVertical: Space.md, gap: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md }}>
+        <View style={{ width: ICON, height: ICON, borderRadius: ICON / 2, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
+        <View style={{ flex: 1, gap: 1 }}>
+          <Txt variant="caption" tone="secondary" numberOfLines={1}>
+            {label}
           </Txt>
+          <Txt variant="label" numberOfLines={1} style={{ fontSize: 16, fontVariant: ['tabular-nums'] }}>
+            {value}
+          </Txt>
+        </View>
+        {chart}
+        {expandable ? (
+          <Animated.View style={chevron}>
+            <ChevronDown size={18} color={colors.text3} />
+          </Animated.View>
         ) : null}
       </View>
-      {chart}
-      {expandable ? (
-        <Animated.View style={chevron}>
-          <ChevronDown size={18} color={colors.text3} />
-        </Animated.View>
+      {/* Under the number, the whole width: the chart never squeezes it. */}
+      {caption ? (
+        <Txt variant="caption" color={captionColor ?? colors.text2} numberOfLines={2} style={{ marginLeft: ICON + Space.md, fontVariant: ['tabular-nums'] }}>
+          {caption}
+        </Txt>
       ) : null}
     </View>
   );

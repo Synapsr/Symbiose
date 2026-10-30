@@ -527,6 +527,9 @@ export const fr = {
   'insights.tab.cravings': 'Envies',
   'insights.peak': 'Surtout vers {hour} h',
   'insights.cravingsTop': 'Surtout : {list}',
+  'insights.firstTitle': 'Tes tendances arrivent avec tes repas',
+  'insights.firstRule': 'Il suivra ton repère : {rule}.',
+  'insights.firstCta': 'Photographier un repas',
   'insights.body': 'Corps',
   'insights.life': 'Ta vie',
   'insights.noData': 'Pas encore de données',
@@ -576,6 +579,7 @@ export const fr = {
   'goals.unit.minutes': 'min / semaine',
   'goals.unit.steps': 'pas / jour',
   'goals.unit.strength': 'séances de muscu / semaine',
+  'goals.activeTime': 'Temps actif',
   'goals.steps': 'Pas',
   'goals.strength': 'Muscu',
 } as const;
