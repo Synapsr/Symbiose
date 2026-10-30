@@ -10,6 +10,7 @@ import { haptics } from '@/lib/haptics';
 import { health } from '@/lib/health';
 import { useApi } from '@/lib/session';
 import { useSettings, useToast } from '@/lib/stores';
+import { useUndoableDelete } from '@/lib/undo';
 import { LIFE_COLORS, Motion, useTheme } from '@/theme';
 
 const AnimatedRect = Animated.createAnimatedComponent(Rect);
@@ -105,5 +106,40 @@ export function useWater(date: string) {
       haptics.warning();
     }
     settle();
+  };
+}
+
+/** The day's last glass logged in the app (the health store's drinks live there). */
+export const lastGlass = (hydration: DayHydration | null | undefined) =>
+  hydration?.entries.filter((e) => e.source === 'manual').sort((a, b) => b.at.localeCompare(a.at))[0] ?? null;
+
+/**
+ * Takes a glass back the one way (see `useUndoableDelete`): the total drops
+ * at once, « Annuler » keeps it, the server hears about it when the toast leaves.
+ */
+export function useRemoveGlass(date: string) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const { t } = useI18n();
+  const remove = useUndoableDelete();
+  const healthEnabled = useSettings((s) => s.healthEnabled);
+  const key = ['day', date];
+  return (entry: WaterEntry) => {
+    queryClient.setQueryData<DaySummary>(key, (day) =>
+      day?.hydration
+        ? { ...day, hydration: { ...day.hydration, totalMl: Math.max(0, day.hydration.totalMl - entry.ml), entries: day.hydration.entries.filter((e) => e.id !== entry.id) } }
+        : day,
+    );
+    remove({
+      id: entry.id,
+      message: t('water.removed', { ml: entry.ml }),
+      commit: async () => {
+        await api.deleteWater(entry.id);
+        if (healthEnabled && health.source) void health.deleteWater(entry.id).catch(() => undefined);
+        void queryClient.invalidateQueries({ queryKey: key });
+        void queryClient.invalidateQueries({ queryKey: ['insights'] });
+      },
+      restore: () => void queryClient.invalidateQueries({ queryKey: key }),
+    });
   };
 }

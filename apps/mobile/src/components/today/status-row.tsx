@@ -7,7 +7,7 @@ import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 
 import { MoodFace, moodColor, moodLabel } from '@/components/mood-face';
 import { MoodPanel } from '@/components/today/mood-row';
-import { Glass, useWater } from '@/components/today/water';
+import { Glass, lastGlass, useRemoveGlass, useWater } from '@/components/today/water';
 import { Card, Pressy, Ring, Row, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatLiters, formatNumber, formatSleep } from '@/lib/format';
@@ -19,7 +19,7 @@ import { LIFE_COLORS, Radius, Space, useTheme } from '@/theme';
 type Panel = 'water' | 'mood' | 'sleep';
 
 /** A week with no session and no steps says nothing yet: no pill rather than a zero. */
-export const hasActivity = (day: DaySummary) => day.activityWeek.activeMinutes > 0 || day.activity?.steps != null || day.workouts.length > 0;
+const hasActivity = (day: DaySummary) => day.activityWeek.activeMinutes > 0 || day.activity?.steps != null || day.workouts.length > 0;
 
 /**
  * The opt-in modules in one row of compact pills, in the order Eau, Humeur,
@@ -34,10 +34,12 @@ export function StatusRow({ day }: { day: DaySummary }) {
   const glassMl = useSettings((s) => s.glassMl);
   const setSettings = useSettings((s) => s.set);
   const pour = useWater(day.date);
+  const removeGlass = useRemoveGlass(day.date);
   const [open, setOpen] = useState<Panel | null>(null);
   const toggle = (panel: Panel) => setOpen((current) => (current === panel ? null : panel));
 
   const hydration = day.hydration ?? null;
+  const last = lastGlass(hydration);
   const showMood = user.profile?.trackMood === true;
   const activity = hasActivity(day);
   const sleep = day.sleep ?? null;
@@ -111,9 +113,25 @@ export function StatusRow({ day }: { day: DaySummary }) {
 
       {open === 'water' && hydration ? (
         <PanelCard key="water">
-          <Txt variant="label" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
-            {t('water.today', { total: formatLiters(hydration.totalMl, locale), goal: formatLiters(hydration.goalMl, locale) })}
-          </Txt>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Txt variant="label" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+              {t('water.today', { total: formatLiters(hydration.totalMl, locale), goal: formatLiters(hydration.goalMl, locale) })}
+            </Txt>
+            {last ? (
+              <Pressy
+                onPress={() => {
+                  setOpen(null);
+                  removeGlass(last);
+                }}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('water.removeLast', { ml: last.ml })}>
+                <Txt variant="label" tone="tertiary" style={{ fontVariant: ['tabular-nums'] }}>
+                  − {last.ml} ml
+                </Txt>
+              </Pressy>
+            ) : null}
+          </Row>
           <Row gap={Space.sm}>
             {WATER_SIZES.map((ml) => (
               <WaterSizeChip

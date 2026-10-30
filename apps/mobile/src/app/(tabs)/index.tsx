@@ -82,7 +82,8 @@ export default function Today() {
     }, [setLift, thumbBottom]),
   );
 
-  const data = day.data;
+  // The previous day stays on screen while the next one loads, never in its place when that load fails.
+  const data = day.isPlaceholderData && day.error ? undefined : day.data;
   const hero = data ? heroNutrient(data, user.plan, hideCalories) : 'kcal';
   const name = user.profile?.name ?? user.name;
 

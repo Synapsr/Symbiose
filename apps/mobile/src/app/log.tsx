@@ -11,7 +11,7 @@ import { WeightForm } from '@/components/forms/weight-form';
 import { KIND_META, kindLabel } from '@/components/journal/meta';
 import { MoodFaces, useMood } from '@/components/today/mood-row';
 import { WaterSizeChip } from '@/components/today/status-row';
-import { Glass, useWater } from '@/components/today/water';
+import { Glass, lastGlass, useRemoveGlass, useWater } from '@/components/today/water';
 import { Card, IconButton, Pressy, Row, Txt } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { formatDay, formatLiters } from '@/lib/format';
@@ -24,7 +24,7 @@ import { Radius, Space, useTheme } from '@/theme';
 /** The owner asked for feelings first; transit comes further down. */
 const NOTE_KINDS: JournalKind[] = ['feeling', 'symptom', 'medication', 'transit', 'other'];
 
-type View_ = 'menu' | 'weight' | 'bp';
+type Pane = 'menu' | 'weight' | 'bp';
 
 /**
  * « + »: the single home for every log that isn't a photo. One tap for a
@@ -38,7 +38,7 @@ export default function LogSheet() {
   const insets = useSafeAreaInsets();
   const today = toLocalDate();
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today ? params.date : today;
-  const [view, setView] = useState<View_>('menu');
+  const [view, setView] = useState<Pane>('menu');
 
   const dayLabel = formatDay(date, locale, { today: t('common.today'), yesterday: t('common.yesterday') });
   const title = view === 'weight' ? t('weight.title') : view === 'bp' ? t('bp.title') : t('log.title');
@@ -71,7 +71,7 @@ export default function LogSheet() {
   );
 }
 
-function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpen: (view: View_) => void }) {
+function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpen: (view: Pane) => void }) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
   const user = useUser();
@@ -79,6 +79,7 @@ function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpe
   const glassMl = useSettings((s) => s.glassMl);
   const setSettings = useSettings((s) => s.set);
   const pour = useWater(date);
+  const removeGlass = useRemoveGlass(date);
   const { pick } = useMood(date);
 
   const rules = user.plan?.rules ?? [];
@@ -90,6 +91,8 @@ function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpe
   const trackMood = user.profile?.trackMood === true;
   const trackBp = user.profile?.trackBloodPressure === true;
   const mood = day?.date === date ? (day.mood ?? null) : null;
+  // A glass too many: the last one logged here can be taken back.
+  const last = lastGlass(hydration);
 
   /** Opens the next sheet in place of this one. */
   const go = (pathname: '/capture' | '/craving' | '/workout' | '/note', params: Record<string, string> = {}) => router.replace({ pathname, params: { date, ...params } });
@@ -130,9 +133,23 @@ function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpe
               <Row gap={Space.sm}>
                 <Glass progress={hydration.totalMl / Math.max(1, hydration.goalMl)} totalMl={hydration.totalMl} height={18} />
                 <Txt variant="label">{t('water.short')}</Txt>
-                <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+                <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1, fontVariant: ['tabular-nums'] }}>
                   {t('water.today', { total: formatLiters(hydration.totalMl, locale), goal: formatLiters(hydration.goalMl, locale) })}
                 </Txt>
+                {last ? (
+                  <Pressy
+                    onPress={() => {
+                      removeGlass(last);
+                      dismiss();
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('water.removeLast', { ml: last.ml })}>
+                    <Txt variant="label" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+                      − {last.ml} ml
+                    </Txt>
+                  </Pressy>
+                ) : null}
               </Row>
               <Row gap={Space.sm}>
                 {WATER_SIZES.map((ml) => (

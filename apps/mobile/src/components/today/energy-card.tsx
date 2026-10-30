@@ -48,10 +48,12 @@ export function EnergyCard({ day, plan, hero: heroKey, hideCalories }: { day: Da
   const centerLabel = reachedMin
     ? t('status.reached')
     : `${isKcal ? 'kcal' : unitOf(heroKey)} ${over ? t('today.over') : kind === 'min' ? t('status.toGo') : isKcal ? t('today.left') : t('today.leftUnit')}`;
-  // « 60 g · repère 25 g », or the day's budget before the first meal.
+  // « 60 g · repère 25 g », « 1 395 / 1 840 kcal », or the day's budget before the first meal.
   const summary = fresh
     ? t(kind === 'max' ? 'hero.fresh.max' : kind === 'min' ? 'hero.fresh.min' : 'hero.fresh.target', { amount: amount(hero.target.value) })
-    : `${amount(hero.consumed)} · ${t(kind === 'max' ? 'hero.limit' : 'hero.goal', { amount: amount(hero.target.value) })}`;
+    : isKcal
+      ? `${formatNumber(hero.consumed, locale)} / ${amount(hero.target.value)}`
+      : `${amount(hero.consumed)} · ${t(kind === 'max' ? 'hero.limit' : 'hero.goal', { amount: amount(hero.target.value) })}`;
   const rows = fresh ? [] : secondary(day, plan, heroKey, hideCalories);
 
   return (
