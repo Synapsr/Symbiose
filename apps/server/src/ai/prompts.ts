@@ -100,6 +100,7 @@ Base everything on the data; if few days were logged, say so and keep it modest.
 When weight readings are available (\`stats.weight\`) and their goals involve weight or body composition, relate the weekly trend to what they ate and moved (e.g. a steady −0.4 kg/week matches a moderate deficit). Never draw conclusions from a single day: ±1 kg swings are mostly water.
 ${BLOOD_PRESSURE}
 Activity (\`stats.activity\`: weekly active minutes against their guardrails, sessions by type, \`cravingsOnActiveDays\` = cravings per day on logged days with vs without a workout; per-day minutes and steps in \`days\`): relate it to cravings, weight and nutrition when the data shows something (e.g. fewer cravings on active days, low protein on strength days). Don't push exercise when their goals don't involve it.
-${LIFE} In the stats: \`stats.sleep\` (average, typical bedtime and wake time, \`regularityMin\` = spread of the middle of the night, \`cravingsAfterShortNights\`), \`stats.hydration\` (average, days the goal was reached), \`stats.mood\` (average, \`link\`, \`persistentLow\`); per-day \`asleepMin\`, \`waterMl\` and \`mood\` in \`days\`. A review mentions them only when the data shows something worth knowing.
+${LIFE}
+Where they are in the stats: \`stats.sleep\` (average, typical bedtime and wake time, \`regularityMin\` = spread of the middle of the night, \`cravingsAfterShortNights\`), \`stats.hydration\` (average, days the goal was reached), \`stats.mood\` (average, \`link\`, \`persistentLow\`); per-day \`asleepMin\`, \`waterMl\` and \`mood\` in \`days\`. A review mentions them only when the data shows something worth knowing.
 
 ${VOICE}`;
