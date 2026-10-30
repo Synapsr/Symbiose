@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { ArrowUp, Sparkles, Trash2 } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -54,7 +54,20 @@ export default function Coach() {
   const clear = useMutation({
     mutationFn: () => api.clearCoach(),
     onSuccess: () => queryClient.setQueryData(['coach'], []),
+    onError: () => haptics.warning(),
   });
+  // The whole conversation can't come back: this one delete asks first.
+  const confirmClear = () => {
+    haptics.impact();
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm?.(`${t('coach.clearTitle')}\n${t('coach.clearBody')}`)) clear.mutate();
+      return;
+    }
+    Alert.alert(t('coach.clearTitle'), t('coach.clearBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('coach.clearConfirm'), style: 'destructive', onPress: () => clear.mutate() },
+    ]);
+  };
 
   const submit = async (message: string) => {
     const question = message.trim();
@@ -66,7 +79,8 @@ export default function Coach() {
     try {
       const saved = await api.streamCoach(question, toLocalDate(), (delta) => setLive((current) => current && { ...current, reply: current.reply + delta }));
       queryClient.setQueryData<CoachMessage[]>(['coach'], (old = []) => [...old, saved.user, saved.reply]);
-      haptics.success();
+      // A reply is a conversation, not a milestone.
+      haptics.soft();
     } catch (e) {
       haptics.warning();
       setError(e);
@@ -92,7 +106,7 @@ export default function Coach() {
             {t('coach.subtitle')}
           </Txt>
         </View>
-        {history.length ? <IconButton label={t('coach.clear')} icon={<Trash2 size={18} color={colors.text2} />} onPress={() => clear.mutate()} /> : null}
+        {history.length ? <IconButton label={t('coach.clear')} icon={<Trash2 size={18} color={colors.text2} />} onPress={confirmClear} /> : null}
       </Row>
 
       {empty ? (

@@ -1,5 +1,5 @@
-import { shortId, toLocalDate, type CreateMealInput, type DaySummary, type Meal } from '@symbiose/shared';
-import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { shortId, toLocalDate, type CreateMealInput, type DaySummary, type Meal, type Workout } from '@symbiose/shared';
+import { keepPreviousData, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
@@ -7,12 +7,14 @@ import { AppState } from 'react-native';
 import { useI18n } from '@/i18n';
 
 import { ApiError } from './api';
+import { withoutMeal } from './day-logic';
 import { haptics } from './haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, inferWalkIntensity } from './health';
 import { dropEntry, isNetworkError, kickOutbox, openOutbox, releaseCapture, stashCapture, useOutbox, type OutboxEntry } from './outbox';
 import { uniqueEatenAt } from './outbox-logic';
 import { useApi, useSession, useUser } from './session';
 import { usePending, useSettings, useToast, type PendingMeal } from './stores';
+import { useUndoableDelete } from './undo';
 
 /** Today's local date, refreshed when the app returns to the foreground. */
 export function useToday(): string {
@@ -30,9 +32,13 @@ export function useToday(): string {
   return today;
 }
 
+/**
+ * One day's summary. Moving to another day keeps the last one on screen
+ * until the new one lands: numbers glide instead of the screen flashing.
+ */
 export function useDay(date: string) {
   const api = useApi();
-  return useQuery({ queryKey: ['day', date], queryFn: () => api.day(date) });
+  return useQuery({ queryKey: ['day', date], queryFn: () => api.day(date), placeholderData: keepPreviousData });
 }
 
 export function errorMessage(error: unknown, fallback: string, offline: string): string {
@@ -50,6 +56,28 @@ export function useRefreshAfterMeal() {
       void queryClient.invalidateQueries({ queryKey: ['library'] });
     },
     [queryClient],
+  );
+}
+
+/** Deletes a meal the one way (see `useUndoableDelete`): gone from the day and its totals at once, back with « Annuler ». */
+export function useDeleteMeal() {
+  const api = useApi();
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const refresh = useRefreshAfterMeal();
+  const remove = useUndoableDelete();
+  return useCallback(
+    (meal: Meal) => {
+      const key = ['day', meal.localDate];
+      queryClient.setQueryData<DaySummary>(key, (day) => (day ? withoutMeal(day, meal) : day));
+      remove({
+        id: meal.id,
+        message: `${t('detail.deleted')} · ${meal.title}`,
+        commit: () => api.deleteMeal(meal.id).then(() => refresh(meal)),
+        restore: () => void queryClient.invalidateQueries({ queryKey: key }),
+      });
+    },
+    [api, queryClient, refresh, remove, t],
   );
 }
 
@@ -119,9 +147,11 @@ export function useMealLogger() {
         void dropEntry(entry.id);
         remove(entry.id);
         refresh(meal);
+        // A milestone: the meal is analysed.
         haptics.success();
         showToast({
-          message: `${t('today.mealLogged')} · ${meal.title}`,
+          // The AI has a question: the toast says so, and a tap opens it.
+          message: meal.insight?.clarification ? `${t('today.mealLogged')} · ${t('today.question')} ›` : `${t('today.mealLogged')} · ${meal.title}`,
           onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
           action: {
             label: t('today.undo'),
@@ -176,7 +206,7 @@ export function useMealLogger() {
       try {
         const copy = await api.duplicateMeal(source.id, { eatenAt: entry.eatenAt, localDate: entry.localDate });
         void dropEntry(entry.id);
-        haptics.success();
+        haptics.soft();
         refresh(copy);
         showToast({ message: `${t('detail.relogged')} · ${copy.title}` });
         return copy;
@@ -386,4 +416,21 @@ export function useRefreshAfterWorkout() {
     void queryClient.invalidateQueries({ queryKey: ['day'] });
     void queryClient.invalidateQueries({ queryKey: ['insights'] });
   }, [queryClient]);
+}
+
+/** A session added by hand leaves the one way (see `useUndoableDelete`); the watch's live in the health app. */
+export function useDeleteWorkout() {
+  const api = useApi();
+  const { t } = useI18n();
+  const refresh = useRefreshAfterWorkout();
+  const remove = useUndoableDelete();
+  return useCallback(
+    (workout: Workout) =>
+      remove({
+        id: workout.id,
+        message: `${t('workout.deleted')} · ${t(`workout.type.${workout.type}`)}`,
+        commit: () => api.deleteWorkout(workout.id).then(refresh),
+      }),
+    [api, refresh, remove, t],
+  );
 }

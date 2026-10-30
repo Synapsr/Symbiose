@@ -13,7 +13,7 @@ import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { formatAmount, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { errorMessage, useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
+import { errorMessage, useDeleteMeal, useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
 import { useApi } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme, verdictColor } from '@/theme';
@@ -76,21 +76,18 @@ function MealEditor({ meal }: { meal: Meal }) {
   const refine = useMutation({
     mutationFn: (text: string) => api.refineMeal(meal.id, text),
     onSuccess: (updated) => {
-      haptics.success();
+      haptics.soft();
       setCorrection('');
       apply(updated);
     },
     onError,
   });
-  const remove = useMutation({
-    mutationFn: () => api.deleteMeal(meal.id),
-    onSuccess: () => {
-      haptics.success();
-      refresh(meal);
-      dismiss();
-    },
-    onError,
-  });
+  // Gone at once, back with « Annuler »: the server hears about it when the toast leaves.
+  const deleteMeal = useDeleteMeal();
+  const remove = () => {
+    deleteMeal(meal);
+    dismiss();
+  };
   // Sent, or kept for later without network (the logger says which); other errors stay on screen.
   const relog = useMutation({
     mutationFn: () => logger.relog(meal, { eatenAt: toLocalDateTime(), localDate: toLocalDate() }),
@@ -292,7 +289,7 @@ function MealEditor({ meal }: { meal: Meal }) {
               onPress={() => update.mutate({ favorite: !meal.favorite })}
             />
             <Action icon={<RotateCcw size={20} color={colors.text} />} label={t('detail.relog')} onPress={() => relog.mutate()} />
-            <Action icon={<Trash2 size={20} color={colors.danger} />} label={t('detail.delete')} onPress={() => remove.mutate()} />
+            <Action icon={<Trash2 size={20} color={colors.danger} />} label={t('detail.delete')} onPress={remove} />
           </Row>
         </View>
       </ScrollView>

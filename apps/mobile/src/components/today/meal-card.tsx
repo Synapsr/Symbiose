@@ -1,7 +1,7 @@
 import { localTime, type Meal } from '@symbiose/shared';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { RotateCw, X } from 'lucide-react-native';
+import { RotateCw, Sparkles, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInDown, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
@@ -40,18 +40,20 @@ function Thumb({ meal }: { meal: Meal }) {
   );
 }
 
+const openMeal = (meal: Meal) => router.push({ pathname: '/meal/[id]', params: { id: meal.id } });
+
 export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boolean }) {
   const { t, locale, nutrient } = useI18n();
   const { colors, elevation } = useTheme();
   const flag = meal.insight?.flags.find((f) => f.nutrient !== 'kcal' && f.share >= 0.15);
-  const asking = Boolean(meal.insight?.clarification);
+  const question = meal.insight?.clarification?.question;
 
   return (
     <Animated.View entering={FadeInDown.duration(320).easing(Easing.out(Easing.cubic))} exiting={FadeOut.duration(150)} layout={LinearTransition.duration(250)}>
       <Pressy
-        onPress={() => router.push({ pathname: '/meal/[id]', params: { id: meal.id } })}
+        onPress={() => openMeal(meal)}
         accessibilityRole="button"
-        accessibilityLabel={meal.title}
+        accessibilityLabel={question ? `${meal.title}. ${t('today.question')} : ${question}` : meal.title}
         style={[{ flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: PAD, backgroundColor: colors.surface, borderRadius: Radius.lg }, elevation]}>
         <Thumb meal={meal} />
         <View style={{ flex: 1, gap: 3 }}>
@@ -69,6 +71,15 @@ export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boo
               </Txt>
             </Row>
           ) : null}
+          {question ? (
+            // The AI's pending question, said in words: the row's one tap opens it with its answers.
+            <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, height: 24, paddingHorizontal: 9, borderRadius: Radius.pill, backgroundColor: colors.accentSoft }}>
+              <Sparkles size={12} color={colors.accent} />
+              <Txt variant="caption" tone="accent" style={{ fontSize: 12, fontWeight: '700' }}>
+                {t('today.question')}
+              </Txt>
+            </View>
+          ) : null}
         </View>
         <View style={{ alignItems: 'flex-end', gap: 6 }}>
           {!hideCalories ? (
@@ -76,16 +87,7 @@ export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boo
               {formatNumber(meal.totals.kcal, locale)}
             </Txt>
           ) : null}
-          <Row gap={6}>
-            {asking ? (
-              <View style={{ backgroundColor: colors.accentSoft, borderRadius: Radius.pill, paddingHorizontal: 7, height: 20, justifyContent: 'center' }}>
-                <Txt variant="caption" tone="accent" style={{ fontSize: 11, fontWeight: '700' }}>
-                  ?
-                </Txt>
-              </View>
-            ) : null}
-            {meal.insight ? <Dot color={verdictColor(meal.insight.verdict, colors)} /> : null}
-          </Row>
+          {meal.insight ? <Dot color={verdictColor(meal.insight.verdict, colors)} /> : null}
         </View>
       </Pressy>
     </Animated.View>

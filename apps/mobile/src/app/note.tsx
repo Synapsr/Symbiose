@@ -124,7 +124,7 @@ function NoteForm({ entry, date, initialKind, fromJournal }: { entry: JournalEnt
   const save = useMutation({
     mutationFn: () => (entry ? api.updateNote(entry.id, fields) : api.createNote(fields)),
     onSuccess: (saved) => {
-      haptics.success();
+      haptics.soft();
       refresh();
       const label = saved.kind === 'other' ? '' : ` · ${headline(saved, t)}`;
       showToast({

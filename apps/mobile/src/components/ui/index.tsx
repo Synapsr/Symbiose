@@ -17,6 +17,7 @@ import {
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
+import { keepTogether } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { Fonts, Motion, Radius, Space, useTheme, type Palette } from '@/theme';
 
@@ -50,15 +51,23 @@ function toneColor(tone: Tone, colors: Palette): string {
   }[tone];
 }
 
+/** Fraunces barely draws U+202F: its texts get a regular no-break space instead. */
+const SERIF: Partial<Record<Variant, true>> = { display: true, number: true, title: true, accent: true };
+
 export function Txt({
   variant = 'body',
   tone = 'primary',
   color,
   style,
+  children,
   ...props
 }: TextProps & { variant?: Variant; tone?: Tone; color?: string }) {
   const { colors } = useTheme();
-  return <RNText {...props} style={[VARIANTS[variant], { color: color ?? toneColor(tone, colors) }, style]} />;
+  return (
+    <RNText {...props} style={[VARIANTS[variant], { color: color ?? toneColor(tone, colors) }, style]}>
+      {typeof children === 'string' ? keepTogether(children, SERIF[variant] === true) : children}
+    </RNText>
+  );
 }
 
 /** Counts smoothly to its value (eased), so changes feel alive instead of jumping. */
@@ -108,12 +117,13 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
   );
 }
 
-/** Staggered entrance for screen sections: fade + small rise, ~70 ms apart. */
-export function Reveal({ index = 0, children, style }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  const progress = useSharedValue(0);
+/** Staggered entrance for screen sections: fade + small rise, ~70 ms apart. `instant` shows it as is (a screen seen many times a day). */
+export function Reveal({ index = 0, children, style, instant = false }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle>; instant?: boolean }) {
+  const progress = useSharedValue(instant ? 1 : 0);
   useEffect(() => {
+    if (instant) return;
     progress.set(withDelay(index * Motion.stagger, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })));
-  }, [index, progress]);
+  }, [index, progress, instant]);
   const animated = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ translateY: (1 - progress.value) * 12 }],
