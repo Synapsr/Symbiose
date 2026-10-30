@@ -14,6 +14,7 @@ import {
   type CoachMessage,
   type DaySummary,
   type Glance,
+  type GoalPlan,
   type GoalsResponse,
   type InsightsResponse,
   type Meal,
@@ -914,5 +915,191 @@ describe('coach meal actions', () => {
     const history = await request<CoachMessage[]>('GET', '/api/coach/messages');
     expect(history.status).toBe(200);
     expect(history.body[0]).toMatchObject({ id: 'legacy', suggestion: null, mealActions: [] });
+  });
+});
+
+describe('adaptive energy', () => {
+  const seen = { coach: [] as CoachInput[], review: [] as ReviewInput[] };
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async coach(input) {
+        seen.coach.push(input);
+        return { reply: 'ok', planChange: null, mealActions: [] };
+      },
+      async review(input) {
+        seen.review.push(input);
+        return fakeAi.review(input);
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let newcomer = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const plan: GoalPlan = {
+    intentions: 'Garder la forme',
+    title: 'En forme',
+    summary: '',
+    tags: ['maintain'],
+    calorieMode: 'maintain',
+    caloriePercent: 0,
+    proteinPerKg: 1.2,
+    fatPercent: 30,
+    rules: [],
+    focus: ['kcal'],
+    habits: [],
+    coachTone: 'gentle',
+    adjustForActivity: false,
+    overrides: {},
+    activity: null,
+  };
+  /** A day's food as one known item (200 kcal per 100 g), so no AI is involved. */
+  const logDay = (date: string, kcal: number, token = owner) =>
+    request(
+      'POST',
+      '/api/meals',
+      {
+        eatenAt: `${date}T12:30:00+01:00`,
+        localDate: date,
+        mealType: 'lunch',
+        items: [{ id: 'plate', name: 'Assiette', grams: kcal / 2, source: 'manual', per100g: { kcal: 200, protein: 10, carbs: 25, sugar: 3, addedSugar: 0, fat: 6.7, satFat: 2, fiber: 3, sodium: 200 } }],
+      },
+      token,
+    );
+  const insights = async (token = owner) => (await request<InsightsResponse>('GET', '/api/insights?days=7', undefined, token)).body.adaptiveEnergy!;
+  const day = async (token = owner) => (await request<DaySummary>('GET', `/api/days/${today}`, undefined, token)).body;
+  const optIn = (since: string | null) => request<GoalsResponse>('PUT', '/api/goals', { plan: { ...plan, adaptiveEnergy: since ? { since } : null } });
+
+  beforeAll(async () => {
+    owner = await register('scale@example.com');
+    newcomer = await register('new-scale@example.com');
+    for (const token of [owner, newcomer]) {
+      expect((await request('PUT', '/api/me/profile', profile, token)).status).toBe(200);
+      expect((await request('PUT', '/api/goals', { plan }, token)).status).toBe(200);
+    }
+    // 8 weeks of 2 300 kcal a day while losing 0.5 kg a week: about 2 850 kcal burned.
+    const samples = [];
+    for (let i = 56; i >= 1; i--) {
+      const date = addDays(today, -i);
+      expect((await logDay(date, 2300)).status).toBe(201);
+      samples.push({ localDate: date, measuredAt: `${date}T07:00:00Z`, kg: Math.round((82 - (0.5 / 7) * (56 - i)) * 10) / 10 });
+    }
+    expect((await request('PUT', '/api/weights', { source: 'healthkit', samples })).status).toBe(200);
+    // The newcomer only has 3 days.
+    for (let i = 3; i >= 1; i--) {
+      const date = addDays(today, -i);
+      await logDay(date, 2100, newcomer);
+      await request('PUT', '/api/weights', { source: 'manual', samples: [{ localDate: date, measuredAt: `${date}T07:00:00Z`, kg: 70 }] }, newcomer);
+    }
+  });
+
+  it('measures expenditure from the logged meals and the weight trend', async () => {
+    const adaptive = await insights();
+    expect(adaptive).toMatchObject({ enabled: false, appliedKcal: 0, stepKcal: 100, reasons: [], clamped: false });
+    expect(adaptive.window).toEqual({ from: addDays(today, -28), to: addDays(today, -1), days: 28 });
+    expect(adaptive.data).toMatchObject({ loggedDays: 28, completeDays: 28, weighIns: 28, avgIntake: 2300, trendKgPerWeek: -0.5 });
+    expect(adaptive.estimate).toBeGreaterThan(2780);
+    expect(adaptive.estimate).toBeLessThan(2920);
+    expect(['medium', 'high']).toContain(adaptive.confidence);
+    // Compared with the formula the budget uses today (Mifflin–St Jeor at the latest weight × 1.375).
+    const { energy } = await day();
+    expect(adaptive.formula).toBe(energy.tdee);
+    expect(adaptive.difference).toBe(adaptive.estimate! - adaptive.formula);
+    expect(energy.adaptiveKcal).toBe(0);
+
+    const goals = await request<GoalsResponse>('GET', `/api/goals?date=${today}`);
+    expect(goals.body.adaptiveEnergy).toMatchObject({ estimate: adaptive.estimate, enabled: false });
+  });
+
+  it('says what is missing when there is not enough data yet', async () => {
+    const adaptive = await insights(newcomer);
+    expect(adaptive.estimate).toBeNull();
+    expect(adaptive.reasons).toEqual(['few_days', 'few_complete_days', 'few_weigh_ins']);
+    expect(adaptive.missing).toEqual({ days: 11, completeDays: 6, weighIns: 3 });
+    // Nothing to tell the AI until there is an estimate or the person opted in.
+    await request('POST', '/api/coach/messages', { text: 'Combien je brûle ?', localDate: today }, newcomer);
+    expect(seen.coach.at(-1)!.energyExpenditure).toBeNull();
+  });
+
+  it('moves the budget by at most 100 kcal a week once opted in', async () => {
+    const before = await day();
+    expect((await optIn(today)).status).toBe(200);
+    // First week: one step toward the measure.
+    const first = await day();
+    expect(first.energy.adaptiveKcal).toBe(100);
+    expect(first.energy.tdee).toBe(before.energy.tdee + 100);
+    expect(first.targets.kcal.value).toBe(Math.round((before.energy.tdee + 100) / 10) * 10);
+
+    // Opted in two weeks ago: three weekly steps.
+    await optIn(addDays(today, -14));
+    const third = await day();
+    expect(third.energy.adaptiveKcal).toBe(300);
+    expect(await insights()).toMatchObject({ enabled: true, appliedKcal: 300 });
+    // Insights budget each day the same way as the day itself.
+    expect((await request<InsightsResponse>('GET', '/api/insights?days=7')).body.days.at(-1)!.kcalTarget).toBe(third.targets.kcal.value);
+  });
+
+  it('keeps the opt-in across plan changes until it is turned off', async () => {
+    // A client that doesn't know the field leaves it alone.
+    await request('PUT', '/api/goals', { plan: { ...plan, title: 'Nouveau titre' } });
+    expect((await request<User>('GET', '/api/me')).body.plan?.adaptiveEnergy).toEqual({ since: addDays(today, -14) });
+    // A new draft keeps it, and its preview budget already includes the shift.
+    const draft = await request<GoalsResponse>('POST', '/api/goals/draft', { intentions: 'Je veux garder la forme' });
+    expect(draft.body.plan?.adaptiveEnergy).toEqual({ since: addDays(today, -14) });
+    expect(draft.body.energy?.adaptiveKcal).toBe(300);
+
+    await optIn(null);
+    expect((await day()).energy.adaptiveKcal).toBe(0);
+    expect((await insights()).enabled).toBe(false);
+  });
+
+  it('never goes below the safety floor, even when the measure is low', async () => {
+    // Someone who notes only part of what they eat: 1 600 kcal a day for a stable weight.
+    const light = await register('light-logger@example.com');
+    await request('PUT', '/api/me/profile', profile, light);
+    await request('PUT', '/api/goals', { plan: { ...plan, calorieMode: 'deficit', caloriePercent: 25, adaptiveEnergy: { since: addDays(today, -42) } } }, light);
+    const samples = [];
+    for (let i = 42; i >= 1; i--) {
+      const date = addDays(today, -i);
+      await logDay(date, 1600, light);
+      samples.push({ localDate: date, measuredAt: `${date}T07:00:00Z`, kg: 75 });
+    }
+    await request('PUT', '/api/weights', { source: 'healthkit', samples }, light);
+    const adaptive = await insights(light);
+    // Pulled back to 1.1 × BMR, and not fully trusted.
+    expect(adaptive).toMatchObject({ clamped: true, confidence: 'medium' });
+    const { energy } = await day(light);
+    expect(energy.adaptiveKcal).toBeLessThan(-300);
+    // The deficit never takes the budget under basal needs.
+    expect(energy.goalKcal).toBeGreaterThanOrEqual(energy.bmr - 5);
+  });
+
+  it('tells the coach and the review, with what the budget does', async () => {
+    await optIn(addDays(today, -14));
+    const adaptive = await insights();
+    await request('POST', '/api/coach/messages', { text: 'Pourquoi mon budget a bougé ?', localDate: today });
+    const brief = seen.coach.at(-1)!.energyExpenditure!;
+    expect(brief).toEqual({
+      estimateKcal: adaptive.estimate,
+      formulaKcal: adaptive.formula,
+      confidence: adaptive.confidence,
+      windowDays: 28,
+      completeDays: 28,
+      weighIns: 28,
+      trendKgPerWeek: -0.5,
+      autoAdjust: true,
+      appliedKcal: 300,
+    });
+
+    await request('POST', '/api/insights/review', { days: 7 });
+    expect(seen.review.at(-1)!.energyExpenditure).toEqual(brief);
+
+    // Opted in without enough data: the coach knows what's missing.
+    await request('PUT', '/api/goals', { plan: { ...plan, adaptiveEnergy: { since: today } } }, newcomer);
+    await request('POST', '/api/coach/messages', { text: 'Et moi ?', localDate: today }, newcomer);
+    expect(seen.coach.at(-1)!.energyExpenditure).toMatchObject({ estimateKcal: null, autoAdjust: true, appliedKcal: 0, missing: { days: 11, completeDays: 6, weighIns: 3 } });
   });
 });

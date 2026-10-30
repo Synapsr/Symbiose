@@ -3,6 +3,7 @@ import type {
   BloodPressureCategory,
   CoachMealProposal,
   DaySummary,
+  ExpenditureConfidence,
   FoodItem,
   GoalPlan,
   InsightsResponse,
@@ -35,6 +36,24 @@ export interface BloodPressureBrief {
   readings: number;
   /** Readings at or above 180/110 over the last 7 days. */
   severeLast7Days: number;
+}
+
+/** Maintenance measured from logged meals and the weight trend; present once estimated, or when the person opted in. */
+export interface EnergyExpenditureBrief {
+  /** kcal/day; null until there is enough data (`missing` says what's needed). */
+  estimateKcal: number | null;
+  /** The formula's maintenance over the same days. */
+  formulaKcal: number;
+  confidence: ExpenditureConfidence | null;
+  windowDays: number;
+  completeDays: number;
+  weighIns: number;
+  trendKgPerWeek: number | null;
+  /** Their budget follows the estimate, by at most 100 kcal a week. */
+  autoAdjust: boolean;
+  /** Shift applied to today's maintenance so far. */
+  appliedKcal: number;
+  missing?: { days: number; completeDays: number; weighIns: number };
 }
 
 /** Movement so far on a given day. */
@@ -101,6 +120,7 @@ export interface CoachInput extends UserContext {
   history: CoachTurn[];
   message: string;
   bloodPressure: BloodPressureBrief | null;
+  energyExpenditure: EnergyExpenditureBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };
@@ -137,6 +157,7 @@ export interface CravingOutput {
 export interface ReviewInput extends UserContext {
   insights: InsightsResponse;
   bloodPressure: BloodPressureBrief | null;
+  energyExpenditure: EnergyExpenditureBrief | null;
 }
 
 export interface Ai {

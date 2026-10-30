@@ -163,6 +163,11 @@ export const GoalPlanSchema = z.object({
   overrides: z.partialRecord(NutrientKeySchema, z.number().min(0)).default({}),
   /** Activity guardrails; null means the goal-based defaults (`activityGoalsFor`). */
   activity: ActivityGoalsSchema.nullable().default(null),
+  /**
+   * Opt-in: maintenance follows the expenditure measured from logged meals and the weight
+   * trend (`estimateExpenditure`), from `since` on and by small weekly steps. Null or absent: off.
+   */
+  adaptiveEnergy: z.object({ since: isoDate }).nullable().optional(),
 });
 export type GoalPlan = z.infer<typeof GoalPlanSchema>;
 
@@ -181,6 +186,8 @@ export interface EnergyBreakdown {
   source: 'profile' | 'activity';
   activeKcal: number | null;
   goalKcal: number;
+  /** Added to the formula's maintenance from the measured expenditure (adaptive energy); 0 when off. */
+  adaptiveKcal?: number;
 }
 
 // ---------------------------------------------------------------- Food & meals
@@ -346,6 +353,52 @@ export interface WeightTrend {
   windowDays: number;
 }
 
+// ---------------------------------------------------------------- Adaptive energy expenditure
+
+export type ExpenditureConfidence = 'low' | 'medium' | 'high';
+
+/** Why there is no estimate yet. */
+export type ExpenditureReason = 'few_days' | 'few_complete_days' | 'few_weigh_ins' | 'weigh_ins_bunched';
+
+/** Maintenance measured from logged meals and the weight trend (`estimateExpenditure`). */
+export interface ExpenditureEstimate {
+  /** kcal/day; null until the data is good enough (see `reasons`). */
+  estimate: number | null;
+  /** The formula's maintenance (Mifflin–St Jeor × activity) over the same days. */
+  formula: number;
+  /** estimate − formula. */
+  difference: number | null;
+  confidence: ExpenditureConfidence | null;
+  /** The raw measure fell outside ±25 % of the formula or physiological bounds and was pulled back. */
+  clamped: boolean;
+  /** Ends the day before the date it is computed for: that day isn't over. */
+  window: { from: string; to: string; days: number };
+  data: {
+    loggedDays: number;
+    /** Days that look completely logged; only they count toward the intake. */
+    completeDays: number;
+    weighIns: number;
+    /** Average over the complete days. */
+    avgIntake: number | null;
+    /** From the smoothed trend line, not raw weigh-ins. */
+    trendChangeKg: number | null;
+    trendKgPerWeek: number | null;
+  };
+  reasons: ExpenditureReason[];
+  /** What's still needed: days of history, complete days, weigh-ins. */
+  missing: { days: number; completeDays: number; weighIns: number };
+}
+
+/** The estimate as served, with the person's opt-in. */
+export interface AdaptiveEnergy extends ExpenditureEstimate {
+  /** Their budget follows the estimate (`plan.adaptiveEnergy`). */
+  enabled: boolean;
+  /** Shift applied today to the formula's maintenance (0 when off or not trusted yet). */
+  appliedKcal: number;
+  /** The applied shift moves by at most this much a week. */
+  stepKcal: number;
+}
+
 // ---------------------------------------------------------------- Blood pressure (opt-in)
 
 export const BloodPressureSourceSchema = z.enum(['healthkit', 'health_connect', 'manual']);
@@ -485,6 +538,8 @@ export interface InsightsResponse {
   activity: InsightsActivity;
   /** Null unless the person tracks blood pressure and has readings in the window. */
   bloodPressure?: BloodPressureTrend | null;
+  /** Measured maintenance as of `to` (absent on older servers). */
+  adaptiveEnergy?: AdaptiveEnergy;
   streak: number;
 }
 
@@ -591,6 +646,8 @@ export interface GoalsResponse {
   plan: GoalPlan | null;
   targets: Targets | null;
   energy: EnergyBreakdown | null;
+  /** GET only: measured maintenance as of the requested day. */
+  adaptiveEnergy?: AdaptiveEnergy | null;
 }
 
 export const GoalDraftInputSchema = z.object({

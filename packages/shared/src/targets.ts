@@ -1,3 +1,4 @@
+import { PAL_MIN } from './expenditure';
 import { NUTRIENT_KEYS, type NutrientKey, type Nutrients } from './nutrients';
 import type {
   ActivityLevel,
@@ -42,6 +43,8 @@ export function bmrMifflin(profile: Pick<Profile, 'sex' | 'birthYear' | 'heightC
 export interface EnergyOptions {
   /** Active energy measured today by a watch / phone, if any. */
   activeKcal?: number | null;
+  /** Shift from the measured expenditure (`adaptiveShift`); used only when the plan opted in. */
+  adaptiveKcal?: number | null;
   now?: Date;
 }
 
@@ -50,9 +53,12 @@ export function computeEnergy(profile: Profile, plan: GoalPlan | null, options: 
   const measured = options.activeKcal ?? null;
   const useActivity = Boolean(plan?.adjustForActivity) && measured !== null;
 
-  const tdee = useActivity
+  const formulaTdee = useActivity
     ? bmr * ACTIVITY_MULTIPLIER.sedentary + (measured ?? 0) * ACTIVE_ENERGY_CREDIT
     : bmr * ACTIVITY_MULTIPLIER[profile.activityLevel];
+  // The measured expenditure recalibrates the formula; daily activity still moves it.
+  const shift = plan?.adaptiveEnergy ? (options.adaptiveKcal ?? 0) : 0;
+  const tdee = shift ? Math.max(formulaTdee + shift, bmr * PAL_MIN) : formulaTdee;
 
   let goal = tdee;
   if (plan) {
@@ -60,9 +66,10 @@ export function computeEnergy(profile: Profile, plan: GoalPlan | null, options: 
     if (plan.calorieMode === 'deficit') goal = tdee * (1 - pct);
     if (plan.calorieMode === 'surplus') goal = tdee * (1 + Math.min(pct, 0.2));
   }
-  // Never prescribe below basal needs or a sex-specific safety floor.
+  // Never prescribe below basal needs or a sex-specific safety floor, nor below
+  // what the formula alone would allow when the measure lowers maintenance.
   const floor = Math.max(CALORIE_FLOOR[profile.sex], bmr);
-  if (plan?.calorieMode === 'deficit') goal = Math.max(goal, Math.min(floor, tdee));
+  if (plan?.calorieMode === 'deficit' || tdee < formulaTdee) goal = Math.max(goal, Math.min(floor, formulaTdee));
 
   const override = plan?.overrides?.kcal;
   const goalKcal = roundTo(override ?? goal, 10);
@@ -73,6 +80,7 @@ export function computeEnergy(profile: Profile, plan: GoalPlan | null, options: 
     source: useActivity ? 'activity' : 'profile',
     activeKcal: measured,
     goalKcal,
+    adaptiveKcal: Math.round(tdee - formulaTdee),
   };
 }
 

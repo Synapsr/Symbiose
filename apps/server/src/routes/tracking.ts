@@ -30,6 +30,7 @@ import { computeInsights, daySummary, library, toActivity, toCraving } from '../
 import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
 import { bloodPressureBrief } from '../services/blood-pressure';
+import { energyExpenditureBrief } from '../services/expenditure';
 import { upsertWeights, weightTrend } from '../services/weights';
 import { activityToday } from '../services/workouts';
 
@@ -177,7 +178,7 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
       .digest('hex');
     const cached = db.select().from(aiCache).where(eq(aiCache.key, key)).get();
     if (cached) return c.json<Review>(cached.value as Review);
-    const review = await ai.review({ ...resolved.context, insights, bloodPressure });
+    const review = await ai.review({ ...resolved.context, insights, bloodPressure, energyExpenditure: energyExpenditureBrief(insights.adaptiveEnergy) });
     db.insert(aiCache).values({ key, userId, value: review, createdAt: nowIso() }).onConflictDoNothing().run();
     return c.json<Review>(review);
   });

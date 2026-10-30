@@ -31,6 +31,7 @@ import { activity, cravings, meals, type ActivityRow, type CravingRow } from '..
 import { toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
 import { visibleTrend } from './blood-pressure';
+import { adaptiveEnergyHistory } from './expenditure';
 import { weightTrend } from './weights';
 import { activeMinutes, activityWeek, workoutsBetween, workoutsKcal } from './workouts';
 
@@ -151,6 +152,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     .where(and(eq(cravings.userId, userId), gte(cravings.localDate, from), lte(cravings.localDate, to)))
     .all();
   const rangeWorkouts = workoutsBetween(db, userId, from, to);
+  const adaptive = adaptiveEnergyHistory(db, userId, profile, plan, from, to);
 
   const activityByDay = new Map(activityRows.map((row) => [row.localDate, row]));
   const workoutsByDay = new Map<string, Workout[]>();
@@ -175,7 +177,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     const act = activityByDay.get(date);
     const dayWorkouts = workoutsByDay.get(date) ?? [];
     const activeKcal = act?.activeKcal ?? workoutsKcal(dayWorkouts);
-    const { targets } = computeTargets(profile, plan, { activeKcal });
+    const { targets } = computeTargets(profile, plan, { activeKcal, adaptiveKcal: adaptive.shiftOn(date) });
     const totals = roundNutrients(sumNutrients(dayMeals.map((m) => m.totals)));
     const logged = dayMeals.length > 0;
     days.push({
@@ -283,6 +285,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       cravingsOnActiveDays: activeDays.length >= 2 && restDays.length >= 2 ? { active: cravingsPerDay(activeDays), inactive: cravingsPerDay(restDays) } : null,
     },
     bloodPressure: visibleTrend(db, userId, profile, to, trendDays),
+    adaptiveEnergy: adaptive.asOf(to),
     streak: streakFor(db, userId, to),
   };
 }

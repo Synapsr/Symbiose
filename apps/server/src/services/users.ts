@@ -5,6 +5,7 @@ import type { UserContext } from '../ai/types';
 import type { Db } from '../db';
 import { activity, users, type UserRow } from '../db/schema';
 import { HttpError, notFound } from '../errors';
+import { adaptiveShiftOn } from './expenditure';
 import { workoutsBetween, workoutsKcal } from './workouts';
 
 export function toUser(row: UserRow): User {
@@ -42,7 +43,7 @@ export interface ResolvedUser {
   context: UserContext;
 }
 
-/** The user with their targets for a given day (activity-adjusted when enabled). */
+/** The user with their targets for a given day (activity-adjusted and measured-expenditure-adjusted when enabled). */
 export function resolveUser(db: Db, userId: string, localDate?: string): ResolvedUser {
   const row = getUserRow(db, userId);
   const profile = row.profile ?? null;
@@ -51,7 +52,8 @@ export function resolveUser(db: Db, userId: string, localDate?: string): Resolve
   let energy: EnergyBreakdown | null = null;
   if (profile) {
     const activeKcal = localDate ? activeKcalFor(db, userId, localDate) : null;
-    ({ targets, energy } = computeTargets(profile, plan, { activeKcal }));
+    const adaptiveKcal = localDate ? adaptiveShiftOn(db, userId, profile, plan, localDate) : null;
+    ({ targets, energy } = computeTargets(profile, plan, { activeKcal, adaptiveKcal }));
   }
   return {
     row,

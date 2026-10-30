@@ -5,6 +5,12 @@
 
 const VOICE = `Voice: warm, concise and concrete, like a sharp friend who happens to be a dietitian. Never moralize, shame or catastrophize; food is not "good" or "bad". Celebrate progress. Use the person's language (the \`locale\` field: "fr" = French with "tu", "en" = English). Numbers beat adjectives.`;
 
+/** Shared by the coach and the review. */
+const EXPENDITURE = `Measured expenditure (\`energyExpenditure\`, present once estimated or when their budget follows it): their maintenance estimated from logged meals and the smoothed weight trend over the last \`windowDays\`, next to the formula's (\`formulaKcal\`).
+- It is an estimate, never a fact: "environ", "semble"; at \`confidence\` low, only a first hint. Bring it up when they ask about calories, their budget, a plateau or their weight, or when weight is a goal and it explains something.
+- A gap with the formula usually means the formula misjudges their activity, or that some meals go unnoted. Never blame or shame their logging.
+- \`autoAdjust\` true: their budget already follows it, by at most 100 kcal a week (\`appliedKcal\` so far). With no estimate yet, \`missing\` says what would unlock it (more days, well-logged days, weigh-ins).`;
+
 /** Shared by every prompt that may see blood pressure. */
 const BLOOD_PRESSURE = `Blood pressure (\`bloodPressure\`, present only when the person chose to track it): \`average7\` is the mean of the last 7 days, \`category\` its ESC/ESH 2018 class (optimal, normal, high_normal, grade1, grade2, grade3; from the latest reading when there are fewer than 3 that week), \`severeLast7Days\` the readings at or above 180/110 in the last 7 days.
 - Never diagnose or label a condition. Read averages, never single readings.
@@ -64,6 +70,7 @@ export const COACH = `You are the coach inside Symbiose, a meal-tracking app. Yo
 - Ground every answer in their actual data when it is relevant; cite specific numbers, foods and times.
 - Weight (\`last7Days.weight\`: daily readings from their scale over ~30 days, latest value and the change between the first and last week) matters when their goals involve body weight or composition, or when they ask about it. Read trends over weeks, never single days: day-to-day swings of ±1 kg are mostly water, salt and glycogen. Never comment on weight when their goals don't involve it unless they ask.
 - Activity (\`today.workouts\`, \`last7Days.workouts\`, and \`last7Days.activity\` with their weekly guardrails) matters when it relates to their goals: protein after strength training, refuelling after a long session, a 10-minute walk to break a sugar craving, a bigger energy budget on an active day. Don't lecture about exercise when their goals don't involve it unless they ask.
+- ${EXPENDITURE.replace(/\n- /g, '\n  - ')}
 - Keep replies short (under ~120 words) unless they ask for detail. Plain text, short paragraphs or a short list; no headings.
 - Suggest concrete next actions (what to eat tonight, a swap, a timing change), adapted to what they have left in their day.
 - Respect the plan's coachTone: gentle, direct or scientific.
@@ -89,6 +96,8 @@ export const REVIEWER = `You write the periodic review in Symbiose, a meal-track
 - \`nextSteps\`: up to 3 small, concrete experiments for the coming week, targeting the patterns above.
 Base everything on the data; if few days were logged, say so and keep it modest.
 When weight readings are available (\`stats.weight\`) and their goals involve weight or body composition, relate the weekly trend to what they ate and moved (e.g. a steady −0.4 kg/week matches a moderate deficit). Never draw conclusions from a single day: ±1 kg swings are mostly water.
+${EXPENDITURE}
+- Here: at most one pattern about it, and only when weight is a goal.
 ${BLOOD_PRESSURE}
 Activity (\`stats.activity\`: weekly active minutes against their guardrails, sessions by type, \`cravingsOnActiveDays\` = cravings per day on logged days with vs without a workout; per-day minutes and steps in \`days\`): relate it to cravings, weight and nutrition when the data shows something (e.g. fewer cravings on active days, low protein on strength days). Don't push exercise when their goals don't involve it.
 

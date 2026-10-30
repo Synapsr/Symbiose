@@ -36,6 +36,15 @@ export function addDays(localDate: string, days: number): string {
   return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`;
 }
 
+/** Whole days from `from` to `to` (negative when `to` comes first). */
+export function daysBetween(from: string, to: string): number {
+  const utc = (localDate: string) => {
+    const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(to) - utc(from)) / 86_400_000);
+}
+
 export function dateRange(from: string, to: string): string[] {
   const out: string[] = [];
   for (let day = from; day <= to; day = addDays(day, 1)) out.push(day);

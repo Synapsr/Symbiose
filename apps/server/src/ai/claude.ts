@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { HttpError } from '../errors';
 import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, REVIEWER } from './prompts';
-import type { Ai, BloodPressureBrief, MealAnalysisInput, UserContext } from './types';
+import type { Ai, BloodPressureBrief, EnergyExpenditureBrief, MealAnalysisInput, UserContext } from './types';
 
 // Structured-output schemas. Kept free of numeric bounds: the server clamps
 // and validates everything afterwards.
@@ -134,6 +134,8 @@ type Effort = 'low' | 'medium' | 'high';
 
 /** Blood pressure only enters the context for people who opted in and have readings. */
 const bloodPressureExtra = (brief: BloodPressureBrief | null) => (brief ? { bloodPressure: brief } : {});
+/** Measured expenditure only enters once estimated, or when the budget follows it. */
+const expenditureExtra = (brief: EnergyExpenditureBrief | null) => (brief ? { energyExpenditure: brief } : {});
 
 function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): string {
   const payload = {
@@ -244,7 +246,13 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
 
     async coach(input, onText) {
       const history: Anthropic.Beta.BetaMessageParam[] = input.history.map((turn) => ({ role: turn.role, content: turn.content }));
-      const extra = { today: input.today, recentMeals: input.recentMeals, last7Days: input.week, ...bloodPressureExtra(input.bloodPressure) };
+      const extra = {
+        today: input.today,
+        recentMeals: input.recentMeals,
+        last7Days: input.week,
+        ...bloodPressureExtra(input.bloodPressure),
+        ...expenditureExtra(input.energyExpenditure),
+      };
       const text = `${contextBlock(input, extra)}\n\n${input.message}`;
       try {
         const stream = client.beta.messages.stream({
@@ -289,8 +297,8 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     },
 
     async review(input) {
-      // The brief replaces the daily blood pressure points.
-      const { days, activity, bloodPressure: _trend, ...rest } = input.insights;
+      // The briefs replace the daily blood pressure points and the full expenditure block.
+      const { days, activity, bloodPressure: _trend, adaptiveEnergy: _adaptive, ...rest } = input.insights;
       const { days: activityDays, ...activityStats } = activity;
       const moves = new Map(activityDays.map((d) => [d.date, d]));
       const compactDays = days.map((d) => ({
@@ -304,7 +312,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         workouts: moves.get(d.date)?.workouts ?? 0,
       }));
       const stats = { ...rest, activity: activityStats };
-      const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure) })}\n\nWrite my review for this period.`;
+      const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure), ...expenditureExtra(input.energyExpenditure) })}\n\nWrite my review for this period.`;
       return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },
   };
