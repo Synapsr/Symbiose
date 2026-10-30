@@ -7,3 +7,4 @@ export * from './activity';
 export * from './health';
 export * from './glance';
 export * from './expenditure';
+export * from './life';

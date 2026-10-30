@@ -55,6 +55,12 @@ export const NUTRIENT_COLORS: Record<NutrientKey, string> = {
   sodium: '#9B7CF4',
 };
 
+/** The opt-in life modules. Mood colours live with the faces (`mood-face.tsx`). */
+export const LIFE_COLORS = {
+  water: '#3E9FE0',
+  sleep: '#7482D9',
+};
+
 export const Space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 } as const;
 export const Radius = { sm: 12, md: 16, lg: 22, xl: 28, pill: 999 } as const;
 

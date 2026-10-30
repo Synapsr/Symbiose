@@ -27,6 +27,7 @@ import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary } from '../services/day';
 import { bloodPressureBrief } from '../services/blood-pressure';
 import { energyExpenditureBrief } from '../services/expenditure';
+import { lifeBrief } from '../services/life';
 import { acceptMealActions, runMealAction } from '../services/meal-actions';
 import { toMeal } from '../services/meals';
 import { resolveUser } from '../services/users';
@@ -88,6 +89,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     message: text,
     bloodPressure: bloodPressureBrief(db, userId, resolved.row.profile ?? null, localDate),
     energyExpenditure: energyExpenditureBrief(week.adaptiveEnergy),
+    life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, localDate),
     today: {
       date: day.date,
       totals: day.totals,

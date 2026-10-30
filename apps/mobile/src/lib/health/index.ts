@@ -13,7 +13,11 @@ export const health: HealthBridge = {
   readBloodPressure: async () => [],
   writeBloodPressure: async () => undefined,
   writeMeal: async () => undefined,
+  readSleep: async () => [],
+  readWater: async () => [],
+  writeWater: async () => undefined,
+  deleteWater: async () => undefined,
 };
 
-export { BP_SCOPES, HEALTH_SCOPES, inferWalkIntensity } from './types';
-export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';
+export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, WATER_SCOPES } from './types';
+export type { DayHealth, HealthBridge, HealthModules, HealthProfile, WeightReading } from './types';

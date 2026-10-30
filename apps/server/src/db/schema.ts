@@ -129,6 +129,62 @@ export const workouts = sqliteTable(
   ],
 );
 
+/** One night per wake-up day, read from the health store (opt-in, stored whatever the switch). */
+export const sleepNights = sqliteTable(
+  'sleep_nights',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    localDate: text('local_date').notNull(),
+    bedtime: text('bedtime').notNull(),
+    wakeTime: text('wake_time').notNull(),
+    asleepMin: integer('asleep_min').notNull(),
+    inBedMin: integer('in_bed_min'),
+    source: text('source', { enum: ['healthkit', 'health_connect'] }).notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
+);
+
+/** Drinks, logged here or imported from the health store. */
+export const waterLogs = sqliteTable(
+  'water_logs',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    externalId: text('external_id'),
+    at: text('at').notNull(),
+    localDate: text('local_date').notNull(),
+    ml: integer('ml').notNull(),
+    source: text('source', { enum: ['healthkit', 'health_connect', 'manual'] }).notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('water_logs_user_date').on(t.userId, t.localDate),
+    // SQLite treats NULLs as distinct: glasses logged here never collide.
+    uniqueIndex('water_logs_user_external').on(t.userId, t.externalId),
+  ],
+);
+
+/** One mood check-in per day; checking in again replaces it. */
+export const moods = sqliteTable(
+  'moods',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    localDate: text('local_date').notNull(),
+    at: text('at').notNull(),
+    mood: integer('mood').notNull(),
+    note: text('note'),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
+);
+
 export const cravings = sqliteTable(
   'cravings',
   {
@@ -182,3 +238,6 @@ export type WeightRow = typeof weights.$inferSelect;
 export type WorkoutRow = typeof workouts.$inferSelect;
 export type BloodPressureRow = typeof bloodPressure.$inferSelect;
 export type CoachMessageRow = typeof coachMessages.$inferSelect;
+export type SleepNightRow = typeof sleepNights.$inferSelect;
+export type WaterLogRow = typeof waterLogs.$inferSelect;
+export type MoodRow = typeof moods.$inferSelect;

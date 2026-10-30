@@ -5,6 +5,8 @@ const enabled = Platform.OS !== 'web';
 
 export const haptics = {
   tap: () => enabled && void Haptics.selectionAsync().catch(() => undefined),
+  /** A rounded, low thud: a glass poured, a mood picked. */
+  soft: () => enabled && void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft).catch(() => undefined),
   impact: () => enabled && void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined),
   success: () => enabled && void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined),
   warning: () => enabled && void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined),

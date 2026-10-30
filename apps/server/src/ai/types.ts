@@ -9,6 +9,7 @@ import type {
   InsightsResponse,
   Locale,
   MealType,
+  MoodLink,
   NutrientKey,
   Nutrients,
   Profile,
@@ -54,6 +55,39 @@ export interface EnergyExpenditureBrief {
   /** Shift applied to today's maintenance so far. */
   appliedKcal: number;
   missing?: { days: number; completeDays: number; weighIns: number };
+}
+
+/**
+ * Sleep, hydration and mood, for the modules the person turned on: a key is
+ * absent when its module is off, so the AI never hears about it.
+ */
+export interface LifeBrief {
+  sleep?: {
+    /** The night that ended on the day of the request. */
+    lastNight: { date: string; asleepMin: number; bedtime: string; wakeTime: string } | null;
+    average7Min: number | null;
+    nights7: number;
+    /** Nights under 7 h over the last 7. */
+    shortNights7: number;
+    /** Cravings per day after short nights vs the others, over 30 days. */
+    cravingsAfterShortNights: { short: number; normal: number } | null;
+  };
+  hydration?: {
+    todayMl: number;
+    goalMl: number;
+    /** Over the 7 days before today, days with drinks only. */
+    average7Ml: number | null;
+    daysReached7: number;
+  };
+  mood?: {
+    /** Check-in from 1 (very low) to 5 (very good). */
+    today: { mood: number; note: string | null; time: string } | null;
+    last7: { date: string; mood: number }[];
+    average7: number | null;
+    /** Very low moods that last: the only case where talking to someone is suggested. */
+    persistentLow: boolean;
+    link: MoodLink | null;
+  };
 }
 
 /** Movement so far on a given day. */
@@ -121,6 +155,7 @@ export interface CoachInput extends UserContext {
   message: string;
   bloodPressure: BloodPressureBrief | null;
   energyExpenditure: EnergyExpenditureBrief | null;
+  life: LifeBrief;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };
@@ -147,6 +182,7 @@ export interface CravingInput extends UserContext {
   intensity: number;
   localTime: string;
   activityToday: ActivityToday | null;
+  life: LifeBrief;
 }
 
 export interface CravingOutput {

@@ -1,9 +1,13 @@
 import {
   BiologicalSex,
+  CategoryValueSleepAnalysis,
+  ComparisonPredicateOperator,
+  deleteObjects,
   getBiologicalSexAsync,
   getDateOfBirthAsync,
   getMostRecentQuantitySample,
   isHealthDataAvailableAsync,
+  queryCategorySamples,
   queryCorrelationSamples,
   queryQuantitySamples,
   queryStatisticsForQuantity,
@@ -16,9 +20,9 @@ import {
   type QuantitySample,
   type WorkoutProxyTyped,
 } from '@kingstinct/react-native-healthkit';
-import type { BloodPressureReadingInput, Meal, Sex, WorkoutInput, WorkoutType } from '@symbiose/shared';
+import type { BloodPressureReadingInput, Meal, Sex, SleepSegment, WaterInput, WorkoutInput, WorkoutType } from '@symbiose/shared';
 
-import { cleanProfile, dayBounds, mealWindow, OWN_READING_KEY, toBloodPressureInput, toWorkoutInput, type HealthBridge } from './types';
+import { cleanProfile, dayBounds, mealWindow, OWN_READING_KEY, toBloodPressureInput, toSleepNights, toWaterInput, toWorkoutInput, type HealthBridge, type HealthModules } from './types';
 
 const READ = [
   'HKQuantityTypeIdentifierStepCount',
@@ -39,6 +43,10 @@ const READ = [
 const BP_READ = ['HKQuantityTypeIdentifierBloodPressureSystolic', 'HKQuantityTypeIdentifierBloodPressureDiastolic', 'HKQuantityTypeIdentifierHeartRate'] as const;
 const BP_WRITE = ['HKQuantityTypeIdentifierBloodPressureSystolic', 'HKQuantityTypeIdentifierBloodPressureDiastolic'] as const;
 
+/** Opt-in sleep (read only) and water (read and write). */
+const SLEEP_READ = ['HKCategoryTypeIdentifierSleepAnalysis'] as const;
+const WATER = ['HKQuantityTypeIdentifierDietaryWater'] as const;
+
 const WRITE = [
   'HKQuantityTypeIdentifierDietaryEnergyConsumed',
   'HKQuantityTypeIdentifierDietaryProtein',
@@ -49,6 +57,13 @@ const WRITE = [
   'HKQuantityTypeIdentifierDietaryFiber',
   'HKQuantityTypeIdentifierDietarySodium',
 ] as const;
+
+/** Sleep stages → what they mean for a night. "Asleep" covers the unspecified, core, deep and REM stages. */
+function sleepKind(value: CategoryValueSleepAnalysis): SleepSegment['kind'] {
+  if (value === CategoryValueSleepAnalysis.inBed) return 'inBed';
+  if (value === CategoryValueSleepAnalysis.awake) return 'awake';
+  return 'asleep';
+}
 
 const SEX: Partial<Record<BiologicalSex, Sex>> = {
   [BiologicalSex.female]: 'female',
@@ -123,9 +138,12 @@ export const health: HealthBridge = {
 
   isAvailable: () => isHealthDataAvailableAsync(),
 
-  async connect(options) {
-    if (!options?.bloodPressure) return requestAuthorization({ toRead: READ, toShare: WRITE });
-    return requestAuthorization({ toRead: [...READ, ...BP_READ], toShare: [...WRITE, ...BP_WRITE] });
+  async connect(options: HealthModules = {}) {
+    // The sheet only lists the types not asked yet: adding a module asks for its types alone.
+    return requestAuthorization({
+      toRead: [...READ, ...(options.bloodPressure ? BP_READ : []), ...(options.sleep ? SLEEP_READ : []), ...(options.hydration ? WATER : [])],
+      toShare: [...WRITE, ...(options.bloodPressure ? BP_WRITE : []), ...(options.hydration ? WATER : [])],
+    });
   },
 
   async readDay(day) {
@@ -216,6 +234,39 @@ export const health: HealthBridge = {
     );
   },
 
+  async readSleep(from, to) {
+    const samples = await queryCategorySamples('HKCategoryTypeIdentifierSleepAnalysis', {
+      filter: { date: { startDate: from, endDate: to } },
+      limit: 0,
+      ascending: true,
+    });
+    return toSleepNights(samples.map((s) => ({ start: s.startDate, end: s.endDate, kind: sleepKind(s.value) })));
+  },
+
+  async readWater(from, to) {
+    const samples = await queryQuantitySamples('HKQuantityTypeIdentifierDietaryWater', {
+      filter: { date: { startDate: from, endDate: to } },
+      limit: 0,
+      ascending: true,
+      unit: 'mL',
+    });
+    return samples
+      // Glasses Symbiose wrote itself are already on the server.
+      .filter((s) => !(s.metadata as Record<string, unknown> | undefined)?.[OWN_READING_KEY])
+      .map((s) => toWaterInput({ externalId: s.uuid, at: s.startDate, ml: s.quantity }))
+      .filter((w): w is WaterInput => w !== null);
+  },
+
+  async writeWater(entry) {
+    await saveQuantitySample('HKQuantityTypeIdentifierDietaryWater', 'mL', entry.ml, entry.at, entry.at, { [OWN_READING_KEY]: entry.id });
+  },
+
+  async deleteWater(id) {
+    await deleteObjects('HKQuantityTypeIdentifierDietaryWater', {
+      metadata: { withMetadataKey: OWN_READING_KEY, operatorType: ComparisonPredicateOperator.equalTo, value: id },
+    });
+  },
+
   async writeMeal(meal: Meal) {
     const { start, end } = mealWindow(meal);
     const t = meal.totals;
@@ -233,5 +284,5 @@ export const health: HealthBridge = {
   },
 };
 
-export { BP_SCOPES, HEALTH_SCOPES, inferWalkIntensity } from './types';
-export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';
+export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, WATER_SCOPES } from './types';
+export type { DayHealth, HealthBridge, HealthModules, HealthProfile, WeightReading } from './types';

@@ -27,6 +27,21 @@ export function unitOf(key: NutrientKey): string {
   return NUTRIENT_META[key].unit;
 }
 
+/** "7 h 05" / "7h 05m", "45 min". */
+export function formatSleep(minutes: number, locale: Locale): string {
+  const total = Math.round(minutes);
+  const h = Math.floor(total / 60);
+  const m = String(total % 60).padStart(2, '0');
+  if (h === 0) return `${total} min`;
+  if (locale === 'fr') return total % 60 ? `${h} h ${m}` : `${h} h`;
+  return total % 60 ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** "1,25 L", "0.5 L". */
+export function formatLiters(ml: number, locale: Locale): string {
+  return `${formatNumber(ml / 1000, locale, 2)} L`;
+}
+
 /** "Aujourd'hui", "Hier", "jeudi 30 oct." */
 export function formatDay(localDate: string, locale: Locale, labels: { today: string; yesterday: string }): string {
   const today = toLocalDate();

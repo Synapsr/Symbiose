@@ -1,6 +1,7 @@
-import type { BloodPressureReadingInput, Meal, WorkoutInput, WorkoutType } from '@symbiose/shared';
+import type { BloodPressureReadingInput, Meal, SleepSegment, WaterInput, WorkoutInput, WorkoutType } from '@symbiose/shared';
 import {
   aggregateRecord,
+  deleteRecordsByUuids,
   ExerciseType,
   getSdkStatus,
   initialize,
@@ -8,13 +9,26 @@ import {
   readRecords,
   requestPermission,
   SdkAvailabilityStatus,
+  SleepStageType,
   type Permission,
   type RecordResult,
   type ReadRecordsOptions,
   type RecordType,
 } from 'react-native-health-connect';
 
-import { cleanProfile, dayBounds, mealWindow, OWN_RECORD_PREFIX, toBloodPressureInput, toWorkoutInput, type HealthBridge } from './types';
+import {
+  cleanProfile,
+  dayBounds,
+  mealWindow,
+  OWN_RECORD_PREFIX,
+  OWN_WATER_PREFIX,
+  toBloodPressureInput,
+  toSleepNights,
+  toWaterInput,
+  toWorkoutInput,
+  type HealthBridge,
+  type HealthModules,
+} from './types';
 
 const MEAL_TYPE = { breakfast: 1, lunch: 2, dinner: 3, snack: 4 } as const;
 
@@ -60,6 +74,21 @@ async function readAll<T extends RecordType>(recordType: T, timeRangeFilter: Rea
   return records;
 }
 
+/** A session spans the time in bed; its stages say when the person slept. Unknown stages are left out. */
+function sleepSegments(session: RecordResult<'SleepSession'>): SleepSegment[] {
+  const kind = (stage: number): SleepSegment['kind'] | null => {
+    if (stage === SleepStageType.AWAKE) return 'awake';
+    if (stage === SleepStageType.OUT_OF_BED) return 'outOfBed';
+    if (stage === SleepStageType.SLEEPING || stage === SleepStageType.LIGHT || stage === SleepStageType.DEEP || stage === SleepStageType.REM) return 'asleep';
+    return null;
+  };
+  const stages = (session.stages ?? []).flatMap((s): SleepSegment[] => {
+    const k = kind(s.stage);
+    return k ? [{ start: new Date(s.startTime), end: new Date(s.endTime), kind: k }] : [];
+  });
+  return [{ start: new Date(session.startTime), end: new Date(session.endTime), kind: 'inBed' }, ...stages];
+}
+
 let initialized = false;
 async function ensureInit(): Promise<boolean> {
   if (!initialized) initialized = await initialize();
@@ -91,7 +120,7 @@ export const health: HealthBridge = {
     }
   },
 
-  async connect(options) {
+  async connect(options: HealthModules = {}) {
     if (!(await ensureInit())) return false;
     const permissions: Permission[] = [
       { accessType: 'read', recordType: 'Steps' },
@@ -101,9 +130,11 @@ export const health: HealthBridge = {
       { accessType: 'read', recordType: 'ExerciseSession' },
       { accessType: 'write', recordType: 'Nutrition' },
     ];
-    if (options?.bloodPressure) {
+    if (options.bloodPressure) {
       permissions.push({ accessType: 'read', recordType: 'BloodPressure' }, { accessType: 'write', recordType: 'BloodPressure' });
     }
+    if (options.sleep) permissions.push({ accessType: 'read', recordType: 'SleepSession' });
+    if (options.hydration) permissions.push({ accessType: 'read', recordType: 'Hydration' }, { accessType: 'write', recordType: 'Hydration' });
     const granted = await requestPermission(permissions);
     return granted.length > 0;
   },
@@ -207,6 +238,41 @@ export const health: HealthBridge = {
     ]);
   },
 
+  async readSleep(from, to) {
+    await ensureInit();
+    const sessions = await readAll('SleepSession', { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() });
+    return toSleepNights(sessions.flatMap(sleepSegments));
+  },
+
+  async readWater(from, to) {
+    await ensureInit();
+    const records = await readAll('Hydration', { operator: 'between', startTime: from.toISOString(), endTime: to.toISOString() });
+    return records
+      // Glasses Symbiose wrote itself are already on the server.
+      .filter((record) => record.metadata?.id && !record.metadata.clientRecordId?.startsWith(OWN_WATER_PREFIX))
+      .map((record) => toWaterInput({ externalId: record.metadata!.id!, at: new Date(record.startTime), ml: record.volume.inMilliliters }))
+      .filter((w): w is WaterInput => w !== null);
+  },
+
+  async writeWater(entry) {
+    await ensureInit();
+    await insertRecords([
+      {
+        recordType: 'Hydration',
+        startTime: entry.at.toISOString(),
+        // Interval records must end after they start.
+        endTime: new Date(entry.at.getTime() + 60_000).toISOString(),
+        volume: { value: entry.ml, unit: 'milliliters' },
+        metadata: { clientRecordId: `${OWN_WATER_PREFIX}${entry.id}` },
+      },
+    ]);
+  },
+
+  async deleteWater(id) {
+    await ensureInit();
+    await deleteRecordsByUuids('Hydration', [], [`${OWN_WATER_PREFIX}${id}`]);
+  },
+
   async writeMeal(meal: Meal) {
     await ensureInit();
     const { start, end } = mealWindow(meal);
@@ -232,5 +298,5 @@ export const health: HealthBridge = {
   },
 };
 
-export { BP_SCOPES, HEALTH_SCOPES, inferWalkIntensity } from './types';
-export type { DayHealth, HealthBridge, HealthProfile, WeightReading } from './types';
+export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, WATER_SCOPES } from './types';
+export type { DayHealth, HealthBridge, HealthModules, HealthProfile, WeightReading } from './types';
