@@ -1,0 +1,63 @@
+.logo {
+  flex: none;
+  overflow: visible;
+}
+
+.logo circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.logo-a {
+  fill: var(--accent);
+}
+
+.logo-b {
+  fill: var(--text);
+  fill-opacity: 0.88;
+}
+
+.logo-core {
+  fill: var(--logo-core, var(--bg));
+}
+
+.logo--animate .logo-a {
+  animation: logo-glide-left 1100ms var(--ease-out) 150ms both;
+}
+
+.logo--animate .logo-b {
+  animation: logo-glide-right 1100ms var(--ease-out) 150ms both;
+}
+
+.logo--animate .logo-core {
+  animation: logo-core 620ms var(--ease-out) 650ms both;
+}
+
+@keyframes logo-glide-left {
+  from {
+    translate: -32% 0;
+  }
+}
+
+@keyframes logo-glide-right {
+  from {
+    translate: 32% 0;
+  }
+}
+
+@keyframes logo-core {
+  from {
+    scale: 0;
+  }
+}
+
+/* "Thinking": the core breathes, as in the app while a meal is analysed. */
+.logo--breathe .logo-core {
+  animation: logo-breathe 1400ms ease-in-out infinite;
+}
+
+@keyframes logo-breathe {
+  50% {
+    scale: 0.6;
+  }
+}

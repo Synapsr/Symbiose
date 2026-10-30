@@ -1,0 +1,285 @@
+/* An always-dark band: the "server room" of the page. Tokens are re-scoped so
+   every child component adapts without special cases. */
+.privacy {
+  --bg: #0d0d0e;
+  --surface: #18181a;
+  --surface-2: #242427;
+  --text: #f5f5f3;
+  --text-2: #a3a3a9;
+  --hairline: rgba(255, 255, 255, 0.09);
+  --accent: #3dd68c;
+  --accent-ink: #3dd68c;
+  --inverted: #f5f5f3;
+  --on-inverted: #0a0a0b;
+  --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.09);
+  --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.15);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color-scheme: dark;
+  padding-inline: clamp(8px, 1.4vw, 20px);
+}
+
+.privacy-panel {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(72px, 10vw, 144px);
+  border-radius: clamp(28px, 4vw, 48px);
+  background: var(--bg);
+  color: var(--text);
+}
+
+:root[data-theme='dark'] .privacy-panel {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+/* Two faint circles, the logo's, drifting in the corner. */
+.privacy-panel::before,
+.privacy-panel::after {
+  content: '';
+  position: absolute;
+  top: -180px;
+  width: 460px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.privacy-panel::before {
+  right: -60px;
+  background: var(--accent);
+  opacity: 0.08;
+}
+
+.privacy-panel::after {
+  right: -260px;
+  background: #fff;
+  opacity: 0.04;
+}
+
+.privacy-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 48px;
+}
+
+@media (min-width: 1080px) {
+  .privacy-grid {
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    gap: 72px;
+    align-items: end;
+  }
+}
+
+.privacy .section-head p {
+  color: var(--text-2);
+}
+
+/* ---------------------------------------------------------------- Terminal */
+
+.terminal {
+  margin-top: 40px;
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 18px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.terminal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: scale, background-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.copy-btn:hover {
+  background: color-mix(in srgb, var(--surface-2) 80%, #fff);
+}
+
+.copy-btn:active {
+  scale: 0.96;
+}
+
+.copy-btn[data-copied] {
+  color: var(--accent);
+}
+
+.terminal pre {
+  margin: 0;
+  padding: 20px 22px;
+  overflow-x: auto;
+  color: #d9d9dc;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.75;
+  tab-size: 2;
+}
+
+@media (min-width: 720px) {
+  .terminal pre {
+    font-size: 14.5px;
+    padding: 24px 26px;
+  }
+}
+
+.terminal pre:focus-visible {
+  outline-offset: -3px;
+}
+
+.c-cmd {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.c-key {
+  color: #f5c46b;
+}
+
+.c-val {
+  color: #f07ab0;
+}
+
+.c-img {
+  color: #fff;
+  font-weight: 600;
+}
+
+.terminal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 22px 16px;
+  border-top: 1px solid var(--hairline);
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.terminal-foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.terminal-foot a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------------------------------------------------------------- Steps */
+
+.privacy-steps {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+@media (min-width: 720px) {
+  .privacy-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.privacy-steps li {
+  position: relative;
+  padding: 20px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.privacy-step-num {
+  position: absolute;
+  top: 16px;
+  right: 18px;
+  color: var(--text-2);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.privacy-step-icon {
+  color: var(--accent);
+}
+
+.privacy-steps h3 {
+  margin: 14px 0 6px;
+  font-family: var(--font-body);
+  font-size: 1.02rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.privacy-steps p {
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- Facts */
+
+.privacy-facts {
+  display: grid;
+  gap: 0;
+}
+
+.privacy-facts li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.privacy-facts li:first-child {
+  padding-top: 0;
+}
+
+.privacy-facts li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.privacy-check {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-top: -1px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+}

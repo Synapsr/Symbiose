@@ -1,0 +1,114 @@
+.roadmap-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: clamp(40px, 6vw, 64px);
+}
+
+@media (min-width: 900px) {
+  .roadmap-grid {
+    grid-template-columns: 1.15fr 0.85fr 1.15fr;
+    gap: 20px;
+    align-items: start;
+  }
+}
+
+.roadmap-col {
+  padding: 26px 26px 22px;
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.roadmap-col[data-status='wip'] {
+  background: color-mix(in srgb, var(--warning) 9%, var(--surface));
+}
+
+.roadmap-col[data-status='next'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--hairline);
+}
+
+.roadmap-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+.roadmap-dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+[data-status='done'] .roadmap-dot {
+  background: var(--accent);
+}
+
+[data-status='wip'] .roadmap-dot {
+  background: var(--warning);
+}
+
+[data-status='wip'] .roadmap-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--warning);
+  animation: pulse 2s ease-out infinite;
+}
+
+[data-status='next'] .roadmap-dot {
+  box-shadow: inset 0 0 0 2px var(--text-2);
+}
+
+.roadmap-col li {
+  position: relative;
+  padding: 11px 0 11px 26px;
+  border-top: 1px solid var(--hairline);
+  font-size: 15.5px;
+  font-weight: 550;
+  line-height: 1.45;
+}
+
+.roadmap-col li::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 1.05em;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  rotate: -45deg;
+}
+
+[data-status='wip'] li::before {
+  width: 8px;
+  height: 8px;
+  top: 1.1em;
+  border: 0;
+  border-radius: 50%;
+  rotate: none;
+  background: var(--warning);
+}
+
+[data-status='next'] li {
+  color: var(--text-2);
+}
+
+[data-status='next'] li::before {
+  width: 8px;
+  height: 8px;
+  top: 1.1em;
+  border: 2px solid var(--text-3);
+  border-radius: 50%;
+  rotate: none;
+}

@@ -1,0 +1,87 @@
+.faq-grid {
+  display: grid;
+  gap: 40px;
+}
+
+@media (min-width: 980px) {
+  .faq-grid {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 80px;
+    align-items: start;
+  }
+
+  .faq-head {
+    position: sticky;
+    top: calc(var(--header-h) + 40px);
+  }
+}
+
+.faq-list {
+  border-top: 1px solid var(--hairline);
+}
+
+.faq-list details {
+  border-bottom: 1px solid var(--hairline);
+}
+
+.faq-list summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 64px;
+  padding: 16px 4px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.faq-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-list summary:focus-visible {
+  outline-offset: 0;
+  border-radius: 12px;
+}
+
+.faq-chevron {
+  flex: none;
+  color: var(--text-2);
+  transition-property: rotate;
+  transition-duration: 300ms;
+  transition-timing-function: var(--ease-swift);
+}
+
+details[open] .faq-chevron {
+  rotate: 180deg;
+}
+
+.faq-list details p {
+  max-width: 62ch;
+  padding: 0 4px 22px;
+  color: var(--text-2);
+}
+
+/* Smooth open/close where the browser supports animating <details>. */
+@supports (interpolate-size: allow-keywords) {
+  .faq-list details {
+    interpolate-size: allow-keywords;
+  }
+
+  .faq-list details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition-property: block-size, content-visibility;
+    transition-duration: 320ms;
+    transition-timing-function: var(--ease-out);
+    transition-behavior: allow-discrete;
+  }
+
+  .faq-list details[open]::details-content {
+    block-size: auto;
+  }
+}

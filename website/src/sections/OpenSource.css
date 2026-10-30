@@ -1,0 +1,133 @@
+.open-grid {
+  display: grid;
+  gap: 48px;
+}
+
+@media (min-width: 980px) {
+  .open-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 80px;
+  }
+}
+
+.open-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+@media (max-width: 520px) {
+  .open-ctas .btn {
+    flex: 1 1 100%;
+  }
+}
+
+.open-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  margin-top: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-underline-offset: 4px;
+  transition-property: color, text-decoration-color;
+  transition-duration: 150ms;
+}
+
+.open-link:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+.stack {
+  display: grid;
+  padding: 8px 28px;
+}
+
+.stack li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 16px;
+  row-gap: 2px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.stack li:last-child {
+  border-bottom: 0;
+}
+
+.stack-name {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.stack-role {
+  grid-column: 1;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.stack-path {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.stack-license {
+  align-items: center;
+}
+
+.stack-license-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.stack-license .stack-path {
+  grid-row: 1;
+}
+
+@media (max-width: 420px) {
+  .stack {
+    padding-inline: 20px;
+  }
+
+  .stack li {
+    grid-template-columns: 1fr;
+  }
+
+  .stack-path {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    margin-top: 8px;
+  }
+
+  .stack-license .stack-path {
+    grid-row: auto;
+  }
+}

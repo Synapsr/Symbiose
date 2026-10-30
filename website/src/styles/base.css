@@ -1,0 +1,510 @@
+/* ------------------------------------------------------------------ Tokens */
+
+:root {
+  color-scheme: light;
+  --bg: #f5f4f0;
+  --bg-deep: #eeede8;
+  --surface: #ffffff;
+  --surface-2: #edece7;
+  --text: #111111;
+  /* Slightly deeper than the app's #6E6E73 so body copy passes AA on every surface. */
+  --text-2: #5f5f64;
+  --text-3: #a1a1a6;
+  --hairline: rgba(0, 0, 0, 0.07);
+  --accent: #1f8a5b;
+  --accent-ink: #17704a;
+  --accent-soft: #e1f0e7;
+  --sugar: #d23c86;
+  --sugar-ink: #b02f6e;
+  --sugar-soft: #fbe6f0;
+  --warning: #e8890c;
+  --protein: #ff7a59;
+  --carbs: #f2b23a;
+  --fat: #4f8ef7;
+  --fiber: #3fb27f;
+  --inverted: #111111;
+  --on-inverted: #ffffff;
+  --img-outline: rgba(0, 0, 0, 0.1);
+  --shadow-border: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06), 0 2px 4px 0 rgba(0, 0, 0, 0.04);
+  --shadow-border-hover: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08), 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 0 0 1px rgba(17, 17, 17, 0.035), 0 1px 2px rgba(17, 17, 17, 0.04), 0 6px 20px rgba(17, 17, 17, 0.05);
+  --shadow-float: 0 0 0 1px rgba(17, 17, 17, 0.04), 0 2px 6px rgba(17, 17, 17, 0.05), 0 18px 40px -8px rgba(17, 17, 17, 0.16);
+  --shadow-phone: 0 1px 2px rgba(17, 17, 17, 0.08), 0 12px 24px -6px rgba(17, 17, 17, 0.12), 0 40px 80px -20px rgba(17, 17, 17, 0.28);
+  --grain-opacity: 0.045;
+
+  --font-display: 'Fraunces Variable', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Instrument Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-swift: cubic-bezier(0.2, 0, 0, 1);
+  --gutter: 20px;
+  --max: 1200px;
+  --header-h: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0a0a0b;
+    --bg-deep: #101012;
+    --surface: #161618;
+    --surface-2: #222225;
+    --text: #f5f5f3;
+    --text-2: #9a9aa0;
+    --text-3: #5f5f66;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --accent: #3dd68c;
+    --accent-ink: #3dd68c;
+    --accent-soft: #12301f;
+    --sugar: #ec5fa0;
+    --sugar-ink: #f07ab0;
+    --sugar-soft: #3a1528;
+    --warning: #ffb224;
+    --inverted: #f5f5f3;
+    --on-inverted: #0a0a0b;
+    --img-outline: rgba(255, 255, 255, 0.1);
+    --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
+    --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 40px -8px rgba(0, 0, 0, 0.6);
+    --shadow-phone: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 40px 80px -20px rgba(0, 0, 0, 0.8);
+    --grain-opacity: 0.06;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0a0a0b;
+  --bg-deep: #101012;
+  --surface: #161618;
+  --surface-2: #222225;
+  --text: #f5f5f3;
+  --text-2: #9a9aa0;
+  --text-3: #5f5f66;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --accent: #3dd68c;
+  --accent-ink: #3dd68c;
+  --accent-soft: #12301f;
+  --sugar: #ec5fa0;
+  --sugar-ink: #f07ab0;
+  --sugar-soft: #3a1528;
+  --warning: #ffb224;
+  --inverted: #f5f5f3;
+  --on-inverted: #0a0a0b;
+  --img-outline: rgba(255, 255, 255, 0.1);
+  --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-border-hover: 0 0 0 1px rgba(255, 255, 255, 0.13);
+  --shadow-card: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 40px -8px rgba(0, 0, 0, 0.6);
+  --shadow-phone: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 40px 80px -20px rgba(0, 0, 0, 0.8);
+  --grain-opacity: 0.06;
+}
+
+@media (min-width: 720px) {
+  :root {
+    --gutter: 32px;
+    --header-h: 72px;
+  }
+}
+
+/* ------------------------------------------------------------------ Reset */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-h) + 16px);
+  background: var(--bg);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  overflow-x: clip;
+}
+
+@media (min-width: 720px) {
+  body {
+    font-size: 17px;
+  }
+}
+
+/* A whisper of paper grain, so the cream reads as a material rather than a flat fill. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+img {
+  height: auto;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+figure,
+blockquote,
+dl,
+dd,
+pre {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+p,
+li,
+dd,
+figcaption,
+blockquote {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-inverted);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 3px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 200;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--inverted);
+  color: var(--on-inverted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 150ms ease-out;
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+/* ------------------------------------------------------------------ Layout */
+
+.wrap {
+  width: min(100% - 2 * var(--gutter), var(--max));
+  margin-inline: auto;
+}
+
+.section {
+  position: relative;
+  padding-block: clamp(80px, 11vw, 168px);
+}
+
+.section-head {
+  display: grid;
+  gap: 18px;
+  max-width: 780px;
+}
+
+.section-head h2,
+.h2 {
+  font-size: clamp(2.35rem, 1.45rem + 3.6vw, 4.4rem);
+  line-height: 1.02;
+  letter-spacing: -0.032em;
+}
+
+.section-head p,
+.lead {
+  color: var(--text-2);
+  font-size: clamp(1.05rem, 0.98rem + 0.35vw, 1.25rem);
+  line-height: 1.55;
+  max-width: 62ch;
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.kicker::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot, var(--accent));
+}
+
+.card {
+  position: relative;
+  background: var(--surface);
+  border-radius: 28px;
+  box-shadow: var(--shadow-card);
+}
+
+.num {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.accent-italic {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c, var(--accent));
+}
+
+/* ------------------------------------------------------------------ Buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: scale, background-color, box-shadow, color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.btn:active {
+  scale: 0.96;
+}
+
+.btn svg {
+  flex: none;
+}
+
+/* Optical balance: the icon side gets 2px less padding than the text side. */
+.btn--icon-end {
+  padding-right: 22px;
+}
+
+.btn--icon-start {
+  padding-left: 22px;
+}
+
+.btn--primary {
+  background: var(--inverted);
+  color: var(--on-inverted);
+}
+
+.btn--primary:hover {
+  background: color-mix(in oklab, var(--inverted) 84%, var(--accent));
+}
+
+.btn--secondary {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-border);
+}
+
+.btn--secondary:hover {
+  box-shadow: var(--shadow-border-hover);
+}
+
+/* ------------------------------------------------------------------ Reveal on scroll */
+
+/* Hidden only once the app has hydrated, so the prerendered page is never blank. */
+.ready [data-reveal]:not([data-in]) {
+  opacity: 0;
+  translate: 0 14px;
+  filter: blur(4px);
+}
+
+.ready [data-reveal] {
+  transition-property: opacity, translate, filter;
+  transition-duration: 700ms;
+  transition-timing-function: var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* ------------------------------------------------------------------ Phone frame */
+
+.phone {
+  --bezel: 9px;
+  --radius: 46px;
+  position: relative;
+  width: var(--w, 300px);
+  padding: var(--bezel);
+  border-radius: var(--radius);
+  background: linear-gradient(160deg, #2a2a2d, #0d0d0e 40%, #1b1b1d);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    var(--shadow-phone);
+}
+
+.phone::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  pointer-events: none;
+}
+
+.phone-screen {
+  position: relative;
+  overflow: hidden;
+  /* Concentric with the frame: outer radius = inner radius + bezel. */
+  border-radius: calc(var(--radius) - var(--bezel));
+  aspect-ratio: 390 / 844;
+  background: var(--surface-2);
+}
+
+.phone-screen img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+  outline: 1px solid var(--img-outline);
+  outline-offset: -1px;
+}
+
+.phone--crop .phone-screen {
+  aspect-ratio: 390 / 520;
+}
+
+.only-dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .only-dark {
+  display: block;
+}
+
+:root[data-theme='dark'] .only-light {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .only-dark {
+    display: block;
+  }
+
+  :root:not([data-theme]) .only-light {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ Motion preferences */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .ready [data-reveal]:not([data-in]) {
+    translate: none;
+    filter: none;
+  }
+
+  .ready [data-reveal] {
+    transition-property: opacity;
+    transition-duration: 300ms;
+    transition-delay: 0ms;
+  }
+}
+
+/* English visitors: hide the prerendered French until React has re-rendered. */
+.lang-swap #root {
+  visibility: hidden;
+}
