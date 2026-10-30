@@ -24,7 +24,7 @@
       "entitlements": {
         "com.apple.security.application-groups": ["group.io.synapsr.symbiose"]
       },
-      "buildNumber": "7",
+      "buildNumber": "8",
       "appleTeamId": "3RZSUHDN87"
     },
     "android": {
