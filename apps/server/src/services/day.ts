@@ -30,6 +30,7 @@ import type { Db } from '../db';
 import { activity, cravings, meals, type ActivityRow, type CravingRow } from '../db/schema';
 import { toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
+import { visibleTrend } from './blood-pressure';
 import { weightTrend } from './weights';
 import { activeMinutes, activityWeek, workoutsBetween, workoutsKcal } from './workouts';
 
@@ -154,8 +155,9 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
   const activityByDay = new Map(activityRows.map((row) => [row.localDate, row]));
   const workoutsByDay = new Map<string, Workout[]>();
   for (const workout of rangeWorkouts) workoutsByDay.set(workout.localDate, [...(workoutsByDay.get(workout.localDate) ?? []), workout]);
-  // Weight is shown over at least 30 days: a week is too short to see a trend.
-  const weight = weightTrend(db, userId, to, Math.max(dateRange(from, to).length, 30));
+  // Weight and blood pressure are shown over at least 30 days: a week is too short to see a trend.
+  const trendDays = Math.max(dateRange(from, to).length, 30);
+  const weight = weightTrend(db, userId, to, trendDays);
   const weightByDay = new Map(weight.points.map((p) => [p.date, p.kg]));
   const mealsByDay = new Map<string, typeof rangeMeals>();
   for (const meal of rangeMeals) mealsByDay.set(meal.localDate, [...(mealsByDay.get(meal.localDate) ?? []), meal]);
@@ -280,6 +282,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       weeklyMinutes: Math.round((totalMinutes / days.length) * 7),
       cravingsOnActiveDays: activeDays.length >= 2 && restDays.length >= 2 ? { active: cravingsPerDay(activeDays), inactive: cravingsPerDay(restDays) } : null,
     },
+    bloodPressure: visibleTrend(db, userId, profile, to, trendDays),
     streak: streakFor(db, userId, to),
   };
 }

@@ -11,6 +11,7 @@ import { HttpError } from './errors';
 import type { Deps } from './http';
 import { landingPage } from './landing';
 import { authRoutes, meRoutes } from './routes/account';
+import { bloodPressureRoutes } from './routes/blood-pressure';
 import { coachRoutes } from './routes/coach';
 import { goalRoutes } from './routes/goals';
 import { mealRoutes } from './routes/meals';
@@ -59,6 +60,7 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/meals', mealRoutes(deps));
   app.route('/api/coach', coachRoutes(deps));
   app.route('/api/workouts', workoutRoutes(deps));
+  app.route('/api/blood-pressure', bloodPressureRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 
   return app;

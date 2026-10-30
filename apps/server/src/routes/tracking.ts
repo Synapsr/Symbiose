@@ -29,6 +29,7 @@ import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary, library, toActivity, toCraving } from '../services/day';
 import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
+import { bloodPressureBrief } from '../services/blood-pressure';
 import { upsertWeights, weightTrend } from '../services/weights';
 import { activityToday } from '../services/workouts';
 
@@ -170,12 +171,13 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
     const insights = computeInsights(db, userId, addDays(to, -(days - 1)), to);
     if (insights.loggedDays === 0) throw new HttpError(409, 'not_enough_data', 'Log a few meals first');
     const resolved = resolveUser(db, userId, to);
+    const bloodPressure = bloodPressureBrief(db, userId, resolved.row.profile ?? null, to);
     const key = createHash('sha256')
-      .update(JSON.stringify({ userId, insights, plan: resolved.row.plan, model: ai.model }))
+      .update(JSON.stringify({ userId, insights, bloodPressure, plan: resolved.row.plan, model: ai.model }))
       .digest('hex');
     const cached = db.select().from(aiCache).where(eq(aiCache.key, key)).get();
     if (cached) return c.json<Review>(cached.value as Review);
-    const review = await ai.review({ ...resolved.context, insights });
+    const review = await ai.review({ ...resolved.context, insights, bloodPressure });
     db.insert(aiCache).values({ key, userId, value: review, createdAt: nowIso() }).onConflictDoNothing().run();
     return c.json<Review>(review);
   });

@@ -30,6 +30,7 @@ import { nowIso, validate, type Deps } from '../http';
 import { decodePhoto } from '../services/photos';
 import { buildInsight, itemsFromAnalysis, toMeal } from '../services/meals';
 import { resolveUser } from '../services/users';
+import { bloodPressureBrief } from '../services/blood-pressure';
 import { mealActivity } from '../services/workouts';
 
 function getMealRow(db: Db, userId: string, id: string): MealRow {
@@ -92,6 +93,7 @@ export function mealRoutes({ db, ai, photos, config }: Deps) {
         mealTypeHint: mealType,
         dayTotalsBefore: totalsBefore(db, userId, input.localDate),
         ...mealActivity(db, userId, input.localDate, input.eatenAt),
+        bloodPressureCategory: bloodPressureBrief(db, userId, resolved.row.profile ?? null, input.localDate)?.category ?? null,
       });
       ensureFood(analysis);
       items = [...itemsFromAnalysis(analysis), ...(input.items ?? [])];
@@ -161,6 +163,7 @@ export function mealRoutes({ db, ai, photos, config }: Deps) {
       mealTypeHint: existing.mealType,
       dayTotalsBefore: totalsBefore(db, userId, existing.localDate, existing.id),
       ...mealActivity(db, userId, existing.localDate, existing.eatenAt),
+      bloodPressureCategory: bloodPressureBrief(db, userId, resolved.row.profile ?? null, existing.localDate)?.category ?? null,
       previous: { title: existing.title, items: existing.items },
       correction: c.req.valid('json').correction,
     });

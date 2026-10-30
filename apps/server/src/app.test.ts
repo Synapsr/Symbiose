@@ -7,6 +7,8 @@ import {
   toLocalDate,
   toLocalDateTime,
   type AuthResponse,
+  type BloodPressureReading,
+  type BloodPressureTrend,
   type DaySummary,
   type GoalsResponse,
   type InsightsResponse,
@@ -17,7 +19,7 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDisabledAi } from './ai/claude';
-import type { Ai, CoachInput, MealAnalysis, MealAnalysisInput } from './ai/types';
+import type { Ai, CoachInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from './ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
 import type { Config } from './env';
@@ -135,6 +137,29 @@ function makeApp(ai: Ai, overrides: Partial<Config> = {}) {
     return new Response('{}', { status: 404 });
   }) as typeof fetch;
   return createApp({ db, ai, photos, config, fetch: fakeFetch });
+}
+
+/** JSON request helpers for the suites that juggle several accounts. */
+function clientFor(app: ReturnType<typeof makeApp>) {
+  return {
+    async request<T>(method: string, path: string, token: string, body?: unknown) {
+      const res = await app.request(path, {
+        method,
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      const text = await res.text();
+      return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
+    },
+    async register(email: string) {
+      const res = await app.request('/api/auth/register', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email, password: 'password123' }),
+      });
+      return ((await res.json()) as AuthResponse).token;
+    },
+  };
 }
 
 const profile: Profile = {
@@ -452,23 +477,8 @@ describe('physical activity', () => {
   let owner = '';
   let stranger = '';
 
-  const request = async <T,>(method: string, path: string, body?: unknown, token = owner) => {
-    const res = await app.request(path, {
-      method,
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    const text = await res.text();
-    return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
-  };
-  const register = async (email: string) => {
-    const res = await app.request('/api/auth/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, password: 'password123' }),
-    });
-    return ((await res.json()) as AuthResponse).token;
-  };
+  const { request: call, register } = clientFor(app);
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
   const list = (from: string) => request<Workout[]>('GET', `/api/workouts?from=${from}&to=${today}`);
 
   beforeAll(async () => {
@@ -584,5 +594,144 @@ describe('physical activity', () => {
 
     const exported = await request<{ workouts: Workout[] }>('GET', '/api/me/export');
     expect(exported.body.workouts).toHaveLength(4);
+  });
+});
+
+describe('blood pressure', () => {
+  const seen = { meal: [] as MealAnalysisInput[], coach: [] as CoachInput[], review: [] as ReviewInput[], plan: [] as PlanDraftInput[] };
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async analyzeMeal(input) {
+        seen.meal.push(input);
+        return croissantAnalysis;
+      },
+      async draftPlan(input) {
+        seen.plan.push(input);
+        return fakeAi.draftPlan(input);
+      },
+      async coach(input) {
+        seen.coach.push(input);
+        return { reply: 'ok', planChange: null };
+      },
+      async review(input) {
+        seen.review.push(input);
+        return fakeAi.review(input);
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const reading = (externalId: string, daysAgo: number, time: string, systolic: number, diastolic: number) => {
+    const localDate = addDays(today, -daysAgo);
+    return { externalId, measuredAt: at(localDate, time), localDate, systolic, diastolic };
+  };
+
+  /** Hits every AI feature once, so `seen` holds what each one was told. */
+  const askEverything = async () => {
+    await request('POST', '/api/meals', { eatenAt: at(today, '12:00'), localDate: today, text: 'jambon beurre' });
+    await request('POST', '/api/coach/messages', { text: 'Ça va ?', localDate: today });
+    await request('POST', '/api/insights/review', { days: 7 });
+    await request('POST', '/api/goals/draft', { intentions: 'Manger moins salé' });
+    return { meal: seen.meal.at(-1)!, coach: seen.coach.at(-1)!, review: seen.review.at(-1)!, plan: seen.plan.at(-1)! };
+  };
+
+  beforeAll(async () => {
+    owner = await register('cuff@example.com');
+    stranger = await register('other-cuff@example.com');
+    expect((await request('PUT', '/api/me/profile', profile)).status).toBe(200);
+  });
+
+  it('imports readings without duplicates, whatever the opt-in', async () => {
+    const first = await request<{ written: number }>('PUT', '/api/blood-pressure', {
+      source: 'healthkit',
+      readings: [
+        { ...reading('hk-1', 2, '07:00', 150, 95), pulse: 70 },
+        reading('hk-2', 1, '07:00', 146, 92),
+        reading('hk-3', 0, '07:00', 142, 91),
+        reading('hk-4', 0, '21:00', 138, 89),
+      ],
+    });
+    expect(first.body.written).toBe(4);
+    const again = await request<{ written: number }>('PUT', '/api/blood-pressure', { source: 'healthkit', readings: [{ ...reading('hk-1', 2, '07:00', 152, 95), pulse: 70 }] });
+    expect(again.body.written).toBe(1);
+
+    const trend = await request<BloodPressureTrend>('GET', '/api/blood-pressure?days=30');
+    expect(trend.body.points).toEqual([
+      { date: addDays(today, -2), systolic: 152, diastolic: 95 },
+      { date: addDays(today, -1), systolic: 146, diastolic: 92 },
+      { date: today, systolic: 140, diastolic: 90 },
+    ]);
+    expect(trend.body.latest).toMatchObject({ externalId: 'hk-4', systolic: 138, diastolic: 89, pulse: null, source: 'healthkit' });
+    // Four readings this week: the category comes from their average, not the last one.
+    expect(trend.body.average7).toEqual({ systolic: 145, diastolic: 92 });
+    expect(trend.body.category).toBe('grade1');
+
+    // With fewer than 3 readings in the week, the latest one is classified.
+    await request('PUT', '/api/blood-pressure', { source: 'health_connect', readings: [reading('hc-1', 0, '08:00', 165, 85)] }, stranger);
+    const sparse = await request<BloodPressureTrend>('GET', '/api/blood-pressure', undefined, stranger);
+    expect(sparse.body).toMatchObject({ category: 'grade2', windowDays: 90 });
+  });
+
+  it('keeps blood pressure out of insights and the AI while tracking is off', async () => {
+    const insights = await request<InsightsResponse>('GET', '/api/insights?days=7');
+    expect(insights.body.bloodPressure).toBeNull();
+    const told = await askEverything();
+    expect(told.meal.bloodPressureCategory).toBeNull();
+    expect(told.coach.bloodPressure).toBeNull();
+    expect(told.review.bloodPressure).toBeNull();
+    expect(told.plan.bloodPressure).toBeNull();
+  });
+
+  it('shares the trend with insights and the AI once tracking is on', async () => {
+    await request('PUT', '/api/me/profile', { ...profile, trackBloodPressure: true });
+    const insights = await request<InsightsResponse>('GET', '/api/insights?days=7');
+    expect(insights.body.bloodPressure).toMatchObject({ category: 'grade1', average7: { systolic: 145, diastolic: 92 }, windowDays: 30 });
+
+    const told = await askEverything();
+    const brief = {
+      average7: { systolic: 145, diastolic: 92 },
+      category: 'grade1',
+      latest: { date: today, systolic: 138, diastolic: 89, pulse: null },
+      readings: 4,
+      severeLast7Days: 0,
+    };
+    expect(told.coach.bloodPressure).toEqual(brief);
+    expect(told.review.bloodPressure).toEqual(brief);
+    expect(told.plan.bloodPressure).toEqual(brief);
+    expect(told.meal.bloodPressureCategory).toBe('grade1');
+
+    // A profile form that doesn't know the opt-in leaves it alone.
+    await request('PUT', '/api/me/profile', profile);
+    expect((await request<{ profile: Profile }>('GET', '/api/me')).body.profile.trackBloodPressure).toBe(true);
+  });
+
+  it('counts severe readings, and deletes manual readings only for their owner', async () => {
+    const manual = await request<BloodPressureReading>('POST', '/api/blood-pressure', { measuredAt: at(today, '22:00'), localDate: today, systolic: 182, diastolic: 100 });
+    expect(manual.status).toBe(201);
+    expect(manual.body).toMatchObject({ source: 'manual', externalId: null, pulse: null });
+    const swapped = await request('POST', '/api/blood-pressure', { measuredAt: at(today, '22:05'), localDate: today, systolic: 80, diastolic: 120 });
+    expect(swapped.status).toBe(400);
+
+    await request('POST', '/api/coach/messages', { text: 'Et ma tension ?', localDate: today });
+    expect(seen.coach.at(-1)?.bloodPressure).toMatchObject({ severeLast7Days: 1, readings: 5 });
+
+    const exported = await request<{ bloodPressure: BloodPressureReading[] }>('GET', '/api/me/export');
+    expect(exported.body.bloodPressure).toHaveLength(5);
+    const hk = exported.body.bloodPressure.find((r) => r.externalId === 'hk-1')!;
+
+    expect((await request('DELETE', `/api/blood-pressure/${manual.body.id}`, undefined, stranger)).status).toBe(404);
+    expect((await request<{ error: { code: string } }>('DELETE', `/api/blood-pressure/${hk.id}`)).body.error.code).toBe('imported_reading');
+    expect((await request('DELETE', `/api/blood-pressure/${manual.body.id}`)).status).toBe(204);
+    expect((await request('DELETE', `/api/blood-pressure/${manual.body.id}`)).status).toBe(404);
+
+    // An explicit false turns it off.
+    await request('PUT', '/api/me/profile', { ...profile, trackBloodPressure: false });
+    expect((await request<InsightsResponse>('GET', '/api/insights?days=7')).body.bloodPressure).toBeNull();
   });
 });

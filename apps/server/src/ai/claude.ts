@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { HttpError } from '../errors';
 import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, REVIEWER } from './prompts';
-import type { Ai, MealAnalysisInput, UserContext } from './types';
+import type { Ai, BloodPressureBrief, MealAnalysisInput, UserContext } from './types';
 
 // Structured-output schemas. Kept free of numeric bounds: the server clamps
 // and validates everything afterwards.
@@ -95,6 +95,9 @@ const CravingOut = z.object({ tip: z.string(), alternative: z.string() });
 
 type Effort = 'low' | 'medium' | 'high';
 
+/** Blood pressure only enters the context for people who opted in and have readings. */
+const bloodPressureExtra = (brief: BloodPressureBrief | null) => (brief ? { bloodPressure: brief } : {});
+
 function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): string {
   const payload = {
     locale: ctx.locale,
@@ -180,6 +183,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       };
       if (input.recentWorkout) extra.recentWorkout = input.recentWorkout;
       if (input.activityToday) extra.activityToday = input.activityToday;
+      if (input.bloodPressureCategory) extra.bloodPressureCategory = input.bloodPressureCategory;
       if (input.previous) {
         extra.previousAnalysis = {
           title: input.previous.title,
@@ -197,13 +201,13 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     async draftPlan(input) {
       const ctx: UserContext = { locale: input.locale, profile: input.profile, plan: input.previousPlan, targets: null };
       const weight = { latestKg: input.weight.latest?.kg ?? null, changeKgOver90Days: input.weight.changeKg, readings: input.weight.points.length };
-      const text = `${contextBlock(ctx, { weightTrend: weight })}\n\nMy goals, in my own words:\n${input.intentions}`;
+      const text = `${contextBlock(ctx, { weightTrend: weight, ...bloodPressureExtra(input.bloodPressure) })}\n\nMy goals, in my own words:\n${input.intentions}`;
       return run({ system: GOAL_PLANNER, content: [{ type: 'text', text }], schema: PlanOut, effort: 'medium' });
     },
 
     async coach(input, onText) {
       const history: Anthropic.Beta.BetaMessageParam[] = input.history.map((turn) => ({ role: turn.role, content: turn.content }));
-      const text = `${contextBlock(input, { today: input.today, last7Days: input.week })}\n\n${input.message}`;
+      const text = `${contextBlock(input, { today: input.today, last7Days: input.week, ...bloodPressureExtra(input.bloodPressure) })}\n\n${input.message}`;
       try {
         const stream = client.beta.messages.stream({
           model,
@@ -242,7 +246,8 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     },
 
     async review(input) {
-      const { days, activity, ...rest } = input.insights;
+      // The brief replaces the daily blood pressure points.
+      const { days, activity, bloodPressure: _trend, ...rest } = input.insights;
       const { days: activityDays, ...activityStats } = activity;
       const moves = new Map(activityDays.map((d) => [d.date, d]));
       const compactDays = days.map((d) => ({
@@ -256,7 +261,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         workouts: moves.get(d.date)?.workouts ?? 0,
       }));
       const stats = { ...rest, activity: activityStats };
-      const text = `${contextBlock(input, { stats, days: compactDays })}\n\nWrite my review for this period.`;
+      const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure) })}\n\nWrite my review for this period.`;
       return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },
   };

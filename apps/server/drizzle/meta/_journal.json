@@ -22,6 +22,13 @@
       "when": 1793387212847,
       "tag": "0002_workouts",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793387997751,
+      "tag": "0003_blood_pressure",
+      "breakpoints": true
     }
   ]
 }

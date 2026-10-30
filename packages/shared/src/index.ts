@@ -4,3 +4,4 @@ export * from './targets';
 export * from './dates';
 export * from './meals';
 export * from './activity';
+export * from './health';

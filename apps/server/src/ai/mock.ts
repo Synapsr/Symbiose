@@ -1,5 +1,10 @@
+import { BloodPressureCategorySchema, type BloodPressureCategory } from '@symbiose/shared';
+
 import type { Ai, AnalyzedItem, MealAnalysis } from './types';
 import { heuristicPlan } from '../services/goals';
+
+const elevated = (category: BloodPressureCategory | null | undefined) =>
+  Boolean(category && BloodPressureCategorySchema.options.indexOf(category) >= BloodPressureCategorySchema.options.indexOf('high_normal'));
 
 /**
  * Deterministic fake AI for local development and UI work without an API key
@@ -33,6 +38,7 @@ export function createMockAi(): Ai {
       if (!items.length) items = input.previous ? input.previous.items.map(({ name, emoji, portion, grams, confidence, per100g }) => ({ name, emoji, portion, grams, confidence: confidence ?? 0.7, per100g })) : DEFAULT_PLATE;
       if (/sans sucre|no sugar|pas de sucre/i.test(text)) items = items.map((i) => ({ ...i, per100g: { ...i.per100g, sugar: i.per100g.sugar - i.per100g.addedSugar, addedSugar: 0, kcal: i.per100g.kcal - i.per100g.addedSugar * 4 } }));
       const added = items.reduce((sum, i) => sum + (i.per100g.addedSugar * i.grams) / 100, 0);
+      const sodium = items.reduce((sum, i) => sum + (i.per100g.sodium * i.grams) / 100, 0);
       const analysis: MealAnalysis = {
         isFood: true,
         title: items.length === 1 ? items[0]!.name : items.slice(0, 2).map((i) => i.name).join(' & '),
@@ -46,6 +52,7 @@ export function createMockAi(): Ai {
         tips: [
           ...(added > 15 ? ['Remplace la boisson sucrée par de l’eau pétillante citronnée.'] : []),
           ...(input.recentWorkout ? ['Après ta séance, vise 20 à 30 g de protéines dans ce repas pour la récupération.'] : []),
+          ...(elevated(input.bloodPressureCategory) && sodium >= 800 ? ['Repas assez salé : la prochaine fois, goûte avant de saler et préfère les herbes.'] : []),
         ],
         clarification: input.correction ? null : /caf[ée]|coffee/i.test(text) ? { question: 'Combien de sucres dans le café ?', options: ['Aucun', '1 sucre', '2 sucres'] } : null,
       };
@@ -54,6 +61,9 @@ export function createMockAi(): Ai {
 
     async draftPlan(input) {
       const { intentions: _i, overrides: _o, ...plan } = heuristicPlan(input.intentions, input.locale);
+      if (elevated(input.bloodPressure?.category) && !plan.rules.some((r) => r.nutrient === 'sodium')) {
+        plan.rules.push({ nutrient: 'sodium', kind: 'max', value: 2000, reason: 'OMS : moins de 5 g de sel par jour' });
+      }
       return { ...plan, title: 'Moins de sucre, plus d’énergie', summary: 'On vise moins de 25 g de sucres ajoutés par jour, en s’attaquant aux réflexes de l’après-midi. Les calories restent au maintien.' };
     },
 

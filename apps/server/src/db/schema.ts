@@ -78,6 +78,30 @@ export const weights = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
 );
 
+/** Blood pressure readings, stored whatever the opt-in; only shown when tracking is on. */
+export const bloodPressure = sqliteTable(
+  'blood_pressure',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    externalId: text('external_id'),
+    measuredAt: text('measured_at').notNull(),
+    localDate: text('local_date').notNull(),
+    systolic: integer('systolic').notNull(),
+    diastolic: integer('diastolic').notNull(),
+    pulse: integer('pulse'),
+    source: text('source', { enum: ['healthkit', 'health_connect', 'manual'] }).notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('blood_pressure_user_date').on(t.userId, t.localDate),
+    // SQLite treats NULLs as distinct: readings without an external id never collide.
+    uniqueIndex('blood_pressure_user_external').on(t.userId, t.externalId),
+  ],
+);
+
 /** Workout sessions, imported from the health store or added by hand. */
 export const workouts = sqliteTable(
   'workouts',
@@ -154,4 +178,5 @@ export type CravingRow = typeof cravings.$inferSelect;
 export type ActivityRow = typeof activity.$inferSelect;
 export type WeightRow = typeof weights.$inferSelect;
 export type WorkoutRow = typeof workouts.$inferSelect;
+export type BloodPressureRow = typeof bloodPressure.$inferSelect;
 export type CoachMessageRow = typeof coachMessages.$inferSelect;

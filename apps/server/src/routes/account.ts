@@ -5,9 +5,10 @@ import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, coachMessages, cravings, meals, users, weights, workouts } from '../db/schema';
+import { activity, bloodPressure, coachMessages, cravings, meals, users, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
+import { toReading } from '../services/blood-pressure';
 import { toActivity, toCraving } from '../services/day';
 import { toMeal } from '../services/meals';
 import { getUserRow, toUser } from '../services/users';
@@ -60,7 +61,10 @@ export function meRoutes({ db, config, photos }: Deps) {
   app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')))));
 
   app.put('/profile', validate('json', ProfileSchema), (c) => {
-    const profile = c.req.valid('json');
+    const input = c.req.valid('json');
+    // Profile forms that predate the opt-in don't send it: keep the stored choice.
+    const stored = getUserRow(db, c.get('userId')).profile?.trackBloodPressure;
+    const profile = input.trackBloodPressure === undefined && stored !== undefined ? { ...input, trackBloodPressure: stored } : input;
     const row = db
       .update(users)
       .set({ profile, name: profile.name })
@@ -81,6 +85,7 @@ export function meRoutes({ db, config, photos }: Deps) {
       activity: db.select().from(activity).where(eq(activity.userId, userId)).all().map(toActivity),
       weights: db.select().from(weights).where(eq(weights.userId, userId)).all(),
       workouts: db.select().from(workouts).where(eq(workouts.userId, userId)).all().map(toWorkout),
+      bloodPressure: db.select().from(bloodPressure).where(eq(bloodPressure.userId, userId)).all().map(toReading),
       cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
       coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),
     };

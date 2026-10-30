@@ -12,6 +12,7 @@ import { coachMessages, type CoachMessageRow } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary } from '../services/day';
+import { bloodPressureBrief } from '../services/blood-pressure';
 import { resolveUser } from '../services/users';
 import { workoutsBetween } from '../services/workouts';
 
@@ -46,6 +47,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     ...resolved.context,
     history: history.map((m) => ({ role: m.role, content: m.content })),
     message: text,
+    bloodPressure: bloodPressureBrief(db, userId, resolved.row.profile ?? null, localDate),
     today: {
       date: day.date,
       totals: day.totals,

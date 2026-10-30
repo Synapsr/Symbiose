@@ -31,6 +31,8 @@ export const ProfileSchema = z.object({
   activityLevel: ActivityLevelSchema,
   locale: LocaleSchema.default('fr'),
   timezone: z.string().max(64).default('Europe/Paris'),
+  /** Opt-in: blood pressure shows up in insights and AI advice only when true. */
+  trackBloodPressure: z.boolean().optional(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
@@ -344,6 +346,52 @@ export interface WeightTrend {
   windowDays: number;
 }
 
+// ---------------------------------------------------------------- Blood pressure (opt-in)
+
+export const BloodPressureSourceSchema = z.enum(['healthkit', 'health_connect', 'manual']);
+export type BloodPressureSource = z.infer<typeof BloodPressureSourceSchema>;
+
+export const BloodPressureReadingInputSchema = z.object({
+  /** Health store identifier (HealthKit UUID, Health Connect id), used to deduplicate imports. */
+  externalId: z.string().min(1).max(120).nullable().default(null),
+  measuredAt: localDateTime,
+  localDate: isoDate,
+  /** mmHg */
+  systolic: z.number().min(60).max(260),
+  diastolic: z.number().min(30).max(160),
+  /** Beats per minute, when the cuff reports it. */
+  pulse: z.number().min(30).max(220).nullable().default(null),
+});
+export type BloodPressureReadingInput = z.input<typeof BloodPressureReadingInputSchema>;
+
+export const BloodPressureInputSchema = z.object({
+  readings: z.array(BloodPressureReadingInputSchema).min(1).max(2000),
+  source: BloodPressureSourceSchema,
+});
+export type BloodPressureInput = z.input<typeof BloodPressureInputSchema>;
+
+export interface BloodPressureReading extends z.output<typeof BloodPressureReadingInputSchema> {
+  id: string;
+  source: BloodPressureSource;
+  createdAt: string;
+}
+
+/** ESC/ESH 2018 office blood pressure categories, lowest first. */
+export const BloodPressureCategorySchema = z.enum(['optimal', 'normal', 'high_normal', 'grade1', 'grade2', 'grade3']);
+export type BloodPressureCategory = z.infer<typeof BloodPressureCategorySchema>;
+
+export interface BloodPressureTrend {
+  /** Daily averages over the window, oldest first. */
+  points: { date: string; systolic: number; diastolic: number }[];
+  /** Most recent reading in the window. */
+  latest: BloodPressureReading | null;
+  /** Average of the readings of the last 7 days of the window. */
+  average7: { systolic: number; diastolic: number } | null;
+  /** Category of `average7`, or of `latest` when the last 7 days have fewer than 3 readings. */
+  category: BloodPressureCategory | null;
+  windowDays: number;
+}
+
 // ---------------------------------------------------------------- Cravings
 
 export const CravingInputSchema = z.object({
@@ -435,6 +483,8 @@ export interface InsightsResponse {
   cravings: { total: number; resisted: number; topWhat: string[] };
   weight: WeightTrend;
   activity: InsightsActivity;
+  /** Null unless the person tracks blood pressure and has readings in the window. */
+  bloodPressure?: BloodPressureTrend | null;
   streak: number;
 }
 

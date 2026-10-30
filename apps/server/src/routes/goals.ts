@@ -9,6 +9,7 @@ import { HttpError } from '../errors';
 import { validate, type Deps } from '../http';
 import { heuristicPlan, planFromDraft } from '../services/goals';
 import { resolveUser } from '../services/users';
+import { bloodPressureBrief } from '../services/blood-pressure';
 import { weightTrend } from '../services/weights';
 
 export function goalRoutes({ db, ai, config }: Deps) {
@@ -36,6 +37,7 @@ export function goalRoutes({ db, ai, config }: Deps) {
             intentions,
             previousPlan: resolved.row.plan ?? null,
             weight: weightTrend(db, c.get('userId'), toLocalDate(), 90),
+            bloodPressure: bloodPressureBrief(db, c.get('userId'), profile, toLocalDate()),
           }),
           intentions,
         )

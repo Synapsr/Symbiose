@@ -1,5 +1,6 @@
 import type {
   ActivityWeek,
+  BloodPressureCategory,
   DaySummary,
   FoodItem,
   GoalPlan,
@@ -23,6 +24,17 @@ export interface UserContext {
   targets: Targets | null;
 }
 
+/** Blood pressure, only for people who opted in and have recent readings. */
+export interface BloodPressureBrief {
+  average7: { systolic: number; diastolic: number } | null;
+  category: BloodPressureCategory | null;
+  latest: { date: string; systolic: number; diastolic: number; pulse: number | null };
+  /** Readings over the last 30 days. */
+  readings: number;
+  /** Readings at or above 180/110 over the last 7 days. */
+  severeLast7Days: number;
+}
+
 /** Movement so far on a given day. */
 export interface ActivityToday {
   steps: number | null;
@@ -41,6 +53,7 @@ export interface MealAnalysisInput extends UserContext {
   /** The workout that ended in the 3 hours before the meal. */
   recentWorkout: { type: WorkoutType; durationMin: number; activeKcal: number | null; endedMinutesAgo: number } | null;
   activityToday: ActivityToday | null;
+  bloodPressureCategory: BloodPressureCategory | null;
   /** For refinements: the previous analysis and the user's correction. */
   previous?: { title: string; items: FoodItem[] };
   correction?: string;
@@ -72,6 +85,7 @@ export interface PlanDraftInput {
   intentions: string;
   previousPlan: GoalPlan | null;
   weight: WeightTrend;
+  bloodPressure: BloodPressureBrief | null;
 }
 
 export type PlanDraft = Omit<GoalPlan, 'intentions' | 'overrides'>;
@@ -84,6 +98,7 @@ export interface CoachTurn {
 export interface CoachInput extends UserContext {
   history: CoachTurn[];
   message: string;
+  bloodPressure: BloodPressureBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
     meals: { time: string; title: string; kcal: number }[];
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
@@ -113,6 +128,7 @@ export interface CravingOutput {
 
 export interface ReviewInput extends UserContext {
   insights: InsightsResponse;
+  bloodPressure: BloodPressureBrief | null;
 }
 
 export interface Ai {
