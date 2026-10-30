@@ -1,4 +1,4 @@
-import type { CoachMealAction, CoachSuggestion, FoodItem, GoalPlan, MealInsight, Profile, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
+import type { CoachMealAction, CoachSuggestion, FoodItem, GoalPlan, JournalData, JournalKind, MealInsight, Profile, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
@@ -203,6 +203,29 @@ export const cravings = sqliteTable(
   (t) => [index('cravings_user_date').on(t.userId, t.localDate)],
 );
 
+/**
+ * The health journal (« Carnet »): short notes the person and their coach read.
+ * Kind-specific fields (Bristol type, ease, feeling) share one JSON column: they
+ * are sparse, never filtered on in SQL, validated by zod, and new ones need no migration.
+ */
+export const journalEntries = sqliteTable(
+  'journal_entries',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    at: text('at').notNull(),
+    localDate: text('local_date').notNull(),
+    kind: text('kind').$type<JournalKind>().notNull(),
+    text: text('text').notNull().default(''),
+    data: text('data', { mode: 'json' }).$type<JournalData>().notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [index('journal_entries_user_date').on(t.userId, t.localDate)],
+);
+
 export const coachMessages = sqliteTable(
   'coach_messages',
   {
@@ -241,3 +264,4 @@ export type CoachMessageRow = typeof coachMessages.$inferSelect;
 export type SleepNightRow = typeof sleepNights.$inferSelect;
 export type WaterLogRow = typeof waterLogs.$inferSelect;
 export type MoodRow = typeof moods.$inferSelect;
+export type JournalEntryRow = typeof journalEntries.$inferSelect;

@@ -5,12 +5,13 @@ import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, bloodPressure, coachMessages, cravings, meals, moods, sleepNights, users, waterLogs, weights, workouts } from '../db/schema';
+import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { toReading } from '../services/blood-pressure';
 import { toActivity, toCraving } from '../services/day';
 import { toWaterEntry } from '../services/hydration';
+import { toJournalEntry } from '../services/journal';
 import { toMeal } from '../services/meals';
 import { toMood } from '../services/mood';
 import { toNight } from '../services/sleep';
@@ -95,6 +96,7 @@ export function meRoutes({ db, config, photos }: Deps) {
       hydration: db.select().from(waterLogs).where(eq(waterLogs.userId, userId)).all().map(toWaterEntry),
       mood: db.select().from(moods).where(eq(moods.userId, userId)).all().map(toMood),
       cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
+      journal: db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).all().map(toJournalEntry),
       coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),
     };
     c.header('Content-Disposition', `attachment; filename="symbiose-export-${payload.exportedAt.slice(0, 10)}.json"`);

@@ -6,6 +6,8 @@ import { PanResponder, Platform, RefreshControl, ScrollView, View } from 'react-
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { JournalRow } from '@/components/journal/journal-row';
+import { NoteAction } from '@/components/journal/note-action';
 import { EnergyCard, heroNutrient, NutrientBars } from '@/components/today/energy-card';
 import { hasLifeCard, LifeCard, SleepLine } from '@/components/today/life-card';
 import { MealCard, PendingMealCard } from '@/components/today/meal-card';
@@ -17,6 +19,7 @@ import { useI18n } from '@/i18n';
 import { formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage, useDay, useHealthSync, useMealLogger, useToday } from '@/lib/hooks';
+import { useJournal } from '@/lib/journal';
 import { dropEntry, isNetworkError, retryEntry, useOutbox } from '@/lib/outbox';
 import { timeline } from '@/lib/outbox-logic';
 import { useUser } from '@/lib/session';
@@ -35,6 +38,7 @@ export default function Today() {
   const [selected, setSelected] = useState(today);
   const date = selected > today ? today : selected;
   const day = useDay(date);
+  const notes = useJournal({ from: date, to: date }).data ?? [];
   const hideCalories = useSettings((s) => s.hideCalories);
   const allPending = usePending((s) => s.items);
   const pending = allPending.filter((p) => p.input.localDate === date);
@@ -71,6 +75,8 @@ export default function Today() {
   const dateLabel = formatDay(date, locale, { today: t('common.today'), yesterday: t('common.yesterday') });
   const empty = Boolean(day.data && day.data.meals.length === 0 && pending.length === 0 && queued.length === 0);
   const offline = isNetworkError(day.error);
+  // Meals, captures waiting for the network and journal notes on one timeline, newest first.
+  const rows = [...timeline(day.data?.meals ?? [], queued), ...notes.map((note) => ({ type: 'note' as const, at: Date.parse(note.at), note }))].sort((a, b) => b.at - a.at);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -163,11 +169,12 @@ export default function Today() {
           )}
         </View>
 
-        {showCraving ? (
-          <Reveal index={7}>
+        {/* Quick actions; the journal's tile sits on the thumb's side. */}
+        <Reveal index={7} style={{ marginTop: Space.lg, flexDirection: leftHanded ? 'row-reverse' : 'row', gap: Space.sm }}>
+          {showCraving ? (
             <Pressy
               onPress={() => router.push('/craving')}
-              style={{ marginTop: Space.lg, flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.accentSoft }}>
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.accentSoft }}>
               <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
                 <Sparkles size={18} color={colors.onAccent} />
               </View>
@@ -180,18 +187,32 @@ export default function Today() {
                 </Txt>
               </View>
             </Pressy>
-          </Reveal>
-        ) : null}
+          ) : null}
+          <NoteAction date={date} compact={showCraving} />
+        </Reveal>
 
         <Reveal index={8}>
-          <SectionTitle>{t('today.meals')}</SectionTitle>
+          <SectionTitle
+            right={
+              notes.length ? (
+                <Pressy hitSlop={8} onPress={() => router.push('/journal')} accessibilityRole="link">
+                  <Txt variant="label" tone="secondary">
+                    {t('journal.seeAll')}
+                  </Txt>
+                </Pressy>
+              ) : null
+            }>
+            {notes.length ? t('journal.dayTitle') : t('today.meals')}
+          </SectionTitle>
           <View style={{ gap: Space.sm }}>
             {pending.map((p) => (
               <PendingMealCard key={p.id} pending={p} onRetry={() => void retry(p)} onDismiss={() => dismiss(p.id)} />
             ))}
-            {timeline(day.data?.meals ?? [], queued).map((row) =>
+            {rows.map((row) =>
               row.type === 'meal' ? (
                 <MealCard key={row.meal.id} meal={row.meal} hideCalories={hideCalories} />
+              ) : row.type === 'note' ? (
+                <JournalRow key={row.note.id} entry={row.note} />
               ) : (
                 <QueuedMealCard
                   key={row.entry.id}

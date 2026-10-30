@@ -16,6 +16,7 @@ import { coachRoutes } from './routes/coach';
 import { glanceRoutes } from './routes/glance';
 import { goalRoutes } from './routes/goals';
 import { hydrationRoutes } from './routes/hydration';
+import { journalRoutes } from './routes/journal';
 import { mealRoutes } from './routes/meals';
 import { moodRoutes } from './routes/mood';
 import { sleepRoutes } from './routes/sleep';
@@ -69,6 +70,7 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/hydration', hydrationRoutes(deps));
   app.route('/api/mood', moodRoutes(deps));
   app.route('/api/glance', glanceRoutes(deps));
+  app.route('/api/journal', journalRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 
   return app;

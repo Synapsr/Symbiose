@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { HttpError } from '../errors';
 import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, REVIEWER } from './prompts';
-import type { Ai, BloodPressureBrief, EnergyExpenditureBrief, MealAnalysisInput, UserContext } from './types';
+import type { Ai, BloodPressureBrief, EnergyExpenditureBrief, JournalBrief, MealAnalysisInput, UserContext } from './types';
 
 // Structured-output schemas. Kept free of numeric bounds: the server clamps
 // and validates everything afterwards.
@@ -136,6 +136,8 @@ type Effort = 'low' | 'medium' | 'high';
 const bloodPressureExtra = (brief: BloodPressureBrief | null) => (brief ? { bloodPressure: brief } : {});
 /** Measured expenditure only enters once estimated, or when the budget follows it. */
 const expenditureExtra = (brief: EnergyExpenditureBrief | null) => (brief ? { energyExpenditure: brief } : {});
+/** The health journal only enters when there are notes. */
+const journalExtra = (brief: JournalBrief | null) => (brief ? { journal: brief } : {});
 
 function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): string {
   const payload = {
@@ -253,6 +255,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         ...bloodPressureExtra(input.bloodPressure),
         ...expenditureExtra(input.energyExpenditure),
         ...input.life,
+        ...journalExtra(input.journal),
       };
       const text = `${contextBlock(input, extra)}\n\n${input.message}`;
       try {
@@ -324,7 +327,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         ...(mood ? { mood: { average: mood.average, checkIns: mood.days.length, link: mood.link, persistentLow: mood.persistentLow } } : {}),
       };
       const stats = { ...rest, activity: activityStats, ...life };
-      const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure), ...expenditureExtra(input.energyExpenditure) })}\n\nWrite my review for this period.`;
+      const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure), ...expenditureExtra(input.energyExpenditure), ...journalExtra(input.journal) })}\n\nWrite my review for this period.`;
       return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },
   };

@@ -31,6 +31,7 @@ import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
 import { bloodPressureBrief } from '../services/blood-pressure';
 import { energyExpenditureBrief } from '../services/expenditure';
+import { journalBrief } from '../services/journal';
 import { lifeBrief } from '../services/life';
 import { upsertWeights, weightTrend } from '../services/weights';
 import { activityToday } from '../services/workouts';
@@ -175,12 +176,13 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
     if (insights.loggedDays === 0) throw new HttpError(409, 'not_enough_data', 'Log a few meals first');
     const resolved = resolveUser(db, userId, to);
     const bloodPressure = bloodPressureBrief(db, userId, resolved.row.profile ?? null, to);
+    const journal = journalBrief(db, userId, insights.from, to);
     const key = createHash('sha256')
-      .update(JSON.stringify({ userId, insights, bloodPressure, plan: resolved.row.plan, model: ai.model }))
+      .update(JSON.stringify({ userId, insights, bloodPressure, journal, plan: resolved.row.plan, model: ai.model }))
       .digest('hex');
     const cached = db.select().from(aiCache).where(eq(aiCache.key, key)).get();
     if (cached) return c.json<Review>(cached.value as Review);
-    const review = await ai.review({ ...resolved.context, insights, bloodPressure, energyExpenditure: energyExpenditureBrief(insights.adaptiveEnergy) });
+    const review = await ai.review({ ...resolved.context, insights, bloodPressure, energyExpenditure: energyExpenditureBrief(insights.adaptiveEnergy), journal });
     db.insert(aiCache).values({ key, userId, value: review, createdAt: nowIso() }).onConflictDoNothing().run();
     return c.json<Review>(review);
   });

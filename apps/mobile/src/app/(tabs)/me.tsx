@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { JournalLink } from '@/components/journal/journal-link';
 import { Card, Dot, Pressy, Row, SectionTitle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount } from '@/lib/format';
@@ -163,6 +164,8 @@ export default function Me() {
           </Row>
         </Card>
       </Pressy>
+
+      <JournalLink />
 
       <SectionTitle>{t('me.health')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>

@@ -17,6 +17,8 @@ import {
   type GoalPlan,
   type GoalsResponse,
   type InsightsResponse,
+  type JournalEntry,
+  type JournalEntryInput,
   type Meal,
   type MoodCheckIn,
   type Profile,
@@ -33,7 +35,7 @@ import { createMockAi } from './ai/mock';
 import type { Ai, CoachInput, CravingInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from './ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
-import { coachMessages, moods, sleepNights, waterLogs } from './db/schema';
+import { coachMessages, journalEntries, moods, sleepNights, waterLogs } from './db/schema';
 import type { Config } from './env';
 import { heuristicPlan, planFromDraft } from './services/goals';
 import { PhotoStore } from './services/photos';
@@ -1351,5 +1353,129 @@ describe('meals sent late from the offline queue', () => {
     await request('POST', '/api/meals', { eatenAt: `${day}T22:00:00+01:00`, localDate: day, text: 'une tisane' });
     const late = mealInputs.find((i) => i.text === 'une tisane')!;
     expect(late.dayTotalsBefore.kcal).toBeGreaterThan(dinner.dayTotalsBefore.kcal);
+  });
+});
+
+describe('health journal', () => {
+  const seen = { coach: [] as CoachInput[], review: [] as ReviewInput[] };
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async coach(input) {
+        seen.coach.push(input);
+        return { reply: 'ok', planChange: null, mealActions: [] };
+      },
+      async review(input) {
+        seen.review.push(input);
+        return fakeAi.review(input);
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const note = (daysAgo: number, time: string, fields: Partial<JournalEntryInput>, token = owner) => {
+    const localDate = addDays(today, -daysAgo);
+    return request<JournalEntry>('POST', '/api/journal', { at: at(localDate, time), localDate, ...fields }, token);
+  };
+
+  beforeAll(async () => {
+    owner = await register('carnet@example.com');
+    stranger = await register('other-carnet@example.com');
+    for (const token of [owner, stranger]) expect((await request('PUT', '/api/me/profile', profile, token)).status).toBe(200);
+    await request('POST', '/api/meals', { eatenAt: at(today, '12:00'), localDate: today, text: 'croissant' });
+  });
+
+  it('writes notes in a few taps and lists them newest first, by days and kind', async () => {
+    const transit = await note(0, '08:10', { kind: 'transit' });
+    expect(transit.status).toBe(201);
+    expect(transit.body).toMatchObject({ kind: 'transit', text: '', data: {}, localDate: today });
+    // Fields that don't belong to the kind are dropped.
+    const detailed = await note(1, '07:45', { kind: 'transit', text: '  Un peu long  ', data: { bristol: 2, ease: 'difficult', feeling: 2 } });
+    expect(detailed.body).toMatchObject({ text: 'Un peu long', data: { bristol: 2, ease: 'difficult' } });
+    expect(detailed.body.data).not.toHaveProperty('feeling');
+    expect((await note(0, '15:00', { kind: 'feeling', data: { feeling: 4 } })).status).toBe(201);
+    expect((await note(2, '21:00', { text: 'Dîner tard, ventre gonflé' })).body.kind).toBe('other');
+    // Words, or a face for a feeling: an empty note isn't one.
+    expect((await note(0, '16:00', { kind: 'symptom' })).status).toBe(400);
+    expect((await note(0, '16:00', { kind: 'feeling' })).status).toBe(400);
+
+    const day = (date: string) => (date === today ? 0 : date === addDays(today, -1) ? 1 : 2);
+    const all = await request<JournalEntry[]>('GET', '/api/journal');
+    expect(all.body.map((e) => `${day(e.localDate)}:${e.kind}`)).toEqual(['0:feeling', '0:transit', '1:transit', '2:other']);
+    expect((await request<JournalEntry[]>('GET', `/api/journal?kind=transit&from=${addDays(today, -1)}&to=${today}`)).body).toHaveLength(2);
+    expect((await request<JournalEntry[]>('GET', `/api/journal?from=${today}&to=${today}`)).body).toHaveLength(2);
+    expect((await request('GET', `/api/journal?from=${today}&to=${addDays(today, -1)}`)).status).toBe(400);
+    expect((await request<JournalEntry[]>('GET', '/api/journal', undefined, stranger)).body).toEqual([]);
+  });
+
+  it('edits and deletes only the owner’s notes', async () => {
+    const created = (await note(0, '18:00', { kind: 'symptom', text: 'Mal de tête' })).body;
+    expect((await request('PATCH', `/api/journal/${created.id}`, { text: 'Pirate' }, stranger)).status).toBe(404);
+    expect((await request('DELETE', `/api/journal/${created.id}`, undefined, stranger)).status).toBe(404);
+
+    // Becoming a feeling, it keeps its words and takes a face.
+    const edited = await request<JournalEntry>('PATCH', `/api/journal/${created.id}`, { kind: 'feeling', data: { feeling: 2, bristol: 4 } });
+    expect(edited.body).toMatchObject({ kind: 'feeling', text: 'Mal de tête', data: { feeling: 2 } });
+    expect(edited.body.data).not.toHaveProperty('bristol');
+    const moved = await request<JournalEntry>('PATCH', `/api/journal/${created.id}`, { at: at(addDays(today, -1), '09:00'), localDate: addDays(today, -1) });
+    expect(moved.body.localDate).toBe(addDays(today, -1));
+    expect((await request('PATCH', `/api/journal/${created.id}`, { at: at(today, '09:00') })).status).toBe(400);
+    // A symptom without words says nothing.
+    expect((await request('PATCH', `/api/journal/${created.id}`, { kind: 'symptom', text: '' })).status).toBe(400);
+
+    expect((await request('DELETE', `/api/journal/${created.id}`)).status).toBe(204);
+    expect((await request('DELETE', `/api/journal/${created.id}`)).status).toBe(404);
+  });
+
+  it('tells the coach the last 14 days, compact, with the transit frequency', async () => {
+    await note(20, '08:00', { kind: 'transit', text: 'Trop ancien pour le coach' });
+    await note(3, '22:00', { kind: 'medication', text: 'x'.repeat(1000) });
+    await request('POST', '/api/coach/messages', { text: 'Mon ventre ?', localDate: today });
+    const journal = seen.coach.at(-1)!.journal!;
+    expect(journal.entries.map((e) => e.kind)).toEqual(['medication', 'other', 'transit', 'transit', 'feeling']);
+    expect(journal.entries[1]).toEqual({ date: addDays(today, -2), time: '21:00', kind: 'other', text: 'Dîner tard, ventre gonflé' });
+    expect(journal.entries[2]).toEqual({ date: addDays(today, -1), time: '07:45', kind: 'transit', consistency: 'hard', bristol: 2, ease: 'difficult', text: 'Un peu long' });
+    expect(journal.entries.at(-1)).toEqual({ date: today, time: '15:00', kind: 'feeling', feeling: 4 });
+    expect(journal.entries[0]!.text).toHaveLength(280);
+    // Counted over the whole window: transits were tracked before it started.
+    expect(journal.transit).toMatchObject({ days: 14, total: 2, perDay: 0.1, daysSinceLast: 0, longestGap: 12, difficult: 1, painful: 0 });
+    expect(journal.omitted).toBe(0);
+
+    // Past the overall cap, the oldest notes are left out.
+    for (let i = 0; i < 30; i++) await note(4 + (i % 8), '12:00', { text: `Note ${i} ${'y'.repeat(400)}` });
+    await request('POST', '/api/coach/messages', { text: 'Et maintenant ?', localDate: today });
+    const capped = seen.coach.at(-1)!.journal!;
+    expect(capped.omitted).toBeGreaterThan(0);
+    expect(JSON.stringify(capped.entries).length).toBeLessThanOrEqual(6100);
+    expect(capped.entries.at(-1)).toMatchObject({ kind: 'feeling', date: today });
+
+    // No notes, no journal.
+    await request('POST', '/api/coach/messages', { text: 'Salut', localDate: today }, stranger);
+    expect(seen.coach.at(-1)!.journal).toBeNull();
+  });
+
+  it('gives the review the period’s notes, and a new note refreshes it', async () => {
+    await request('POST', '/api/insights/review', { days: 7 });
+    const reviews = seen.review.length;
+    expect(seen.review.at(-1)!.journal!.entries.every((e) => e.date >= addDays(today, -6))).toBe(true);
+    expect(seen.review.at(-1)!.journal!.transit).toMatchObject({ days: 7, total: 2 });
+    await request('POST', '/api/insights/review', { days: 7 });
+    expect(seen.review).toHaveLength(reviews);
+    await note(0, '19:00', { kind: 'transit', data: { bristol: 4, ease: 'easy' } });
+    await request('POST', '/api/insights/review', { days: 7 });
+    expect(seen.review).toHaveLength(reviews + 1);
+  });
+
+  it('exports the notes and deletes them with the account', async () => {
+    const exported = await request<{ journal: JournalEntry[] }>('GET', '/api/me/export');
+    expect(exported.body.journal.length).toBeGreaterThan(30);
+    const userId = (await request<User>('GET', '/api/me')).body.id;
+    expect((await request('DELETE', '/api/me')).status).toBe(204);
+    expect(app.db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).all()).toEqual([]);
   });
 });

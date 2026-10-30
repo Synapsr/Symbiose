@@ -19,6 +19,10 @@ import type {
   GoalsResponse,
   InsightsResponse,
   HydrationTrend,
+  JournalEntry,
+  JournalEntryInput,
+  JournalEntryPatch,
+  JournalKind,
   LibraryResponse,
   Meal,
   MealType,
@@ -164,6 +168,15 @@ export function createApi(baseUrl: string, token: string) {
 
     createCraving: (input: CravingInput) => call<{ craving: Craving; alternative: string }>('POST', '/api/cravings', input, 60_000),
     updateCraving: (id: string, outcome: CravingOutcome) => call<Craving>('PATCH', `/api/cravings/${id}`, { outcome }),
+
+    /** Health journal (« Carnet »): newest first, optionally between two days and of one kind. */
+    journal: (range: { from?: string; to?: string; kind?: JournalKind } = {}) => {
+      const query = new URLSearchParams(Object.entries(range).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
+      return call<JournalEntry[]>('GET', `/api/journal${query ? `?${query}` : ''}`);
+    },
+    createNote: (input: JournalEntryInput) => call<JournalEntry>('POST', '/api/journal', input),
+    updateNote: (id: string, patch: JournalEntryPatch) => call<JournalEntry>('PATCH', `/api/journal/${id}`, patch),
+    deleteNote: (id: string) => call<void>('DELETE', `/api/journal/${id}`),
 
     insights: (days: number, to: string) => call<InsightsResponse>('GET', `/api/insights?days=${days}&to=${to}`),
     review: (days: number, to: string) => call<Review>('POST', '/api/insights/review', { days, to }, AI_TIMEOUT),

@@ -43,6 +43,13 @@
       "when": 1793392757279,
       "tag": "0005_life_modules",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793397055131,
+      "tag": "0006_health_journal",
+      "breakpoints": true
     }
   ]
 }
