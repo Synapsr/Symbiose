@@ -47,7 +47,9 @@
         "android.permission.health.WRITE_NUTRITION",
         "android.permission.health.READ_SLEEP",
         "android.permission.health.READ_HYDRATION",
-        "android.permission.health.WRITE_HYDRATION"
+        "android.permission.health.WRITE_HYDRATION",
+        "android.permission.health.READ_HEART_RATE_VARIABILITY",
+        "android.permission.health.READ_RESTING_HEART_RATE"
       ],
       "predictiveBackGestureEnabled": false
     },
@@ -87,12 +89,20 @@
       [
         "@kingstinct/react-native-healthkit",
         {
-          "NSHealthShareUsageDescription": "Symbiose reads your steps, active energy, workouts, weight, height, sex and date of birth to fill in your profile and adapt your daily budget, and, only if you choose to track them, your sleep, the water you drink and your blood pressure.",
+          "NSHealthShareUsageDescription": "Symbiose reads your steps, active energy, workouts, weight, height, sex and date of birth to fill in your profile and adapt your daily budget, and, only if you choose to track them, your sleep, the water you drink, your blood pressure, and your nightly heart rate variability and resting heart rate for the morning check-in.",
           "NSHealthUpdateUsageDescription": "Symbiose saves the nutrition of the meals you log to Apple Health, and, if you track them, the glasses of water and the blood pressure readings you add.",
           "background": false
         }
       ],
       "react-native-health-connect",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#1F8A5B",
+          "enableRemoteNotifications": false
+        }
+      ],
       [
         "expo-build-properties",
         {

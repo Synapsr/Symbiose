@@ -1,4 +1,4 @@
-import type { CoachMealAction, CoachSuggestion, FoodItem, GoalPlan, JournalData, JournalKind, MealInsight, Profile, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
+import type { CoachMealAction, CoachMessageKind, CoachSuggestion, FoodItem, GoalPlan, JournalData, JournalKind, MealInsight, Profile, VitalMetric, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
@@ -238,9 +238,38 @@ export const coachMessages = sqliteTable(
     suggestion: text('suggestion', { mode: 'json' }).$type<CoachSuggestion>(),
     /** Null on user messages and on replies saved before meal actions existed. */
     mealActions: text('meal_actions', { mode: 'json' }).$type<CoachMealAction[]>(),
+    /** Messages the coach writes on its own (the morning check-in); null on the conversation's turns. */
+    kind: text('kind').$type<CoachMessageKind>(),
+    /** The day a proactive message is about. */
+    localDate: text('local_date'),
     createdAt: text('created_at').notNull(),
   },
-  (t) => [index('coach_user_created').on(t.userId, t.createdAt)],
+  (t) => [
+    index('coach_user_created').on(t.userId, t.createdAt),
+    // One proactive message of a kind per day; NULLs never collide, so the conversation's turns are free.
+    uniqueIndex('coach_user_kind_date').on(t.userId, t.kind, t.localDate),
+  ],
+);
+
+/**
+ * Nightly vitals from the watch (opt-in, with the morning check-in): one value
+ * per day and metric. HRV is stored as the store measures it (SDNN or RMSSD),
+ * each its own metric, never mixed.
+ */
+export const vitals = sqliteTable(
+  'vitals',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    localDate: text('local_date').notNull(),
+    metric: text('metric').$type<VitalMetric>().notNull(),
+    value: real('value').notNull(),
+    samples: integer('samples').notNull().default(1),
+    source: text('source', { enum: ['healthkit', 'health_connect'] }).notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localDate, t.metric] })],
 );
 
 /** Cached AI outputs (weekly reviews) keyed by a hash of their inputs. */
@@ -265,3 +294,4 @@ export type SleepNightRow = typeof sleepNights.$inferSelect;
 export type WaterLogRow = typeof waterLogs.$inferSelect;
 export type MoodRow = typeof moods.$inferSelect;
 export type JournalEntryRow = typeof journalEntries.$inferSelect;
+export type VitalRow = typeof vitals.$inferSelect;

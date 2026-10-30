@@ -18,8 +18,10 @@ import {
 
 import {
   cleanProfile,
+  dailyRestingHr,
   dayBounds,
   mealWindow,
+  nightlyHrv,
   OWN_RECORD_PREFIX,
   OWN_WATER_PREFIX,
   toBloodPressureInput,
@@ -135,6 +137,7 @@ export const health: HealthBridge = {
     }
     if (options.sleep) permissions.push({ accessType: 'read', recordType: 'SleepSession' });
     if (options.hydration) permissions.push({ accessType: 'read', recordType: 'Hydration' }, { accessType: 'write', recordType: 'Hydration' });
+    if (options.vitals) permissions.push({ accessType: 'read', recordType: 'HeartRateVariabilityRmssd' }, { accessType: 'read', recordType: 'RestingHeartRate' });
     const granted = await requestPermission(permissions);
     return granted.length > 0;
   },
@@ -273,6 +276,17 @@ export const health: HealthBridge = {
     await deleteRecordsByUuids('Hydration', [], [`${OWN_WATER_PREFIX}${id}`]);
   },
 
+  /** Health Connect measures HRV as RMSSD: stored as its own metric, never compared with SDNN. */
+  async readVitals(from, to, nights) {
+    await ensureInit();
+    const range = { operator: 'between' as const, startTime: from.toISOString(), endTime: to.toISOString() };
+    const [hrv, resting] = await Promise.all([readAll('HeartRateVariabilityRmssd', range).catch(() => []), readAll('RestingHeartRate', range).catch(() => [])]);
+    return [
+      ...nightlyHrv(hrv.map((r) => ({ at: new Date(r.time), value: r.heartRateVariabilityMillis })), nights, 'hrv_rmssd'),
+      ...dailyRestingHr(resting.map((r) => ({ at: new Date(r.time), value: r.beatsPerMinute }))),
+    ];
+  },
+
   async writeMeal(meal: Meal) {
     await ensureInit();
     const { start, end } = mealWindow(meal);
@@ -298,5 +312,5 @@ export const health: HealthBridge = {
   },
 };
 
-export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, WATER_SCOPES } from './types';
+export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, VITALS_SCOPES, WATER_SCOPES } from './types';
 export type { DayHealth, HealthBridge, HealthModules, HealthProfile, WeightReading } from './types';

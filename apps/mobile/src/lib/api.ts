@@ -7,6 +7,7 @@ import type {
   BloodPressureTrend,
   CoachMealActionResult,
   CoachMessage,
+  CravingNudges,
   CreateMealInput,
   Craving,
   CravingInput,
@@ -29,6 +30,8 @@ import type {
   MoodCheckIn,
   MoodInput,
   MoodTrend,
+  ProactiveSchedule,
+  ProactiveSettingsPatch,
   Profile,
   Review,
   ServerInfo,
@@ -36,6 +39,7 @@ import type {
   SleepTrend,
   UpdateMealInput,
   User,
+  VitalsInput,
   WaterEntry,
   WaterImport,
   WaterInput,
@@ -93,6 +97,49 @@ async function request<T>(baseUrl: string, token: string | null, method: string,
     throw new ApiError(res.status, err?.code ?? 'http_error', err?.message ?? `HTTP ${res.status}`);
   }
   return data as T;
+}
+
+/**
+ * POSTs and reads Server-Sent Events: `delta` events go to `onDelta` as the
+ * text is written, `done` resolves with its payload, `error` throws.
+ */
+async function postStream<T>(url: string, token: string, body: unknown, onDelta: (text: string) => void): Promise<T> {
+  let res;
+  try {
+    res = await streamingFetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new ApiError(0, 'network', error instanceof Error ? error.message : 'Network error');
+  }
+  if (!res.ok || !res.body) {
+    const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+    throw new ApiError(res.status, data?.error?.code ?? 'http_error', data?.error?.message ?? `HTTP ${res.status}`);
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (value) buffer += value;
+    // Events are separated by a blank line; each has `event:` and `data:` lines.
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary !== -1) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf('\n\n');
+      const event = /^event: ?(.*)$/m.exec(block)?.[1];
+      const data = /^data: ?(.*)$/m.exec(block)?.[1];
+      if (!event || data === undefined) continue;
+      const payload = JSON.parse(data) as Record<string, unknown>;
+      if (event === 'delta') onDelta(String(payload.text ?? ''));
+      if (event === 'done') return payload as T;
+      if (event === 'error') throw new ApiError(424, String(payload.code ?? 'ai_error'), String(payload.message ?? 'Error'));
+    }
+    if (done) break;
+  }
+  throw new ApiError(0, 'stream_ended', 'The reply was interrupted');
 }
 
 export function getServerInfo(baseUrl: string) {
@@ -191,44 +238,17 @@ export function createApi(baseUrl: string, token: string) {
     dismissCoachMealAction: (messageId: string, index: number) => call<CoachMessage>('POST', `/api/coach/messages/${messageId}/meal-actions/${index}/dismiss`),
 
     /** Coach reply as Server-Sent Events: `onDelta` receives the text as it is written. */
-    async streamCoach(text: string, localDate: string, onDelta: (text: string) => void): Promise<{ user: CoachMessage; reply: CoachMessage }> {
-      let res;
-      try {
-        res = await streamingFetch(`${baseUrl}/api/coach/messages/stream`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ text, localDate }),
-        });
-      } catch (error) {
-        throw new ApiError(0, 'network', error instanceof Error ? error.message : 'Network error');
-      }
-      if (!res.ok || !res.body) {
-        const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
-        throw new ApiError(res.status, data?.error?.code ?? 'http_error', data?.error?.message ?? `HTTP ${res.status}`);
-      }
-      const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buffer = '';
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (value) buffer += value;
-        // Events are separated by a blank line; each has `event:` and `data:` lines.
-        let boundary = buffer.indexOf('\n\n');
-        while (boundary !== -1) {
-          const block = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-          boundary = buffer.indexOf('\n\n');
-          const event = /^event: ?(.*)$/m.exec(block)?.[1];
-          const data = /^data: ?(.*)$/m.exec(block)?.[1];
-          if (!event || data === undefined) continue;
-          const payload = JSON.parse(data) as Record<string, unknown>;
-          if (event === 'delta') onDelta(String(payload.text ?? ''));
-          if (event === 'done') return payload as { user: CoachMessage; reply: CoachMessage };
-          if (event === 'error') throw new ApiError(424, String(payload.code ?? 'ai_error'), String(payload.message ?? 'Error'));
-        }
-        if (done) break;
-      }
-      throw new ApiError(0, 'stream_ended', 'The reply was interrupted');
-    },
+    streamCoach: (text: string, localDate: string, onDelta: (text: string) => void) =>
+      postStream<{ user: CoachMessage; reply: CoachMessage }>(`${baseUrl}/api/coach/messages/stream`, token, { text, localDate }, onDelta),
+
+    /** Proactive coach: the schedule the phone plans its notifications from, and its settings. */
+    proactive: (date: string) => call<ProactiveSchedule>('GET', `/api/proactive?date=${date}`),
+    saveProactive: (patch: ProactiveSettingsPatch, localDate: string) => call<ProactiveSchedule>('PUT', '/api/proactive/settings', { ...patch, localDate }),
+    /** The day's morning check-in, written on the first call, streamed as it is written. */
+    streamMorning: (localDate: string, hideCalories: boolean, onDelta: (text: string) => void) =>
+      postStream<{ message: CoachMessage }>(`${baseUrl}/api/proactive/morning/stream`, token, { localDate, hideCalories }, onDelta),
+    nudges: (localDate: string) => call<CravingNudges>('POST', '/api/proactive/nudges', { localDate }, AI_TIMEOUT),
+    putVitals: (input: VitalsInput) => call<{ written: number }>('PUT', '/api/vitals', input),
   };
 }
 

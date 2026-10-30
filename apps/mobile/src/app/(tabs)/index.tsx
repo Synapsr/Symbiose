@@ -6,8 +6,8 @@ import { PanResponder, Platform, RefreshControl, ScrollView, View } from 'react-
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CoachLine } from '@/components/coach/coach-line';
 import { JournalRow } from '@/components/journal/journal-row';
-import { CoachLine } from '@/components/today/coach-slot';
 import { CravingRow, WorkoutRow } from '@/components/today/day-rows';
 import { EnergyCard, heroNutrient } from '@/components/today/energy-card';
 import { MealCard, PendingMealCard } from '@/components/today/meal-card';
@@ -160,7 +160,7 @@ export default function Today() {
           <Reveal index={1} instant={!animate} style={{ gap: Space.md }}>
             {data ? (
               <>
-                <CoachLine fallback={dayVoice(data, hero, t, nutrient, locale, !isToday)} />
+                <CoachLine date={date} fallback={dayVoice(data, hero, t, nutrient, locale, !isToday)} />
                 <View>
                   <EnergyCard day={data} plan={user.plan} hero={hero} hideCalories={hideCalories} />
                   {queued.length ? <WaitingNote count={queued.length} /> : null}

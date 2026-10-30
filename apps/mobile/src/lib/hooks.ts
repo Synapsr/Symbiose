@@ -233,8 +233,8 @@ export function useMealLogger() {
   return { log, retry: run, dismiss: remove, relog, queueBarcode };
 }
 
-// Today and Me both mount the sync hook: one run at a time is enough.
-let syncing = false;
+// Today, Me and the proactive coach all mount the sync hook: one run at a time, which the others wait for.
+let syncing: Promise<void> | null = null;
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -252,8 +252,9 @@ const sinceLastSync = (last: number, overlapDays: number, first: number) =>
 /**
  * Pulls the watch's data from the phone's health store and sends it to the
  * server, each kind at its own pace: today's activity and (when tracked)
- * drinks every 10 min, sleep every 30 min, workouts every hour, weights and
- * (when tracked) blood pressure every 6 hours.
+ * drinks every 10 min, sleep and (with the morning check-in) nightly vitals
+ * every 30 min, workouts every hour, weights and (when tracked) blood
+ * pressure every 6 hours.
  */
 export function useHealthSync(today: string) {
   const api = useApi();
@@ -265,33 +266,37 @@ export function useHealthSync(today: string) {
   const trackBp = modules.bloodPressure === true;
   const trackSleep = modules.sleep === true;
   const trackWater = modules.hydration === true;
+  const trackVitals = modules.vitals === true;
   const weightKg = user.profile?.weightKg ?? null;
 
   const sync = useCallback(
-    async (force = false) => {
-      if (!enabled || !health.source || syncing) return;
+    async (force = false): Promise<void> => {
+      if (!enabled || !health.source) return;
+      if (syncing) return syncing;
       const source = health.source;
       const due = (last: number, every: number) => force || Date.now() - last >= every;
-      syncing = true;
-      try {
+      syncing = (async () => {
         await askForNewTypes();
         await syncDay();
         await syncWeights();
         await syncWorkouts();
         await syncBloodPressure();
         await syncSleep();
+        await syncVitals();
         await syncWater();
-      } finally {
-        syncing = false;
-      }
+      })().finally(() => {
+        syncing = null;
+      });
+      return syncing;
 
       // Connected with an older version, or just turned a module on: ask once for the new types.
       async function askForNewTypes() {
         const settings = useSettings.getState();
-        const wanted = grantedScopes({ bloodPressure: trackBp, sleep: trackSleep, hydration: trackWater });
+        const asked = { bloodPressure: trackBp, sleep: trackSleep, hydration: trackWater, vitals: trackVitals };
+        const wanted = grantedScopes(asked);
         const missing = (Object.keys(wanted) as (keyof typeof wanted)[]).some((key) => settings[key] < wanted[key]!);
         if (settings.healthScopes >= HEALTH_SCOPES && !missing) return;
-        await health.connect({ bloodPressure: trackBp, sleep: trackSleep, hydration: trackWater }).catch(() => false);
+        await health.connect(asked).catch(() => false);
         setSettings({ healthScopes: HEALTH_SCOPES, ...wanted });
       }
 
@@ -378,6 +383,22 @@ export function useHealthSync(today: string) {
         }
       }
 
+      // Nightly HRV and resting heart rate, only with the morning check-in: 31 days the first time (its baseline needs two weeks), then from 2 nights before the last sync.
+      async function syncVitals() {
+        const { lastVitalsSync } = useSettings.getState();
+        if (!trackVitals || !due(lastVitalsSync, 30 * 60_000)) return;
+        try {
+          const from = sinceLastSync(lastVitalsSync, 2, 31);
+          // The sleep windows say which HRV readings were taken asleep; without sleep tracking, the early hours stand in.
+          const nights = trackSleep ? await health.readSleep(from, new Date()).catch(() => []) : [];
+          const days = await health.readVitals(from, new Date(), nights);
+          for (let i = 0; i < days.length; i += 1000) await api.putVitals({ days: days.slice(i, i + 1000), source });
+          setSettings({ lastVitalsSync: Date.now() });
+        } catch {
+          // Same.
+        }
+      }
+
       // Drinks from other apps, only for people who opted in: 30 days the first time, then from the day before the last sync.
       async function syncWater() {
         const { lastWaterSync } = useSettings.getState();
@@ -395,7 +416,7 @@ export function useHealthSync(today: string) {
         }
       }
     },
-    [api, enabled, queryClient, setSettings, today, trackBp, trackSleep, trackWater, weightKg],
+    [api, enabled, queryClient, setSettings, today, trackBp, trackSleep, trackVitals, trackWater, weightKg],
   );
 
   useEffect(() => {
