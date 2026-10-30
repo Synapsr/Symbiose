@@ -5,6 +5,7 @@ import type {
   BloodPressureReading,
   BloodPressureReadingInput,
   BloodPressureTrend,
+  CoachMealActionResult,
   CoachMessage,
   CreateMealInput,
   Craving,
@@ -13,6 +14,7 @@ import type {
   DayActivity,
   DaySummary,
   FoodItem,
+  Glance,
   GoalPlan,
   GoalsResponse,
   InsightsResponse,
@@ -28,6 +30,7 @@ import type {
   Workout,
   WorkoutInput,
 } from '@symbiose/shared';
+import { toLocalDateTime } from '@symbiose/shared';
 import { fetch as streamingFetch } from 'expo/fetch';
 
 export class ApiError extends Error {
@@ -110,6 +113,7 @@ export function createApi(baseUrl: string, token: string) {
     deleteMeal: (id: string) => call<void>('DELETE', `/api/meals/${id}`),
 
     library: (today: string) => call<LibraryResponse>('GET', `/api/foods/library?today=${today}`),
+    glance: (date: string, hideCalories: boolean) => call<Glance>('GET', `/api/glance?date=${date}&hideCalories=${hideCalories ? 1 : 0}`),
     barcode: (code: string) => call<FoodItem>('GET', `/api/foods/barcode/${code}`),
 
     putActivity: (input: ActivityInput) => call<DayActivity>('PUT', '/api/activity', input),
@@ -138,6 +142,10 @@ export function createApi(baseUrl: string, token: string) {
     sendCoach: (text: string, localDate: string) =>
       call<{ user: CoachMessage; reply: CoachMessage }>('POST', '/api/coach/messages', { text, localDate }, AI_TIMEOUT),
     clearCoach: () => call<void>('DELETE', '/api/coach/messages'),
+    /** Confirms a meal the coach proposed to add, edit or delete; adds and edits go through the AI. */
+    applyCoachMealAction: (messageId: string, index: number) =>
+      call<CoachMealActionResult>('POST', `/api/coach/messages/${messageId}/meal-actions/${index}/apply`, { now: toLocalDateTime() }, AI_TIMEOUT),
+    dismissCoachMealAction: (messageId: string, index: number) => call<CoachMessage>('POST', `/api/coach/messages/${messageId}/meal-actions/${index}/dismiss`),
 
     /** Coach reply as Server-Sent Events: `onDelta` receives the text as it is written. */
     async streamCoach(text: string, localDate: string, onDelta: (text: string) => void): Promise<{ user: CoachMessage; reply: CoachMessage }> {

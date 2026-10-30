@@ -1,4 +1,4 @@
-import type { DaySummary, GoalPlan, NutrientKey, NutrientProgress } from '@symbiose/shared';
+import { heroNutrient as sharedHero, type DaySummary, type GoalPlan, type NutrientKey, type NutrientProgress } from '@symbiose/shared';
 import { Flame, Watch } from 'lucide-react-native';
 import { View } from 'react-native';
 
@@ -7,15 +7,9 @@ import { useI18n } from '@/i18n';
 import { formatAmount, formatNumber, unitOf } from '@/lib/format';
 import { NUTRIENT_COLORS, Space, useTheme } from '@/theme';
 
-/**
- * The goal decides the hero metric: calories when weight is the goal,
- * otherwise the nutrient the person cares about most (e.g. added sugar).
- */
+/** The goal decides the hero metric; shared with the server so the watch and widgets agree. */
 export function heroNutrient(day: DaySummary, plan: GoalPlan | null, hideCalories: boolean): NutrientKey {
-  const firstFocus = day.progress.find((p) => p.nutrient !== 'kcal')?.nutrient ?? 'protein';
-  if (hideCalories) return firstFocus;
-  const energyGoal = !plan || plan.calorieMode !== 'maintain' || plan.focus[0] === 'kcal';
-  return energyGoal ? 'kcal' : firstFocus;
+  return sharedHero(day.progress, plan, hideCalories);
 }
 
 const colorFor = (key: NutrientKey, accent: string) => (key === 'kcal' ? accent : NUTRIENT_COLORS[key]);

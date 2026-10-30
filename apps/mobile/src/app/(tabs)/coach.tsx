@@ -7,6 +7,7 @@ import { FlatList, Keyboard, KeyboardAvoidingView, Platform, TextInput, View } f
 import Animated, { FadeIn, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MealActionCard } from '@/components/coach/meal-action-card';
 import { Button, Chip, IconButton, Row, Txt, webInput, webSingleRow } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { useI18n, type TranslationKey } from '@/i18n';
@@ -61,7 +62,7 @@ export default function Coach() {
     haptics.tap();
     setText('');
     setError(null);
-    setLive({ user: { id: 'live-user', role: 'user', content: question, suggestion: null, createdAt: new Date().toISOString() }, reply: '' });
+    setLive({ user: { id: 'live-user', role: 'user', content: question, suggestion: null, mealActions: [], createdAt: new Date().toISOString() }, reply: '' });
     try {
       const saved = await api.streamCoach(question, toLocalDate(), (delta) => setLive((current) => current && { ...current, reply: current.reply + delta }));
       queryClient.setQueryData<CoachMessage[]>(['coach'], (old = []) => [...old, saved.user, saved.reply]);
@@ -77,7 +78,7 @@ export default function Coach() {
 
   const history = messages.data ?? [];
   const shown: (CoachMessage & { streaming?: boolean })[] = live
-    ? [...history, live.user, { id: 'live-reply', role: 'assistant', content: live.reply, suggestion: null, createdAt: '', streaming: true }]
+    ? [...history, live.user, { id: 'live-reply', role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: true }]
     : history;
   const empty = shown.length === 0;
   const composerBottom = Platform.OS === 'web' ? 96 : keyboardVisible ? Space.sm : insets.bottom + Space.sm;
@@ -209,6 +210,10 @@ function Bubble({ message, streaming }: { message: CoachMessage; streaming?: boo
           <Button title={t('coach.apply')} size="md" variant="accent" onPress={() => router.push({ pathname: '/goals', params: { intentions: message.suggestion!.intentions } })} />
         </View>
       ) : null}
+      {/* Servers older than the app send no meal actions. */}
+      {(message.mealActions ?? []).map((action, index) => (
+        <MealActionCard key={index} messageId={message.id} index={index} action={action} />
+      ))}
     </Animated.View>
   );
 }

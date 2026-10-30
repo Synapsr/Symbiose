@@ -22,23 +22,40 @@ export function MoveCard({ day, isToday }: { day: DaySummary; isToday: boolean }
   const week = day.activityWeek;
   const { goals } = week;
   const steps = day.activity?.steps ?? null;
-  const reached = goals.weeklyActiveMinutes > 0 && week.activeMinutes >= goals.weeklyActiveMinutes;
   const leftHanded = useSettings((s) => s.leftHanded);
+  // No session this week, but the steps are there: lead with what was done, not with a zero.
+  const stepsFirst = week.activeMinutes === 0 && steps !== null;
+  const progress = stepsFirst
+    ? goals.dailySteps
+      ? steps / goals.dailySteps
+      : 0
+    : goals.weeklyActiveMinutes > 0
+      ? week.activeMinutes / goals.weeklyActiveMinutes
+      : 0;
+  const reached = progress >= 1;
 
   return (
     <Card style={{ gap: Space.lg }}>
       <Row gap={Space.md} style={leftHanded ? { flexDirection: 'row-reverse' } : null}>
-        <Ring progress={goals.weeklyActiveMinutes > 0 ? week.activeMinutes / goals.weeklyActiveMinutes : 0} size={52} stroke={6} color={colors.accent}>
-          <SwapIcon on={reached} onIcon={<Check size={20} color={colors.accent} strokeWidth={2.5} />} offIcon={<SportShoe size={18} color={colors.accent} />} />
+        <Ring progress={progress} size={52} stroke={6} color={colors.accent}>
+          <SwapIcon
+            on={reached}
+            onIcon={<Check size={20} color={colors.accent} strokeWidth={2.5} />}
+            offIcon={stepsFirst ? <Footprints size={18} color={colors.accent} /> : <SportShoe size={18} color={colors.accent} />}
+          />
         </Ring>
         <View style={{ flex: 1, gap: 2 }}>
           <Txt variant="overline" tone="secondary">
             {t('today.move')}
           </Txt>
           <Row gap={5} style={{ alignItems: 'baseline' }}>
-            <AnimatedNumber value={week.activeMinutes} format={(n) => formatNumber(Math.round(n), locale)} variant="number" />
+            <AnimatedNumber value={stepsFirst ? steps : week.activeMinutes} format={(n) => formatNumber(Math.round(n), locale)} variant="number" />
             <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {t('today.moveWeek', { goal: formatNumber(goals.weeklyActiveMinutes, locale) })}
+              {stepsFirst
+                ? goals.dailySteps
+                  ? t('today.moveStepsLead', { goal: formatNumber(goals.dailySteps, locale) })
+                  : t('today.moveStepsLeadNoGoal')
+                : t('today.moveWeek', { goal: formatNumber(goals.weeklyActiveMinutes, locale) })}
             </Txt>
           </Row>
         </View>
@@ -50,9 +67,9 @@ export function MoveCard({ day, isToday }: { day: DaySummary; isToday: boolean }
         />
       </Row>
 
-      {steps !== null || goals.weeklyStrengthSessions !== null ? (
+      {(steps !== null && !stepsFirst) || goals.weeklyStrengthSessions !== null ? (
         <Row gap={Space.lg} style={{ flexWrap: 'wrap' }}>
-          {steps !== null ? (
+          {steps !== null && !stepsFirst ? (
             <Row gap={5}>
               <Footprints size={14} color={goals.dailySteps && steps >= goals.dailySteps ? colors.accent : colors.text2} />
               <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
