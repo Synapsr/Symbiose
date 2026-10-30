@@ -83,11 +83,12 @@ function useWater(date: string) {
     void queryClient.invalidateQueries({ queryKey: ['insights'] });
   };
 
-  const remove = async (entry: WaterEntry) => {
+  /** `written` is the copy to Health still on its way: it must land before it can leave. */
+  const remove = async (entry: WaterEntry, written: Promise<void> | null) => {
     await bump(-entry.ml);
     try {
       await api.deleteWater(entry.id);
-      if (healthEnabled && health.source) void health.deleteWater(entry.id).catch(() => undefined);
+      if (written) void written.then(() => health.deleteWater(entry.id)).catch(() => undefined);
     } catch {
       haptics.warning();
     }
@@ -100,8 +101,8 @@ function useWater(date: string) {
     try {
       const entry = await api.addWater({ externalId: null, at: toLocalDateTime(), localDate: date, ml });
       if (hydration.totalMl < hydration.goalMl && hydration.totalMl + ml >= hydration.goalMl) haptics.success();
-      showToast({ message: t('water.added', { ml }), action: { label: t('today.undo'), onPress: () => void remove(entry) } });
-      if (healthEnabled && health.source) void health.writeWater({ id: entry.id, at: new Date(entry.at), ml }).catch(() => undefined);
+      const written = healthEnabled && health.source ? health.writeWater({ id: entry.id, at: new Date(entry.at), ml }).catch(() => undefined) : null;
+      showToast({ message: t('water.added', { ml }), action: { label: t('today.undo'), onPress: () => void remove(entry, written) } });
     } catch {
       await bump(-ml);
       haptics.warning();
