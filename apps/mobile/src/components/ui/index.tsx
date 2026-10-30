@@ -126,12 +126,13 @@ export function SectionTitle({ children, right }: { children: ReactNode; right?:
   );
 }
 
-/** Staggered entrance for screen sections: fade + small rise, ~70 ms apart. */
-export function Reveal({ index = 0, children, style }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  const progress = useSharedValue(0);
+/** Staggered entrance for screen sections: fade + small rise, ~70 ms apart. `instant` shows it as is (a screen seen many times a day). */
+export function Reveal({ index = 0, children, style, instant = false }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle>; instant?: boolean }) {
+  const progress = useSharedValue(instant ? 1 : 0);
   useEffect(() => {
+    if (instant) return;
     progress.set(withDelay(index * Motion.stagger, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })));
-  }, [index, progress]);
+  }, [index, progress, instant]);
   const animated = useAnimatedStyle(() => ({
     opacity: progress.value,
     transform: [{ translateY: (1 - progress.value) * 12 }],

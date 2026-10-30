@@ -6,12 +6,13 @@ import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ActivitySummary } from '@/components/today/activity-summary';
 import { AnimatedNumber, Button, Chip, IconButton, Reveal, Row, Segmented, Txt } from '@/components/ui';
 import { intensityKey, WORKOUT_ICONS, WORKOUT_INTENSITIES, WORKOUT_TYPES, workoutTypeKey } from '@/components/workout-meta';
 import { useI18n } from '@/i18n';
 import { formatDay, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { errorMessage, useRefreshAfterWorkout } from '@/lib/hooks';
+import { errorMessage, useDay, useRefreshAfterWorkout } from '@/lib/hooks';
 import { dismiss } from '@/lib/nav';
 import { useApi, useUser } from '@/lib/session';
 import { useSettings, useToast } from '@/lib/stores';
@@ -35,6 +36,9 @@ export default function WorkoutSheet() {
 
   const today = toLocalDate();
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date < today ? params.date : today;
+  // The day's summary is usually already cached by Today.
+  const day = useDay(date).data;
+  const summary = day?.date === date ? day : null;
   const [type, setType] = useState<WorkoutType | null>(null);
   const [duration, setDuration] = useState(30);
   const [intensity, setIntensity] = useState<WorkoutIntensity>('moderate');
@@ -64,7 +68,7 @@ export default function WorkoutSheet() {
       });
     },
     onSuccess: (workout) => {
-      haptics.success();
+      haptics.soft();
       refresh();
       showToast({
         message: `${t('workout.added')} · ${label}`,
@@ -80,20 +84,30 @@ export default function WorkoutSheet() {
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: Space.xl, paddingTop: Space.xxl, paddingBottom: insets.bottom + Space.xxl, gap: Space.xl }}>
       <Reveal index={0} style={{ gap: Space.sm }}>
-        <Txt variant="title">{t('workout.title')}</Txt>
+        <Txt variant="title">{t('today.move')}</Txt>
         <Txt tone="secondary">
           {date === today ? t('workout.subtitle') : capitalize(formatDay(date, locale, { today: t('common.today'), yesterday: t('common.yesterday') }))}
         </Txt>
       </Reveal>
 
-      <Reveal index={1} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
-        {WORKOUT_TYPES.map((key) => {
-          const Icon = WORKOUT_ICONS[key];
-          const selected = type === key;
-          return (
-            <Chip key={key} label={t(workoutTypeKey(key))} selected={selected} onPress={() => setType(key)} icon={<Icon size={16} color={selected ? colors.onInverted : colors.text} />} />
-          );
-        })}
+      {/* The week first (it's what the Activité pill opened), then a session to add. */}
+      {summary ? (
+        <Reveal index={0}>
+          <ActivitySummary day={summary} />
+        </Reveal>
+      ) : null}
+
+      <Reveal index={1} style={{ gap: Space.md }}>
+        <Txt variant="heading">{t('workout.title')}</Txt>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.sm }}>
+          {WORKOUT_TYPES.map((key) => {
+            const Icon = WORKOUT_ICONS[key];
+            const selected = type === key;
+            return (
+              <Chip key={key} label={t(workoutTypeKey(key))} selected={selected} onPress={() => setType(key)} icon={<Icon size={16} color={selected ? colors.onInverted : colors.text} />} />
+            );
+          })}
+        </View>
       </Reveal>
 
       <Reveal index={2} style={{ gap: Space.md }}>

@@ -1,4 +1,5 @@
 import { DEFAULT_GLASS_ML, type CreateMealInput } from '@symbiose/shared';
+import { AppState } from 'react-native';
 import { create } from 'zustand';
 
 import { storage } from './storage';
@@ -22,7 +23,7 @@ interface SettingsState {
   /** Same for sleep and water (`SLEEP_SCOPES`, `WATER_SCOPES`). */
   sleepScopes: number;
   waterScopes: number;
-  /** What one tap on the water button logs; a long press picks another size and remembers it. */
+  /** What one tap on the water pill logs; the « + » sheet (or a long press) picks another size and remembers it. */
   glassMl: number;
   /** Mirrors the thumb-reach controls (camera button, capture tools, toast action) to the left. */
   leftHanded: boolean;
@@ -128,28 +129,50 @@ export interface Toast {
   message: string;
   action?: { label: string; onPress: () => void };
   onPress?: () => void;
+  /** Runs when the toast leaves without its action: timed out, replaced, tapped away or the app left. */
+  onExpire?: () => void;
 }
 
 interface ToastState {
   current: Toast | null;
+  /** Distance from the bottom of the screen the toast keeps clear of (Today's thumb buttons); 0 elsewhere. */
+  lift: number;
   show: (toast: Omit<Toast, 'id'>) => void;
   hide: () => void;
+  /** The action was used: it runs instead of `onExpire`. */
+  act: () => void;
+  setLift: (lift: number) => void;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let toastSeq = 0;
 
-export const useToast = create<ToastState>()((set) => ({
-  current: null,
-  show: (toast) => {
+export const useToast = create<ToastState>()((set, get) => {
+  const leave = () => {
     clearTimeout(toastTimer);
-    set({ current: { ...toast, id: Date.now() } });
-    toastTimer = setTimeout(() => set({ current: null }), 4500);
-  },
-  hide: () => {
-    clearTimeout(toastTimer);
+    const toast = get().current;
     set({ current: null });
-  },
-}));
+    return toast;
+  };
+  return {
+    current: null,
+    lift: 0,
+    show: (toast) => {
+      const previous = leave();
+      set({ current: { ...toast, id: ++toastSeq } });
+      previous?.onExpire?.();
+      toastTimer = setTimeout(() => get().hide(), 4500);
+    },
+    hide: () => leave()?.onExpire?.(),
+    act: () => leave()?.action?.onPress(),
+    setLift: (lift) => set({ lift }),
+  };
+});
+
+// Leaving the app closes the undo window: what was deleted is deleted for real.
+AppState.addEventListener('change', (state) => {
+  if (state === 'background') useToast.getState().hide();
+});
 
 // ---------------------------------------------------------------- Server QR scan result
 

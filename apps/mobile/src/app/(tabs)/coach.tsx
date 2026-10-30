@@ -109,7 +109,8 @@ export default function Coach() {
     try {
       const saved = await api.streamCoach(question, toLocalDate(), (delta) => setLive((current) => current && { ...current, reply: current.reply + delta }));
       queryClient.setQueryData<CoachMessage[]>(['coach'], (old = []) => [...old, saved.user, saved.reply]);
-      haptics.success();
+      // A reply is a conversation, not a milestone.
+      haptics.soft();
     } catch (e) {
       haptics.warning();
       setError(e);
@@ -214,7 +215,7 @@ export default function Coach() {
             {...webSingleRow}
             style={[{ flex: 1, minHeight: 44, maxHeight: 140, color: colors.text, fontSize: 16, lineHeight: 20, paddingTop: 12, paddingBottom: 12 }, webInput]}
           />
-          <IconButton label={t('capture.send')} variant="inverted" icon={<ArrowUp size={20} color={colors.onInverted} />} onPress={() => void submit(text)} />
+          <IconButton label={t('coach.send')} variant="inverted" icon={<ArrowUp size={20} color={colors.onInverted} />} onPress={() => void submit(text)} />
         </View>
       </View>
     </KeyboardAvoidingView>

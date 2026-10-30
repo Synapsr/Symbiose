@@ -1,15 +1,16 @@
 import { NUTRIENT_META, type NutrientKey, type NutrientUnit } from './nutrients';
 import type { GoalPlan, MealType, NutrientProgress, TargetKind } from './schemas';
+import { goalNutrient } from './targets';
 
 /**
- * The goal decides the hero metric: calories when weight is the goal,
- * otherwise the nutrient the person cares about most (e.g. added sugar).
+ * The goal decides the hero metric: the plan's first focus nutrient (added
+ * sugar for « moins de sucre, et perdre 2 kg »), calories when the plan puts
+ * them first or there is no plan yet. Calories then sit on the hero's
+ * secondary line. Hidden calories fall back to the next focus nutrient.
+ * It is `goalNutrient`, Trends' rule: Today, Trends, the watch and the widgets agree.
  */
-export function heroNutrient(progress: NutrientProgress[], plan: GoalPlan | null, hideCalories: boolean): NutrientKey {
-  const firstFocus = progress.find((p) => p.nutrient !== 'kcal')?.nutrient ?? 'protein';
-  if (hideCalories) return firstFocus;
-  const energyGoal = !plan || plan.calorieMode !== 'maintain' || plan.focus[0] === 'kcal';
-  return energyGoal ? 'kcal' : firstFocus;
+export function heroNutrient(_progress: NutrientProgress[], plan: GoalPlan | null, hideCalories: boolean): NutrientKey {
+  return goalNutrient(plan, hideCalories);
 }
 
 export interface GlanceMetric {

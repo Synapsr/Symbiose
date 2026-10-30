@@ -17,6 +17,7 @@ import { useJournal } from '@/lib/journal';
 import { dismiss } from '@/lib/nav';
 import { useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
+import { useHiddenIds } from '@/lib/undo';
 import { Radius, Space, useTheme } from '@/theme';
 
 /** Days loaded at a time; « Voir plus ancien » adds as many. */
@@ -39,7 +40,9 @@ export default function Journal() {
 
   const from = addDays(today, -(PAGE_DAYS * pages - 1));
   const journal = useJournal({ from, to: today }, { keepPrevious: true });
-  const all = journal.data ?? [];
+  // A note just deleted stays out while « Annuler » is on screen.
+  const hidden = useHiddenIds();
+  const all = (journal.data ?? []).filter((e) => !hidden[e.id]);
   const entries = filter === 'all' ? all : all.filter((e) => e.kind === filter);
   // The frequency card belongs to the Transit filter: the Carnet opens on the notes themselves.
   const transit = filter === 'transit' ? transitSummary(all, today) : null;

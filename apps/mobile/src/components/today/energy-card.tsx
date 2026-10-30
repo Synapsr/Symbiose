@@ -1,5 +1,4 @@
 import { heroNutrient as sharedHero, type DaySummary, type GoalPlan, type NutrientKey, type NutrientProgress } from '@symbiose/shared';
-import { Flame, Watch } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { AnimatedNumber, Bar, Card, Dot, Glow, Ring, Row, Txt } from '@/components/ui';
@@ -14,144 +13,113 @@ export function heroNutrient(day: DaySummary, plan: GoalPlan | null, hideCalorie
 
 const colorFor = (key: NutrientKey, accent: string) => (key === 'kcal' ? accent : NUTRIENT_COLORS[key]);
 
-/** The hero: what's left today for the metric that matters, plus the watch's contribution. */
-export function EnergyCard({ day, hero: heroKey, hideCalories }: { day: DaySummary; hero: NutrientKey; hideCalories: boolean }) {
+/** Under the hero: calories first (unless hidden or already the hero), then the plan's nutrients, protein and fibre. */
+function secondary(day: DaySummary, plan: GoalPlan | null, hero: NutrientKey, hideCalories: boolean): NutrientProgress[] {
+  const keys = new Set<NutrientKey>(['kcal', ...(plan?.focus ?? []), ...(plan?.rules.map((r) => r.nutrient) ?? []), 'protein', 'fiber']);
+  return [...keys]
+    .filter((key) => key !== hero && !(hideCalories && key === 'kcal'))
+    .map((key) => day.progress.find((p) => p.nutrient === key))
+    .filter((p): p is NutrientProgress => Boolean(p))
+    .slice(0, 3);
+}
+
+/**
+ * The hero: what's left today for the plan's first focus nutrient, with
+ * calories and two other nutrients as quiet bars beside it. One card, not two.
+ * Before the first meal there are no bars: a day starts with its budget, not a row of zeros.
+ */
+export function EnergyCard({ day, plan, hero: heroKey, hideCalories }: { day: DaySummary; plan: GoalPlan | null; hero: NutrientKey; hideCalories: boolean }) {
   const { t, locale, nutrient } = useI18n();
   const { colors } = useTheme();
 
   const hero = day.progress.find((p) => p.nutrient === heroKey)!;
-  const kcal = day.progress.find((p) => p.nutrient === 'kcal')!;
+  const kcal = day.progress.find((p) => p.nutrient === 'kcal');
   const isKcal = heroKey === 'kcal';
-  const over = hero.status === 'over' || (hero.target.kind !== 'min' && hero.consumed > hero.target.value);
+  const fresh = day.meals.length === 0;
+  const { kind } = hero.target;
+  const over = hero.status === 'over' || (kind !== 'min' && hero.consumed > hero.target.value);
   const remaining = hero.target.value - hero.consumed;
-  const heroColor = over && hero.target.kind !== 'min' ? colors.warning : colorFor(heroKey, colors.accent);
-  const amount = (value: number) => (isKcal ? formatNumber(value, locale) : formatAmount(heroKey, value, locale));
+  const heroColor = over && kind !== 'min' ? colors.warning : colorFor(heroKey, colors.accent);
+  const amount = (value: number) => (isKcal ? `${formatNumber(value, locale)} kcal` : formatAmount(heroKey, value, locale));
 
-  const reachedMin = hero.target.kind === 'min' && remaining <= 0;
+  const reachedMin = kind === 'min' && remaining <= 0;
   const formatCenter = (v: number) => (isKcal ? formatNumber(v, locale) : formatAmount(heroKey, v, locale, false));
-  const centerValue = reachedMin ? '✓' : formatCenter(Math.abs(remaining));
-  const centerLabel =
-    hero.target.kind === 'min' && remaining <= 0
-      ? t('status.reached')
-      : `${isKcal ? 'kcal' : unitOf(heroKey)} ${over ? t('today.over') : hero.target.kind === 'min' ? t('status.toGo') : isKcal ? t('today.left') : t('today.leftUnit')}`;
+  const centerValue = formatCenter(Math.abs(remaining));
+  const centerLabel = reachedMin
+    ? t('status.reached')
+    : `${isKcal ? 'kcal' : unitOf(heroKey)} ${over ? t('today.over') : kind === 'min' ? t('status.toGo') : isKcal ? t('today.left') : t('today.leftUnit')}`;
+  // « 60 g · repère 25 g », « 1 395 / 1 840 kcal », or the day's budget before the first meal.
+  const summary = fresh
+    ? t(kind === 'max' ? 'hero.fresh.max' : kind === 'min' ? 'hero.fresh.min' : 'hero.fresh.target', { amount: amount(hero.target.value) })
+    : isKcal
+      ? `${formatNumber(hero.consumed, locale)} / ${amount(hero.target.value)}`
+      : `${amount(hero.consumed)} · ${t(kind === 'max' ? 'hero.limit' : 'hero.goal', { amount: amount(hero.target.value) })}`;
+  const rows = fresh ? [] : secondary(day, plan, heroKey, hideCalories);
 
   return (
-    <Card style={{ gap: Space.lg, overflow: 'hidden' }}>
-      <Glow color={heroColor} size={300} opacity={0.22} style={{ left: -90, top: -90 }} />
-      <Row gap={Space.xl}>
-        <Ring progress={hero.ratio} size={140} stroke={13} color={heroColor}>
+    <Card style={{ overflow: 'hidden', padding: Space.lg + 2 }}>
+      <Glow color={heroColor} size={260} opacity={0.2} style={{ left: -80, top: -80 }} />
+      <Row gap={Space.lg + 2}>
+        <Ring progress={hero.ratio} size={118} stroke={11} color={heroColor}>
           {reachedMin ? (
-            <Txt variant="display" style={{ fontSize: 38 }}>
+            <Txt variant="display" style={{ fontSize: 34 }}>
               ✓
             </Txt>
           ) : (
-            <AnimatedNumber value={Math.abs(remaining)} format={formatCenter} style={{ fontSize: centerValue.length > 4 ? 32 : 40 }} />
+            <AnimatedNumber value={Math.abs(remaining)} format={formatCenter} style={{ fontSize: centerValue.length > 4 ? 27 : 34, lineHeight: 40 }} />
           )}
-          <Txt variant="caption" tone={over ? 'warning' : 'secondary'} style={{ textAlign: 'center' }}>
+          <Txt variant="caption" tone={over ? 'warning' : 'secondary'} numberOfLines={2} style={{ textAlign: 'center', fontSize: 12, lineHeight: 15, maxWidth: 84 }}>
             {centerLabel}
           </Txt>
         </Ring>
 
         <View style={{ flex: 1, gap: Space.md }}>
-          <Row gap={6}>
-            <Dot color={colorFor(heroKey, colors.accent)} />
-            <Txt variant="overline" tone="secondary" numberOfLines={1}>
-              {nutrient(heroKey)}
-            </Txt>
-          </Row>
-          <Stat label={t('today.eaten')} value={amount(hero.consumed)} />
-          <Stat label={hero.target.kind === 'max' ? t('plan.kind.max') : hero.target.kind === 'min' ? t('plan.kind.min') : t('today.goal')} value={amount(hero.target.value)} />
-        </View>
-      </Row>
-
-      {!isKcal && !hideCalories ? <KcalLine progress={kcal} /> : null}
-      <ActivityLine day={day} hideCalories={hideCalories} />
-    </Card>
-  );
-}
-
-function KcalLine({ progress }: { progress: NutrientProgress }) {
-  const { locale } = useI18n();
-  const { colors } = useTheme();
-  return (
-    <View style={{ gap: 6 }}>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Txt variant="caption" tone="secondary">
-          {formatNumber(progress.consumed, locale)} / {formatNumber(progress.target.value, locale)} kcal
-        </Txt>
-      </Row>
-      <Bar progress={progress.ratio} color={progress.status === 'over' ? colors.warning : colors.accent} height={6} />
-    </View>
-  );
-}
-
-/** Energy burned today, from the watch or the day's sessions. Steps live in the Movement card. */
-function ActivityLine({ day, hideCalories }: { day: DaySummary; hideCalories: boolean }) {
-  const { locale, t } = useI18n();
-  const { colors } = useTheme();
-  const activeKcal = day.activity?.activeKcal ?? (day.energy.source === 'activity' ? day.energy.activeKcal : null);
-  if (activeKcal === null || hideCalories) return null;
-  return (
-    <Row gap={Space.lg}>
-      <Row gap={5}>
-        <Flame size={14} color={colors.warning} />
-        <Txt variant="caption" tone="secondary">
-          {formatNumber(activeKcal, locale)} kcal {t('today.burned').toLowerCase()}
-        </Txt>
-      </Row>
-      {day.energy.source === 'activity' ? <Watch size={14} color={colors.accent} /> : null}
-    </Row>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View>
-      <Txt variant="caption" tone="secondary">
-        {label}
-      </Txt>
-      <Txt variant="number" style={{ fontSize: 20 }}>
-        {value}
-      </Txt>
-    </View>
-  );
-}
-
-/** Only what matters for the person's goals: focus nutrients, then protein and fibre. */
-export function NutrientBars({ day, plan, hero, count = 3 }: { day: DaySummary; plan: GoalPlan | null; hero: NutrientKey; count?: number }) {
-  const { t, locale, nutrient } = useI18n();
-  const { colors } = useTheme();
-  const wanted = [...new Set<NutrientKey>([...(plan?.focus ?? []), ...(plan?.rules.map((r) => r.nutrient) ?? []), 'protein', 'fiber'])].filter(
-    (k) => k !== 'kcal' && k !== hero,
-  );
-  const rows = wanted
-    .map((key) => day.progress.find((p) => p.nutrient === key))
-    .filter((p): p is NutrientProgress => Boolean(p))
-    .slice(0, count);
-  if (!rows.length) return null;
-
-  return (
-    <Card style={{ gap: Space.lg }}>
-      {rows.map((p) => {
-        const color = NUTRIENT_COLORS[p.nutrient];
-        const over = p.status === 'over';
-        return (
-          <View key={p.nutrient} style={{ gap: 8 }}>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Row gap={8}>
-                <Dot color={color} />
-                <Txt variant="label">{nutrient(p.nutrient)}</Txt>
-              </Row>
-              <Txt variant="label" tone={over ? 'warning' : 'secondary'} style={{ fontVariant: ['tabular-nums'] }}>
-                {formatAmount(p.nutrient, p.consumed, locale, false)} / {formatAmount(p.nutrient, p.target.value, locale)}
-                {p.target.kind === 'min' && p.status === 'reached' ? ' ✓' : ''}
-                {over ? ` · ${t('status.over')}` : ''}
+          <View style={{ gap: 3 }}>
+            <Row gap={6}>
+              <Dot color={colorFor(heroKey, colors.accent)} />
+              <Txt variant="overline" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {nutrient(heroKey)}
               </Txt>
             </Row>
-            <Bar progress={p.ratio} color={over ? colors.warning : color} />
+            <Txt variant="label" tone={over ? 'warning' : 'primary'} numberOfLines={2} style={{ fontVariant: ['tabular-nums'] }}>
+              {summary}
+            </Txt>
+            {fresh && !isKcal && !hideCalories && kcal ? (
+              <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+                {nutrient('kcal')} · {formatNumber(kcal.target.value, locale)} kcal
+              </Txt>
+            ) : null}
           </View>
-        );
-      })}
+          {rows.map((p) => (
+            <MiniBar key={p.nutrient} progress={p} />
+          ))}
+        </View>
+      </Row>
     </Card>
+  );
+}
+
+/** « Protéines  65 / 120 g », a thin bar under it. */
+function MiniBar({ progress: p }: { progress: NutrientProgress }) {
+  const { locale, nutrient } = useI18n();
+  const { colors } = useTheme();
+  const over = p.status === 'over';
+  const isKcal = p.nutrient === 'kcal';
+  const value = isKcal
+    ? `${formatNumber(p.consumed, locale)} / ${formatNumber(p.target.value, locale)}`
+    : `${formatAmount(p.nutrient, p.consumed, locale, false)} / ${formatAmount(p.nutrient, p.target.value, locale)}`;
+  return (
+    <View style={{ gap: 5 }} accessible accessibilityLabel={`${nutrient(p.nutrient)} ${value}`}>
+      <Row style={{ justifyContent: 'space-between' }} gap={6}>
+        <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, lineHeight: 15 }}>
+          {nutrient(p.nutrient)}
+        </Txt>
+        <Txt variant="caption" tone={over ? 'warning' : 'secondary'} style={{ fontSize: 12, lineHeight: 15, fontVariant: ['tabular-nums'] }}>
+          {value}
+          {p.target.kind === 'min' && p.status === 'reached' ? ' ✓' : ''}
+        </Txt>
+      </Row>
+      <Bar progress={p.ratio} color={over ? colors.warning : colorFor(p.nutrient, colors.accent)} height={5} />
+    </View>
   );
 }

@@ -1,13 +1,11 @@
 import type { JournalEntry, JournalKind } from '@symbiose/shared';
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
 
 import { useI18n } from '@/i18n';
 
-import { haptics } from './haptics';
 import { useApi } from './session';
-import { useToast } from './stores';
+import { useUndoableDelete } from './undo';
 
 /** The notes between two days (newest first); every journal query shares the `journal` prefix. */
 export function useJournal(range: { from: string; to: string; kind?: JournalKind }, options: { enabled?: boolean; keepPrevious?: boolean } = {}) {
@@ -36,41 +34,17 @@ export function useRefreshAfterNote() {
   return useCallback(() => void queryClient.invalidateQueries({ queryKey: ['journal'] }), [queryClient]);
 }
 
-/** Long-press → confirm → gone, with a toast to bring it back. */
+/** Gone at once, back with « Annuler » (see `useUndoableDelete`); lists hide it with `useHiddenIds`. */
 export function useDeleteNote(onDeleted?: () => void) {
   const api = useApi();
   const { t } = useI18n();
   const refresh = useRefreshAfterNote();
-  const showToast = useToast((s) => s.show);
-  const { mutate: remove } = useMutation({
-    mutationFn: (entry: JournalEntry) => api.deleteNote(entry.id),
-    onSuccess: (_, entry) => {
-      haptics.success();
-      refresh();
-      onDeleted?.();
-      showToast({
-        message: t('journal.deleted'),
-        action: {
-          label: t('today.undo'),
-          onPress: () => void api.createNote({ at: entry.at, localDate: entry.localDate, kind: entry.kind, text: entry.text, data: entry.data }).then(refresh),
-        },
-      });
-    },
-    onError: () => haptics.warning(),
-  });
-
+  const remove = useUndoableDelete();
   return useCallback(
     (entry: JournalEntry) => {
-      haptics.impact();
-      if (Platform.OS === 'web') {
-        if (globalThis.confirm?.(`${t('journal.delete')}\n${t('journal.deleteBody')}`)) remove(entry);
-        return;
-      }
-      Alert.alert(t('journal.delete'), t('journal.deleteBody'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.delete'), style: 'destructive', onPress: () => remove(entry) },
-      ]);
+      remove({ id: entry.id, message: t('journal.deleted'), commit: () => api.deleteNote(entry.id).then(refresh) });
+      onDeleted?.();
     },
-    [remove, t],
+    [api, onDeleted, refresh, remove, t],
   );
 }
