@@ -6,6 +6,7 @@ import { PanResponder, Platform, RefreshControl, ScrollView, View } from 'react-
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CoachLine } from '@/components/coach/coach-line';
 import { JournalRow } from '@/components/journal/journal-row';
 import { NoteAction } from '@/components/journal/note-action';
 import { EnergyCard, heroNutrient, NutrientBars } from '@/components/today/energy-card';
@@ -124,9 +125,7 @@ export default function Today() {
                 {queued.length ? <WaitingNote count={queued.length} /> : null}
               </Reveal>
               <Reveal index={3}>
-                <Txt variant="accent" tone="secondary" style={{ fontSize: 19, lineHeight: 26, paddingHorizontal: 6 }}>
-                  {dayVoice(day.data, hero, t, nutrient, locale)}
-                </Txt>
+                <CoachLine date={date} fallback={dayVoice(day.data, hero, t, nutrient, locale)} />
               </Reveal>
               <Reveal index={4}>
                 <NutrientBars day={day.data} plan={user.plan} hero={hero} />

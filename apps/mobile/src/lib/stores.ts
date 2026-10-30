@@ -26,6 +26,15 @@ interface SettingsState {
   glassMl: number;
   /** Mirrors the thumb-reach controls (camera button, capture tools, toast action) to the left. */
   leftHanded: boolean;
+  /** Proactive coach: the nightly vitals' permissions (`VITALS_SCOPES`) and last import. */
+  vitalsScopes: number;
+  lastVitalsSync: number;
+  /** The day the morning check-in was read in the app: no notification needed for it then. */
+  morningSeen: string;
+  /** What was swiped off Today's coach line, for that day only. */
+  lineDismissed: { date: string; kinds: string[] };
+  /** The week's craving nudges, kept for the notifications scheduled ahead. */
+  nudges: { week: string; lines: string[] } | null;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -48,6 +57,11 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   waterScopes: 0,
   glassMl: DEFAULT_GLASS_ML,
   leftHanded: false,
+  vitalsScopes: 0,
+  lastVitalsSync: 0,
+  morningSeen: '',
+  lineDismissed: { date: '', kinds: [] },
+  nudges: null,
   set: (patch) => {
     set(patch);
     const s = get();
@@ -65,6 +79,11 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       waterScopes: s.waterScopes,
       glassMl: s.glassMl,
       leftHanded: s.leftHanded,
+      vitalsScopes: s.vitalsScopes,
+      lastVitalsSync: s.lastVitalsSync,
+      morningSeen: s.morningSeen,
+      lineDismissed: s.lineDismissed,
+      nudges: s.nudges,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

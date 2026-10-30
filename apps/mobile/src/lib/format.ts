@@ -63,3 +63,10 @@ export function weekdayInitial(localDate: string, locale: Locale): string {
 export function dayOfMonth(localDate: string): string {
   return String(Number(localDate.slice(8, 10)));
 }
+
+/** "7 h 20", "16 h" / "7:20", "16:00", from a local "HH:MM". */
+export function formatClockTime(time: string, locale: Locale): string {
+  const [h, m] = time.split(':') as [string, string];
+  if (locale === 'fr') return m === '00' ? `${Number(h)} h` : `${Number(h)} h ${m}`;
+  return `${Number(h)}:${m}`;
+}

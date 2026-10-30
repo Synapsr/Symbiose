@@ -8,6 +8,7 @@ import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { JournalLink } from '@/components/journal/journal-link';
+import { CoachSettings } from '@/components/settings/coach-settings';
 import { Card, Dot, Pressy, Row, SectionTitle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount } from '@/lib/format';
@@ -28,7 +29,7 @@ const HEALTH_MODULE: Record<ModuleKey, keyof HealthModules | null> = {
   trackBloodPressure: 'bloodPressure',
 };
 /** Turning a module on (again) re-reads its history from the store, asking for its types first if needed. */
-const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, bloodPressure: { lastBpSync: 0 } } as const;
+const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, bloodPressure: { lastBpSync: 0 }, vitals: { lastVitalsSync: 0 } } as const;
 
 export default function Me() {
   const { t, locale, nutrient } = useI18n();
@@ -166,6 +167,9 @@ export default function Me() {
       </Pressy>
 
       <JournalLink />
+
+      <SectionTitle>{t('proactive.section')}</SectionTitle>
+      <CoachSettings />
 
       <SectionTitle>{t('me.health')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>

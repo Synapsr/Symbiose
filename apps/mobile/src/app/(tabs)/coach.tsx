@@ -1,18 +1,19 @@
-import { toLocalDate, type CoachMessage } from '@symbiose/shared';
+import { localTime, MIN_REVIEW_DAYS, toLocalDate, toLocalDateTime, type CoachMessage } from '@symbiose/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { ArrowUp, Sparkles, Trash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
+import { ArrowUp, ChevronRight, Ellipsis, Settings2, Sparkles, Sun, Trash2 } from 'lucide-react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, TextInput, View, type TextInputInstance } from 'react-native';
 import Animated, { FadeIn, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MealActionCard } from '@/components/coach/meal-action-card';
-import { Button, Chip, IconButton, Row, Txt, webInput, webSingleRow } from '@/components/ui';
+import { Button, Chip, IconButton, Pressy, Row, Txt, webInput, webSingleRow } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
+import { markMorningSeen, useMorningDraft, useProactive } from '@/lib/proactive';
 import { useApi } from '@/lib/session';
 import { Radius, Space, useTheme } from '@/theme';
 
@@ -40,7 +41,7 @@ function useKeyboardVisible() {
 
 export default function Coach() {
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const { colors, elevation } = useTheme();
   // Inside a native tab, the bottom inset already includes the tab bar.
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
@@ -49,12 +50,54 @@ export default function Coach() {
   const [text, setText] = useState('');
   const [live, setLive] = useState<Live | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [menu, setMenu] = useState(false);
+  const input = useRef<TextInputInstance>(null);
   const messages = useQuery({ queryKey: ['coach'], queryFn: () => api.coachMessages() });
+  const schedule = useProactive().data;
+  const draft = useMorningDraft((s) => s.draft);
+  const today = toLocalDate();
+
+  // Something to talk about, from elsewhere (« En parler au coach »): ready in the composer, never sent on its own.
+  const params = useLocalSearchParams<{ prompt?: string; message?: string }>();
+  const [prompted, setPrompted] = useState<string | undefined>(undefined);
+  if (params.prompt !== prompted) {
+    setPrompted(params.prompt);
+    if (params.prompt) setText(params.prompt);
+  }
+  useEffect(() => {
+    if (params.prompt) router.setParams({ prompt: undefined });
+  }, [params.prompt]);
+  // Opened on a proactive message (the coach line): the keyboard is up, ready for « pourquoi ? ».
+  useEffect(() => {
+    if (!params.message) return;
+    const timer = setTimeout(() => {
+      input.current?.focus();
+      router.setParams({ message: undefined });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [params.message]);
 
   const clear = useMutation({
     mutationFn: () => api.clearCoach(),
-    onSuccess: () => queryClient.setQueryData(['coach'], []),
+    onSuccess: () => {
+      queryClient.setQueryData(['coach'], []);
+      // Today's check-in went with it: no rewriting it, no notification for it.
+      useMorningDraft.setState({ draft: null });
+      markMorningSeen(today);
+      void queryClient.invalidateQueries({ queryKey: ['proactive'] });
+    },
   });
+  const confirmClear = () => {
+    setMenu(false);
+    if (Platform.OS === 'web') {
+      if (globalThis.confirm?.(`${t('coach.clear')}\n\n${t('coach.clearConfirm')}`)) clear.mutate();
+      return;
+    }
+    Alert.alert(t('coach.clear'), t('coach.clearConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('coach.clearAction'), style: 'destructive', onPress: () => clear.mutate() },
+    ]);
+  };
 
   const submit = async (message: string) => {
     const question = message.trim();
@@ -77,9 +120,21 @@ export default function Coach() {
   };
 
   const history = messages.data ?? [];
+  // Today's check-in while it is written (opened from its notification): it streams in like a reply.
+  const morningDone = history.some((m) => m.kind === 'morning' && m.localDate === today);
+  const writing: (CoachMessage & { streaming?: boolean })[] =
+    draft?.date === today && draft.writing && !morningDone
+      ? [{ id: 'live-morning', role: 'assistant', content: draft.text, suggestion: null, mealActions: [], kind: 'morning', localDate: today, createdAt: new Date().toISOString(), streaming: true }]
+      : [];
   const shown: (CoachMessage & { streaming?: boolean })[] = live
-    ? [...history, live.user, { id: 'live-reply', role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: true }]
-    : history;
+    ? [...history, ...writing, live.user, { id: 'live-reply', role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: true }]
+    : [...history, ...writing];
+  // Read here: today's morning notification isn't needed any more.
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (focused && morningDone) markMorningSeen(today);
+  }, [focused, morningDone, today]);
+  const reviewDay = schedule && schedule.settings.weekly && schedule.review.loggedDays >= MIN_REVIEW_DAYS ? schedule.review.monday : null;
   const empty = shown.length === 0;
   const composerBottom = Platform.OS === 'web' ? 96 : keyboardVisible ? Space.sm : insets.bottom + Space.sm;
 
@@ -92,8 +147,26 @@ export default function Coach() {
             {t('coach.subtitle')}
           </Txt>
         </View>
-        {history.length ? <IconButton label={t('coach.clear')} icon={<Trash2 size={18} color={colors.text2} />} onPress={() => clear.mutate()} /> : null}
+        <IconButton label={t('coach.more')} icon={<Ellipsis size={20} color={colors.text2} />} onPress={() => setMenu((open) => !open)} />
       </Row>
+      {menu ? (
+        <>
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }} onPress={() => setMenu(false)} accessibilityLabel={t('common.cancel')} />
+          <Animated.View
+            entering={FadeIn.duration(140)}
+            style={[{ position: 'absolute', top: insets.top + Space.md + 48, right: Space.xl, zIndex: 11, minWidth: 240, backgroundColor: colors.surface, borderRadius: Radius.lg, borderCurve: 'continuous', paddingVertical: Space.xs }, elevation]}>
+            <MenuItem
+              icon={<Settings2 size={18} color={colors.text} />}
+              label={t('coach.settings')}
+              onPress={() => {
+                setMenu(false);
+                router.push('/coach-settings');
+              }}
+            />
+            {history.length ? <MenuItem icon={<Trash2 size={18} color={colors.danger} />} label={t('coach.clear')} danger onPress={confirmClear} /> : null}
+          </Animated.View>
+        </>
+      ) : null}
 
       {empty ? (
         <View style={{ flex: 1, justifyContent: 'center', padding: Space.xl, gap: Space.xl }}>
@@ -124,13 +197,14 @@ export default function Coach() {
               </Txt>
             ) : undefined
           }
-          renderItem={({ item }) => <Bubble message={item} streaming={item.streaming} />}
+          renderItem={({ item }) => <Bubble message={item} streaming={item.streaming} review={Boolean(reviewDay && item.kind === 'morning' && item.localDate === reviewDay)} />}
         />
       )}
 
       <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: composerBottom }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm, backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, padding: 6, paddingLeft: Space.lg }}>
           <TextInput
+            ref={input}
             value={text}
             onChangeText={setText}
             placeholder={t('coach.placeholder')}
@@ -158,7 +232,33 @@ function Caret() {
   return <Animated.View style={[{ width: 8, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginLeft: 2, marginBottom: 3 }, style]} />;
 }
 
-function Bubble({ message, streaming }: { message: CoachMessage; streaming?: boolean }) {
+function MenuItem({ icon, label, onPress, danger }: { icon: ReactNode; label: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <Pressy onPress={onPress} accessibilityRole="button" style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, paddingHorizontal: Space.lg, height: 48 }}>
+      {icon}
+      <Txt variant="label" tone={danger ? 'danger' : 'primary'} style={{ fontSize: 16 }}>
+        {label}
+      </Txt>
+    </Pressy>
+  );
+}
+
+/** « Point du matin · 07:20 »: what a message the coach wrote on its own is. */
+function ProactiveLabel({ message }: { message: CoachMessage }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  if (message.kind !== 'morning') return null;
+  return (
+    <Row gap={6} style={{ paddingLeft: 4, marginBottom: -2 }}>
+      <Sun size={13} color={colors.warning} />
+      <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+        {t('proactive.label.morning', { time: localTime(toLocalDateTime(new Date(message.createdAt))) })}
+      </Txt>
+    </Row>
+  );
+}
+
+function Bubble({ message, streaming, review }: { message: CoachMessage; streaming?: boolean; review?: boolean }) {
   const { colors } = useTheme();
   const { t } = useI18n();
   const mine = message.role === 'user';
@@ -179,6 +279,7 @@ function Bubble({ message, streaming }: { message: CoachMessage; streaming?: boo
 
   return (
     <Animated.View entering={streaming ? undefined : FadeInUp.duration(220)} style={{ alignItems: mine ? 'flex-end' : 'flex-start', gap: Space.sm }}>
+      <ProactiveLabel message={message} />
       <View
         style={{
           maxWidth: '86%',
@@ -209,6 +310,12 @@ function Bubble({ message, streaming }: { message: CoachMessage; streaming?: boo
           </Txt>
           <Button title={t('coach.apply')} size="md" variant="accent" onPress={() => router.push({ pathname: '/goals', params: { intentions: message.suggestion!.intentions } })} />
         </View>
+      ) : null}
+      {review ? (
+        <Pressy onPress={() => router.navigate('/insights')} accessibilityRole="link" style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Space.md, height: 34, borderRadius: Radius.pill, backgroundColor: colors.surface2 }}>
+          <Txt variant="label">{t('proactive.reviewLink')}</Txt>
+          <ChevronRight size={16} color={colors.text3} />
+        </Pressy>
       ) : null}
       {/* Servers older than the app send no meal actions. */}
       {(message.mealActions ?? []).map((action, index) => (

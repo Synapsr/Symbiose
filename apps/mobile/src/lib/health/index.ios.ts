@@ -22,7 +22,20 @@ import {
 } from '@kingstinct/react-native-healthkit';
 import type { BloodPressureReadingInput, Meal, Sex, SleepSegment, WaterInput, WorkoutInput, WorkoutType } from '@symbiose/shared';
 
-import { cleanProfile, dayBounds, mealWindow, OWN_READING_KEY, toBloodPressureInput, toSleepNights, toWaterInput, toWorkoutInput, type HealthBridge, type HealthModules } from './types';
+import {
+  cleanProfile,
+  dailyRestingHr,
+  dayBounds,
+  mealWindow,
+  nightlyHrv,
+  OWN_READING_KEY,
+  toBloodPressureInput,
+  toSleepNights,
+  toWaterInput,
+  toWorkoutInput,
+  type HealthBridge,
+  type HealthModules,
+} from './types';
 
 const READ = [
   'HKQuantityTypeIdentifierStepCount',
@@ -46,6 +59,8 @@ const BP_WRITE = ['HKQuantityTypeIdentifierBloodPressureSystolic', 'HKQuantityTy
 /** Opt-in sleep (read only) and water (read and write). */
 const SLEEP_READ = ['HKCategoryTypeIdentifierSleepAnalysis'] as const;
 const WATER = ['HKQuantityTypeIdentifierDietaryWater'] as const;
+/** Nightly vitals for the morning check-in (read only): the watch measures HRV as SDNN. */
+const VITALS_READ = ['HKQuantityTypeIdentifierHeartRateVariabilitySDNN', 'HKQuantityTypeIdentifierRestingHeartRate'] as const;
 
 const WRITE = [
   'HKQuantityTypeIdentifierDietaryEnergyConsumed',
@@ -141,7 +156,13 @@ export const health: HealthBridge = {
   async connect(options: HealthModules = {}) {
     // The sheet only lists the types not asked yet: adding a module asks for its types alone.
     return requestAuthorization({
-      toRead: [...READ, ...(options.bloodPressure ? BP_READ : []), ...(options.sleep ? SLEEP_READ : []), ...(options.hydration ? WATER : [])],
+      toRead: [
+        ...READ,
+        ...(options.bloodPressure ? BP_READ : []),
+        ...(options.sleep ? SLEEP_READ : []),
+        ...(options.hydration ? WATER : []),
+        ...(options.vitals ? VITALS_READ : []),
+      ],
       toShare: [...WRITE, ...(options.bloodPressure ? BP_WRITE : []), ...(options.hydration ? WATER : [])],
     });
   },
@@ -267,6 +288,18 @@ export const health: HealthBridge = {
     });
   },
 
+  async readVitals(from, to, nights) {
+    const filter = { date: { startDate: from, endDate: to } };
+    const [hrv, resting] = await Promise.all([
+      queryQuantitySamples('HKQuantityTypeIdentifierHeartRateVariabilitySDNN', { filter, limit: 0, ascending: true, unit: 'ms' }).catch(() => []),
+      queryQuantitySamples('HKQuantityTypeIdentifierRestingHeartRate', { filter, limit: 0, ascending: true, unit: 'count/min' }).catch(() => []),
+    ]);
+    return [
+      ...nightlyHrv(hrv.map((s) => ({ at: s.startDate, value: s.quantity })), nights, 'hrv_sdnn'),
+      ...dailyRestingHr(resting.map((s) => ({ at: s.startDate, value: s.quantity }))),
+    ];
+  },
+
   async writeMeal(meal: Meal) {
     const { start, end } = mealWindow(meal);
     const t = meal.totals;
@@ -284,5 +317,5 @@ export const health: HealthBridge = {
   },
 };
 
-export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, WATER_SCOPES } from './types';
+export { BP_SCOPES, grantedScopes, HEALTH_SCOPES, healthModules, inferWalkIntensity, SLEEP_SCOPES, VITALS_SCOPES, WATER_SCOPES } from './types';
 export type { DayHealth, HealthBridge, HealthModules, HealthProfile, WeightReading } from './types';
