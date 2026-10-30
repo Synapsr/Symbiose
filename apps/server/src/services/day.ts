@@ -6,6 +6,7 @@ import {
   dateRange,
   focusNutrients,
   foodKey,
+  goalNutrient,
   itemNutrients,
   localHour,
   NUTRIENT_KEYS,
@@ -129,17 +130,19 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
     },
     streak: streakFor(db, userId, date),
     sleep: profile.trackSleep ? nightOf(db, userId, date) : null,
-    hydration: profile.trackHydration ? dayHydration(db, userId, profile.sex, date) : null,
+    hydration: profile.trackHydration ? dayHydration(db, userId, profile, date) : null,
     mood: profile.trackMood ? moodOf(db, userId, date) : null,
   };
 }
 
-export function computeInsights(db: Db, userId: string, from: string, to: string): InsightsResponse {
+export function computeInsights(db: Db, userId: string, from: string, to: string, options: { hideCalories?: boolean } = {}): InsightsResponse {
   const resolved = resolveUser(db, userId, to);
   requireProfile(resolved);
   const profile = resolved.row.profile!;
   const plan = resolved.row.plan ?? null;
   const focus = focusNutrients(plan);
+  // The goal's headline nutrient, calories included when the plan puts them first.
+  const hero = goalNutrient(plan, options.hideCalories);
 
   const rangeMeals = db
     .select()
@@ -174,6 +177,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
   const watched = new Set<NutrientKey>(focus);
   for (const rule of plan?.rules ?? []) watched.add(rule.nutrient);
   watched.delete('kcal');
+  watched.add(hero);
 
   const days: InsightsDay[] = [];
   const activityDays: InsightsActivity['days'] = [];
@@ -232,8 +236,8 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       .map((s) => ({ ...s, amount: Math.round(s.amount * 10) / 10 }));
   }
 
-  // When during the day the primary focus nutrient is eaten.
-  const primary = focus[0] ?? 'kcal';
+  // When during the day the headline nutrient is eaten.
+  const primary = hero;
   const hours = Array.from({ length: 24 }, () => 0);
   for (const meal of rangeMeals) hours[localHour(meal.eatenAt)]! += meal.totals[primary];
 
@@ -268,6 +272,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     loggedDays: loggedDays.length,
     averages,
     focus,
+    hero,
     adherence: [...adherence.entries()].map(([nutrient, a]) => ({
       nutrient,
       kind: a.kind,
@@ -295,7 +300,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     adaptiveEnergy: adaptive.asOf(to),
     // Sleep and hydration follow the window; mood needs 30 days to say anything.
     sleep: profile.trackSleep ? sleepTrend(db, userId, from, to) : null,
-    hydration: profile.trackHydration ? hydrationTrend(db, userId, profile.sex, from, to) : null,
+    hydration: profile.trackHydration ? hydrationTrend(db, userId, profile, from, to) : null,
     mood: profile.trackMood ? moodTrend(db, userId, profile, plan, to, trendDays) : null,
     streak: streakFor(db, userId, to),
   };

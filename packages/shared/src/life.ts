@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { addDays } from './dates';
-import { LocalDateSchema, LocalDateTimeSchema, type Sex } from './schemas';
+import { LocalDateSchema, LocalDateTimeSchema, type Profile, type Sex } from './schemas';
 
 /**
  * Opt-in life modules: sleep (read from the health store), hydration and
@@ -212,12 +212,19 @@ const MAX_ACTIVITY_ML = 750;
  * midpoint, 1.8 L). Exercise adds sweat losses roughly in proportion to the
  * energy spent, so logged workouts add ≈1 ml per kcal (the classic
  * water-to-energy ratio), capped at +750 ml: the goal moves, lightly.
- * Rounded to 50 ml.
+ * A goal chosen by hand (`Profile.waterGoalMl`) replaces the everyday base;
+ * workouts still add to it. Rounded to 50 ml.
  */
-export function hydrationGoalMl(sex: Sex, workoutKcal: number | null = 0): number {
+export function hydrationGoalMl(sex: Sex, workoutKcal: number | null = 0, chosenMl: number | null = null): number {
   const totalWater = sex === 'female' ? 2000 : sex === 'male' ? 2500 : 2250;
+  const base = chosenMl ?? totalWater * DRINKS_SHARE;
   const extra = Math.min(MAX_ACTIVITY_ML, Math.max(0, workoutKcal ?? 0));
-  return Math.round((totalWater * DRINKS_SHARE + extra) / 50) * 50;
+  return Math.round((base + extra) / 50) * 50;
+}
+
+/** The everyday drinks goal of a profile, before workouts. */
+export function everydayWaterGoalMl(profile: Pick<Profile, 'sex' | 'waterGoalMl'>): number {
+  return hydrationGoalMl(profile.sex, 0, profile.waterGoalMl ?? null);
 }
 
 // ---------------------------------------------------------------- Mood

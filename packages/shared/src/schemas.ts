@@ -65,6 +65,8 @@ export const ProfileSchema = z.object({
   trackSleep: z.boolean().optional(),
   trackHydration: z.boolean().optional(),
   trackMood: z.boolean().optional(),
+  /** Everyday drinks goal chosen by hand, in ml; absent or null: the EFSA-based default (`hydrationGoalMl`). */
+  waterGoalMl: z.number().int().min(1000).max(5000).nullable().optional(),
   /** The proactive coach; absent means off. */
   proactive: ProactiveSettingsSchema.optional(),
 });
@@ -569,6 +571,8 @@ export interface InsightsResponse {
   loggedDays: number;
   averages: Nutrients;
   focus: NutrientKey[];
+  /** The goal's headline nutrient (`goalNutrient`): sources, hours and adherence always include it. Absent on older servers. */
+  hero?: NutrientKey;
   adherence: { nutrient: NutrientKey; kind: TargetKind; target: number; daysOk: number; daysLogged: number }[];
   topSources: Partial<Record<NutrientKey, NutrientSource[]>>;
   /** For the primary focus nutrient: amount consumed per local hour (0..23). */
@@ -594,6 +598,33 @@ export const ReviewSchema = z.object({
   nextSteps: z.array(z.string()),
 });
 export type Review = z.infer<typeof ReviewSchema>;
+
+/** The review of the 7 days ending on `to`, saved so it survives navigation (« Bilan de la semaine »). */
+export interface WeeklyReview extends Review {
+  from: string;
+  to: string;
+  generatedAt: string;
+}
+
+export interface WeeklyReviewState {
+  review: WeeklyReview | null;
+  /**
+   * fresh: up to date. stale: newer data since, can be refreshed on demand. due: missing, or from a past
+   * week with new data since: generate it now. none: not enough to review yet (or no AI), and no recent review.
+   */
+  status: 'fresh' | 'stale' | 'due' | 'none';
+  /** False when the server has no AI: nothing can be generated. */
+  ai: boolean;
+  /** The goal's headline nutrient over the same 7 days, for a one-line summary while there is no review. */
+  week: {
+    from: string;
+    to: string;
+    loggedDays: number;
+    nutrient: NutrientKey;
+    average: number;
+    adherence: { kind: TargetKind; target: number; daysOk: number; daysLogged: number } | null;
+  };
+}
 
 // ---------------------------------------------------------------- Coach
 

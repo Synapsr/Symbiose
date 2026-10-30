@@ -19,7 +19,7 @@ export function hydrationRoutes({ db, config }: Deps) {
     const { days, to = toLocalDate() } = c.req.valid('query');
     const resolved = resolveUser(db, c.get('userId'));
     requireProfile(resolved);
-    return c.json<HydrationTrend>(hydrationTrend(db, c.get('userId'), resolved.row.profile!.sex, addDays(to, -(days - 1)), to));
+    return c.json<HydrationTrend>(hydrationTrend(db, c.get('userId'), resolved.row.profile!, addDays(to, -(days - 1)), to));
   });
 
   /** A glass logged in the app. */

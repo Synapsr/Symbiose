@@ -15,7 +15,7 @@ import { Radius, Space, useTheme } from '@/theme';
 const HEIGHT = 120;
 
 /** A smooth line with a soft area under it; every reading is a dot. */
-function WeightChart({ points, color }: { points: WeightTrend['points']; color: string }) {
+export function WeightChart({ points, color }: { points: WeightTrend['points']; color: string }) {
   const { colors } = useTheme();
   const [width, setWidth] = useState(0);
   const values = points.map((p) => p.kg);

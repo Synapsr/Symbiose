@@ -1,83 +1,41 @@
 import type { AdaptiveEnergy, ExpenditureConfidence } from '@symbiose/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Gauge } from 'lucide-react-native';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Bar, Card, Dot, Row, Txt } from '@/components/ui';
+import { ExpandRow } from '@/components/insights/expand-row';
+import { Bar, Dot, Row, Txt } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { haptics } from '@/lib/haptics';
-import { useToday } from '@/lib/hooks';
-import { useApi, useSetUser, useUser } from '@/lib/session';
 import { Space, useTheme } from '@/theme';
 
 const FILLED: Record<ExpenditureConfidence, number> = { low: 1, medium: 2, high: 3 };
 
-const signed = (value: number, text: string) => (value > 0 ? `+${text}` : value < 0 ? `−${text}` : text);
+export const signed = (value: number, text: string) => (value > 0 ? `+${text}` : value < 0 ? `−${text}` : text);
 
 /**
- * What the person really burns, measured from their meals and weight trend,
- * next to the formula; or, kindly, what's still missing to measure it.
+ * What the person really burns, measured from their meals and weight trend, next to the formula;
+ * or, kindly, what's still missing to measure it. Read-only: the switch that lets the budget
+ * follow it lives in Me, with the other goal settings.
  */
-export function AdaptiveEnergyCard({ adaptive }: { adaptive: AdaptiveEnergy }) {
+export function AdaptiveEnergyRow({ adaptive, enabled }: { adaptive: AdaptiveEnergy; enabled: boolean }) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
-  const api = useApi();
-  const user = useUser();
-  const setUser = useSetUser();
-  const today = useToday();
-  const queryClient = useQueryClient();
-  const plan = user.plan;
-
-  // Opting in starts a gradual ramp from today; the server keeps the date.
-  const toggle = useMutation({
-    mutationFn: async (on: boolean) => {
-      await api.saveGoals({ ...plan!, adaptiveEnergy: on ? { since: today } : null });
-      return api.me();
-    },
-    onSuccess: (saved) => {
-      haptics.success();
-      setUser(saved);
-      void queryClient.invalidateQueries({ queryKey: ['insights'] });
-      void queryClient.invalidateQueries({ queryKey: ['day'] });
-    },
-    onError: () => haptics.warning(),
-  });
-  const enabled = toggle.isPending ? toggle.variables : Boolean(plan?.adaptiveEnergy);
   const { estimate, confidence, data, window } = adaptive;
   const kcal = (value: number) => formatNumber(value, locale);
+  const measured = estimate !== null && confidence !== null;
   const applied = enabled && adaptive.enabled && adaptive.appliedKcal !== 0;
 
   return (
-    <Card style={{ gap: Space.lg }}>
-      <View style={{ gap: 2 }}>
-        <Row gap={6}>
-          <Gauge size={14} color={colors.text2} />
-          <Txt variant="label" tone="secondary">
-            {estimate !== null ? t('energy.title') : t('energy.titleShort')}
-          </Txt>
-        </Row>
-        {estimate !== null && confidence ? (
-          <>
-            <Row gap={6} style={{ alignItems: 'baseline' }}>
-              <Txt variant="display" style={{ fontSize: 36 }}>
-                {kcal(estimate)}
-              </Txt>
-              <Txt tone="secondary">{t('energy.perDay')}</Txt>
-            </Row>
-            <Txt variant="label" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
-              {t('energy.formula', { kcal: kcal(adaptive.formula) })}
-              {adaptive.difference ? ` · ${signed(adaptive.difference, kcal(Math.abs(adaptive.difference)))}` : ''}
-            </Txt>
-          </>
-        ) : (
-          <Txt variant="heading" style={{ marginTop: Space.xs, lineHeight: 24 }}>
-            {missingText(adaptive, t)}
-          </Txt>
-        )}
-      </View>
-
-      {estimate !== null && confidence ? (
+    <ExpandRow
+      icon={<Gauge size={17} color={colors.text} />}
+      label={measured ? t('energy.title') : t('energy.titleShort')}
+      value={measured ? `${kcal(estimate)} ${t('energy.perDay')}` : missingText(adaptive, t)}
+      caption={
+        measured
+          ? `${t('energy.formula', { kcal: kcal(adaptive.formula) })}${adaptive.difference ? ` · ${signed(adaptive.difference, kcal(Math.abs(adaptive.difference)))}` : ''}`
+          : null
+      }>
+      {measured ? (
         <View style={{ gap: 6 }}>
           <Row gap={Space.sm}>
             <Row gap={3}>
@@ -108,23 +66,12 @@ export function AdaptiveEnergyCard({ adaptive }: { adaptive: AdaptiveEnergy }) {
           <Progress label={t('energy.progress.days')} done={data.completeDays} needed={data.completeDays + adaptive.missing.completeDays} />
         </View>
       )}
-
-      {plan ? (
-        <Row gap={Space.md} style={{ paddingTop: Space.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Txt variant="label">{t('energy.auto')}</Txt>
-            <Txt variant="caption" tone={applied ? 'accent' : 'secondary'} style={{ fontVariant: ['tabular-nums'] }}>
-              {applied
-                ? t('energy.autoApplied', { kcal: signed(adaptive.appliedKcal, kcal(Math.abs(adaptive.appliedKcal))) })
-                : enabled
-                  ? t('energy.autoWaiting')
-                  : t('energy.autoHint')}
-            </Txt>
-          </View>
-          <Switch value={enabled} disabled={toggle.isPending} onValueChange={(on) => toggle.mutate(on)} accessibilityLabel={t('energy.auto')} />
-        </Row>
+      {enabled ? (
+        <Txt variant="caption" tone={applied ? 'accent' : 'secondary'} style={{ fontVariant: ['tabular-nums'] }}>
+          {applied ? t('energy.autoApplied', { kcal: signed(adaptive.appliedKcal, kcal(Math.abs(adaptive.appliedKcal))) }) : t('energy.autoWaiting')}
+        </Txt>
       ) : null}
-    </Card>
+    </ExpandRow>
   );
 }
 
@@ -136,8 +83,7 @@ function missingText(adaptive: AdaptiveEnergy, t: ReturnType<typeof useI18n>['t'
     missing.completeDays > 0 ? t(missing.completeDays === 1 ? 'energy.missing.days.one' : 'energy.missing.days.other', { count: missing.completeDays }) : null,
   ].filter((part) => part !== null);
   if (!parts.length) return t(missing.days === 1 ? 'energy.missing.wait.one' : 'energy.missing.wait.other', { count: Math.max(missing.days, 1) });
-  const within = missing.days > missing.completeDays ? t('energy.missing.within', { count: missing.days }) : '';
-  return `${t('energy.missing.lead', { list: parts.join(t('energy.missing.and')) })}${within}`;
+  return t('energy.missing.lead', { list: parts.join(t('energy.missing.and')) });
 }
 
 function Progress({ label, done, needed }: { label: string; done: number; needed: number }) {
