@@ -34,6 +34,7 @@ const basePlan: GoalPlan = {
   coachTone: 'gentle',
   adjustForActivity: false,
   overrides: {},
+  activity: null,
 };
 
 describe('energy', () => {
@@ -137,5 +138,26 @@ describe('dates', () => {
     expect(localHour('2026-10-30T16:05:00+01:00')).toBe(16);
     expect(mealTypeForHour(8)).toBe('breakfast');
     expect(mealTypeForHour(16)).toBe('snack');
+  });
+});
+
+describe('activity', async () => {
+  const { activityGoalsFor, countsAsActive, estimateWorkoutKcal } = await import('./activity');
+
+  it('estimates active energy from METs', () => {
+    // (9.8 - 1) × 76 kg × 0.5 h ≈ 334 kcal for 30 min of running
+    expect(estimateWorkoutKcal('running', 'moderate', 30, 76)).toBe(334);
+  });
+
+  it('derives activity goals from the plan tags', () => {
+    expect(activityGoalsFor({ ...basePlan, tags: ['gain_muscle'], activity: null })).toEqual({ weeklyActiveMinutes: 150, dailySteps: null, weeklyStrengthSessions: 3 });
+    expect(activityGoalsFor({ ...basePlan, tags: ['lose_weight'], activity: null }).dailySteps).toBe(8000);
+    const custom = { weeklyActiveMinutes: 200, dailySteps: 10000, weeklyStrengthSessions: 2 };
+    expect(activityGoalsFor({ ...basePlan, activity: custom })).toEqual(custom);
+  });
+
+  it('does not count an easy stroll as active minutes', () => {
+    expect(countsAsActive({ type: 'walking', intensity: 'light' })).toBe(false);
+    expect(countsAsActive({ type: 'walking', intensity: null })).toBe(true);
   });
 });

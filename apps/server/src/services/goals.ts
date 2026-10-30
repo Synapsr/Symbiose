@@ -1,4 +1,4 @@
-import { GoalPlanSchema, type GoalPlan, type GoalTag, type Locale, type NutrientKey, type NutrientRule } from '@symbiose/shared';
+import { defaultActivityGoals, GoalPlanSchema, type ActivityGoals, type GoalPlan, type GoalTag, type Locale, type NutrientKey, type NutrientRule } from '@symbiose/shared';
 
 import type { PlanDraft } from '../ai/types';
 
@@ -17,6 +17,18 @@ const RULE_BOUNDS: Record<Exclude<NutrientKey, 'kcal'>, [number, number]> = {
 };
 
 const unique = <T,>(list: T[]) => [...new Set(list)];
+
+/** Zero or missing means "no goal" for the optional guardrails. */
+const optionalGoal = (value: number | null, min: number, max: number) => (value && value > 0 ? Math.round(clamp(value, min, max)) : null);
+
+function clampActivity(activity: ActivityGoals | null): ActivityGoals | null {
+  if (!activity) return null;
+  return {
+    weeklyActiveMinutes: Math.round(clamp(activity.weeklyActiveMinutes, 60, 600)),
+    dailySteps: optionalGoal(activity.dailySteps, 3000, 20_000),
+    weeklyStrengthSessions: optionalGoal(activity.weeklyStrengthSessions, 1, 6),
+  };
+}
 
 const slug = (value: string) =>
   value
@@ -60,6 +72,7 @@ export function planFromDraft(draft: PlanDraft, intentions: string, overrides: G
     coachTone: draft.coachTone,
     adjustForActivity: draft.adjustForActivity,
     overrides,
+    activity: clampActivity(draft.activity),
   };
   return GoalPlanSchema.parse(plan);
 }
@@ -147,6 +160,7 @@ export function heuristicPlan(intentions: string, locale: Locale): GoalPlan {
     habits,
     coachTone: 'gentle',
     adjustForActivity: calorieMode !== 'maintain',
+    activity: defaultActivityGoals({ tags }),
   };
   return planFromDraft(draft, intentions);
 }

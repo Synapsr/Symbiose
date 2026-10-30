@@ -1,4 +1,5 @@
 import type {
+  ActivityWeek,
   DaySummary,
   FoodItem,
   GoalPlan,
@@ -11,6 +12,7 @@ import type {
   Targets,
   Verdict,
   WeightTrend,
+  WorkoutType,
 } from '@symbiose/shared';
 
 /** What the AI knows about the person when it reasons about a meal. */
@@ -21,6 +23,14 @@ export interface UserContext {
   targets: Targets | null;
 }
 
+/** Movement so far on a given day. */
+export interface ActivityToday {
+  steps: number | null;
+  /** The watch's daily total, else the logged workouts' energy. */
+  activeKcal: number | null;
+  workouts: number;
+}
+
 export interface MealAnalysisInput extends UserContext {
   photo: { base64: string; mime: 'image/jpeg' | 'image/png' | 'image/webp' } | null;
   text: string | null;
@@ -28,6 +38,9 @@ export interface MealAnalysisInput extends UserContext {
   mealTypeHint: MealType;
   /** What was already eaten today before this meal. */
   dayTotalsBefore: Nutrients;
+  /** The workout that ended in the 3 hours before the meal. */
+  recentWorkout: { type: WorkoutType; durationMin: number; activeKcal: number | null; endedMinutesAgo: number } | null;
+  activityToday: ActivityToday | null;
   /** For refinements: the previous analysis and the user's correction. */
   previous?: { title: string; items: FoodItem[] };
   correction?: string;
@@ -71,8 +84,14 @@ export interface CoachTurn {
 export interface CoachInput extends UserContext {
   history: CoachTurn[];
   message: string;
-  today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & { meals: { time: string; title: string; kcal: number }[] };
-  week: Pick<InsightsResponse, 'averages' | 'loggedDays' | 'adherence' | 'topSources' | 'byHour' | 'cravings' | 'weight'>;
+  today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
+    meals: { time: string; title: string; kcal: number }[];
+    workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
+  };
+  week: Pick<InsightsResponse, 'averages' | 'loggedDays' | 'adherence' | 'topSources' | 'byHour' | 'cravings' | 'weight'> & {
+    activity: ActivityWeek;
+    workouts: { date: string; type: WorkoutType; minutes: number; kcal: number | null }[];
+  };
 }
 
 export interface CoachOutput {
@@ -84,6 +103,7 @@ export interface CravingInput extends UserContext {
   what: string;
   intensity: number;
   localTime: string;
+  activityToday: ActivityToday | null;
 }
 
 export interface CravingOutput {

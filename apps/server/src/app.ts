@@ -15,6 +15,7 @@ import { coachRoutes } from './routes/coach';
 import { goalRoutes } from './routes/goals';
 import { mealRoutes } from './routes/meals';
 import { trackingRoutes } from './routes/tracking';
+import { workoutRoutes } from './routes/workouts';
 
 export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   const { db, ai, config } = deps;
@@ -57,6 +58,7 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/goals', goalRoutes(deps));
   app.route('/api/meals', mealRoutes(deps));
   app.route('/api/coach', coachRoutes(deps));
+  app.route('/api/workouts', workoutRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 
   return app;

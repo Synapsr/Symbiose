@@ -3,3 +3,4 @@ export * from './schemas';
 export * from './targets';
 export * from './dates';
 export * from './meals';
+export * from './activity';

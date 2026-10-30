@@ -30,6 +30,7 @@ import { computeInsights, daySummary, library, toActivity, toCraving } from '../
 import { lookupBarcode } from '../services/openfoodfacts';
 import { resolveUser } from '../services/users';
 import { upsertWeights, weightTrend } from '../services/weights';
+import { activityToday } from '../services/workouts';
 
 const FALLBACK_TIPS = {
   fr: [
@@ -112,7 +113,13 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
     let advice = FALLBACK_TIPS[resolved.context.locale][Math.floor(Math.random() * 2)]!;
     if (ai.enabled) {
       try {
-        advice = await ai.cravingTip({ ...resolved.context, what: input.what, intensity: input.intensity, localTime: localTime(input.at) });
+        advice = await ai.cravingTip({
+          ...resolved.context,
+          what: input.what,
+          intensity: input.intensity,
+          localTime: localTime(input.at),
+          activityToday: activityToday(db, userId, input.localDate),
+        });
       } catch (error) {
         console.warn('craving tip failed, using fallback', error);
       }

@@ -30,6 +30,7 @@ import { nowIso, validate, type Deps } from '../http';
 import { decodePhoto } from '../services/photos';
 import { buildInsight, itemsFromAnalysis, toMeal } from '../services/meals';
 import { resolveUser } from '../services/users';
+import { mealActivity } from '../services/workouts';
 
 function getMealRow(db: Db, userId: string, id: string): MealRow {
   const row = db.select().from(meals).where(and(eq(meals.id, id), eq(meals.userId, userId))).get();
@@ -90,6 +91,7 @@ export function mealRoutes({ db, ai, photos, config }: Deps) {
         localTime: localTime(input.eatenAt),
         mealTypeHint: mealType,
         dayTotalsBefore: totalsBefore(db, userId, input.localDate),
+        ...mealActivity(db, userId, input.localDate, input.eatenAt),
       });
       ensureFood(analysis);
       items = [...itemsFromAnalysis(analysis), ...(input.items ?? [])];
@@ -158,6 +160,7 @@ export function mealRoutes({ db, ai, photos, config }: Deps) {
       localTime: localTime(existing.eatenAt),
       mealTypeHint: existing.mealType,
       dayTotalsBefore: totalsBefore(db, userId, existing.localDate, existing.id),
+      ...mealActivity(db, userId, existing.localDate, existing.eatenAt),
       previous: { title: existing.title, items: existing.items },
       correction: c.req.valid('json').correction,
     });

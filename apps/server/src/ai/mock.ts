@@ -43,7 +43,10 @@ export function createMockAi(): Ai {
           added > 5
             ? `≈${Math.round(added)} g de sucres ajoutés dans ce repas.`
             : 'Repas équilibré, presque sans sucre ajouté. Bien joué.',
-        tips: added > 15 ? ['Remplace la boisson sucrée par de l’eau pétillante citronnée.'] : [],
+        tips: [
+          ...(added > 15 ? ['Remplace la boisson sucrée par de l’eau pétillante citronnée.'] : []),
+          ...(input.recentWorkout ? ['Après ta séance, vise 20 à 30 g de protéines dans ce repas pour la récupération.'] : []),
+        ],
         clarification: input.correction ? null : /caf[ée]|coffee/i.test(text) ? { question: 'Combien de sucres dans le café ?', options: ['Aucun', '1 sucre', '2 sucres'] } : null,
       };
       return analysis;

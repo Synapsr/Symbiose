@@ -34,6 +34,72 @@ export const ProfileSchema = z.object({
 });
 export type Profile = z.infer<typeof ProfileSchema>;
 
+// ---------------------------------------------------------------- Physical activity
+
+export const WorkoutTypeSchema = z.enum(['walking', 'running', 'cycling', 'strength', 'swimming', 'hiit', 'yoga', 'sports', 'other']);
+export type WorkoutType = z.infer<typeof WorkoutTypeSchema>;
+
+export const WorkoutIntensitySchema = z.enum(['light', 'moderate', 'vigorous']);
+export type WorkoutIntensity = z.infer<typeof WorkoutIntensitySchema>;
+
+export const WorkoutSourceSchema = z.enum(['healthkit', 'health_connect', 'manual']);
+
+/** A workout session, from the watch (via the health store) or added by hand. */
+export const WorkoutInputSchema = z.object({
+  /** Health store identifier (HealthKit UUID, Health Connect id), used to deduplicate imports. */
+  externalId: z.string().min(1).max(120).nullable().default(null),
+  type: WorkoutTypeSchema,
+  /** Device-local start time with offset. */
+  startedAt: localDateTime,
+  localDate: isoDate,
+  durationMin: z.number().min(1).max(1440),
+  intensity: WorkoutIntensitySchema.nullable().default(null),
+  /** Measured by the watch, or estimated from METs for manual entries. */
+  activeKcal: z.number().min(0).max(10_000).nullable().default(null),
+  distanceKm: z.number().min(0).max(1000).nullable().default(null),
+  avgHeartRate: z.number().min(30).max(250).nullable().default(null),
+  source: WorkoutSourceSchema,
+});
+export type WorkoutInput = z.input<typeof WorkoutInputSchema>;
+
+export const WorkoutsImportSchema = z.object({ workouts: z.array(WorkoutInputSchema).min(1).max(1000) });
+
+export interface Workout extends z.output<typeof WorkoutInputSchema> {
+  id: string;
+  createdAt: string;
+}
+
+/** Simple, goal-dependent activity guardrails that live in the plan. */
+export const ActivityGoalsSchema = z.object({
+  /** WHO: at least 150 min of moderate activity a week. */
+  weeklyActiveMinutes: z.number().int().min(0).max(3000),
+  dailySteps: z.number().int().min(0).max(50_000).nullable(),
+  weeklyStrengthSessions: z.number().int().min(0).max(14).nullable(),
+});
+export type ActivityGoals = z.infer<typeof ActivityGoalsSchema>;
+
+/** Rolling 7 days ending on a given day. */
+export interface ActivityWeek {
+  /** Minutes of workouts that count as active (see `countsAsActive`). */
+  activeMinutes: number;
+  strengthSessions: number;
+  workouts: number;
+  /** Average daily steps over the days that have step data. */
+  avgSteps: number | null;
+  goals: ActivityGoals;
+}
+
+export interface InsightsActivity {
+  goals: ActivityGoals;
+  days: { date: string; activeMinutes: number; steps: number | null; workouts: number }[];
+  byType: { type: WorkoutType; sessions: number; minutes: number }[];
+  totalMinutes: number;
+  /** Average active minutes per 7 days over the period. */
+  weeklyMinutes: number;
+  /** Cravings per day on days with vs without a workout (logged days only); null without enough data. */
+  cravingsOnActiveDays: { active: number; inactive: number } | null;
+}
+
 // ---------------------------------------------------------------- Goals
 
 export const GoalTagSchema = z.enum([
@@ -93,6 +159,8 @@ export const GoalPlanSchema = z.object({
   adjustForActivity: z.boolean(),
   /** Manual target values set by the user; they win over everything else. */
   overrides: z.partialRecord(NutrientKeySchema, z.number().min(0)).default({}),
+  /** Activity guardrails; null means the goal-based defaults (`activityGoalsFor`). */
+  activity: ActivityGoalsSchema.nullable().default(null),
 });
 export type GoalPlan = z.infer<typeof GoalPlanSchema>;
 
@@ -319,6 +387,8 @@ export interface DaySummary {
   progress: NutrientProgress[];
   meals: Meal[];
   activity: DayActivity | null;
+  workouts: Workout[];
+  activityWeek: ActivityWeek;
   cravings: { total: number; resisted: number; items: Craving[] };
   streak: number;
 }
@@ -364,6 +434,7 @@ export interface InsightsResponse {
   byHour: { nutrient: NutrientKey; hours: number[] };
   cravings: { total: number; resisted: number; topWhat: string[] };
   weight: WeightTrend;
+  activity: InsightsActivity;
   streak: number;
 }
 

@@ -64,6 +64,11 @@ const PlanOut = z.object({
   habits: z.array(z.object({ id: z.string(), label: z.string(), kind: z.enum(['avoid', 'do']) })),
   coachTone: z.enum(['gentle', 'direct', 'scientific']),
   adjustForActivity: z.boolean(),
+  activity: z.object({
+    weeklyActiveMinutes: z.number(),
+    dailySteps: z.number().nullable(),
+    weeklyStrengthSessions: z.number().nullable(),
+  }),
 });
 
 const PlanChange = z.object({ intentions: z.string().min(1), rationale: z.string() });
@@ -173,6 +178,8 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         mealTypeHint: input.mealTypeHint,
         alreadyEatenToday: input.dayTotalsBefore,
       };
+      if (input.recentWorkout) extra.recentWorkout = input.recentWorkout;
+      if (input.activityToday) extra.activityToday = input.activityToday;
       if (input.previous) {
         extra.previousAnalysis = {
           title: input.previous.title,
@@ -230,19 +237,25 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     },
 
     async cravingTip(input) {
-      const text = `${contextBlock(input, { localTime: input.localTime })}\n\nI'm craving: ${input.what} (intensity ${input.intensity}/3)`;
+      const text = `${contextBlock(input, { localTime: input.localTime, activityToday: input.activityToday })}\n\nI'm craving: ${input.what} (intensity ${input.intensity}/3)`;
       return run({ system: CRAVING, content: [{ type: 'text', text }], schema: CravingOut, effort: 'low' });
     },
 
     async review(input) {
-      const { days, ...stats } = input.insights;
+      const { days, activity, ...rest } = input.insights;
+      const { days: activityDays, ...activityStats } = activity;
+      const moves = new Map(activityDays.map((d) => [d.date, d]));
       const compactDays = days.map((d) => ({
         date: d.date,
         logged: d.logged,
         kcal: d.totals.kcal,
         kcalTarget: d.kcalTarget,
         ...Object.fromEntries(input.insights.focus.map((k) => [k, d.totals[k]])),
+        activeMinutes: moves.get(d.date)?.activeMinutes ?? 0,
+        steps: moves.get(d.date)?.steps ?? null,
+        workouts: moves.get(d.date)?.workouts ?? 0,
       }));
+      const stats = { ...rest, activity: activityStats };
       const text = `${contextBlock(input, { stats, days: compactDays })}\n\nWrite my review for this period.`;
       return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },

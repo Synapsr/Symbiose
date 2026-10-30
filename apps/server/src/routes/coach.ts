@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { addDays, CoachInputSchema, localTime, type CoachMessage } from '@symbiose/shared';
+import { addDays, CoachInputSchema, localTime, type CoachMessage, type Workout } from '@symbiose/shared';
 import { desc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
@@ -13,6 +13,7 @@ import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { computeInsights, daySummary } from '../services/day';
 import { resolveUser } from '../services/users';
+import { workoutsBetween } from '../services/workouts';
 
 const HISTORY_TURNS = 20;
 
@@ -40,6 +41,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
 
   const day = daySummary(db, userId, localDate);
   const week = computeInsights(db, userId, addDays(localDate, -6), localDate);
+  const brief = (w: Workout) => ({ type: w.type, minutes: Math.round(w.durationMin), kcal: w.activeKcal === null ? null : Math.round(w.activeKcal) });
   return {
     ...resolved.context,
     history: history.map((m) => ({ role: m.role, content: m.content })),
@@ -50,6 +52,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
       progress: day.progress,
       activity: day.activity,
       meals: day.meals.map((m) => ({ time: localTime(m.eatenAt), title: m.title, kcal: m.totals.kcal })),
+      workouts: day.workouts.map((w) => ({ time: localTime(w.startedAt), ...brief(w) })),
     },
     week: {
       averages: week.averages,
@@ -59,6 +62,8 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
       byHour: week.byHour,
       cravings: week.cravings,
       weight: week.weight,
+      activity: day.activityWeek,
+      workouts: workoutsBetween(db, userId, addDays(localDate, -6), localDate).map((w) => ({ date: w.localDate, ...brief(w) })),
     },
   };
 }

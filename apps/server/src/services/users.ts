@@ -5,6 +5,7 @@ import type { UserContext } from '../ai/types';
 import type { Db } from '../db';
 import { activity, users, type UserRow } from '../db/schema';
 import { HttpError, notFound } from '../errors';
+import { workoutsBetween, workoutsKcal } from './workouts';
 
 export function toUser(row: UserRow): User {
   return {
@@ -24,13 +25,14 @@ export function getUserRow(db: Db, userId: string): UserRow {
   return row;
 }
 
+/** The watch's daily total (which includes its workouts), else the energy of the logged workouts. */
 export function activeKcalFor(db: Db, userId: string, localDate: string): number | null {
   const row = db
     .select({ activeKcal: activity.activeKcal })
     .from(activity)
     .where(and(eq(activity.userId, userId), eq(activity.localDate, localDate)))
     .get();
-  return row?.activeKcal ?? null;
+  return row?.activeKcal ?? workoutsKcal(workoutsBetween(db, userId, localDate, localDate));
 }
 
 export interface ResolvedUser {

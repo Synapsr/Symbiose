@@ -1,5 +1,5 @@
-import type { CoachSuggestion, FoodItem, GoalPlan, MealInsight, Profile } from '@symbiose/shared';
-import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import type { CoachSuggestion, FoodItem, GoalPlan, MealInsight, Profile, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -78,6 +78,33 @@ export const weights = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
 );
 
+/** Workout sessions, imported from the health store or added by hand. */
+export const workouts = sqliteTable(
+  'workouts',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    externalId: text('external_id'),
+    type: text('type').$type<WorkoutType>().notNull(),
+    startedAt: text('started_at').notNull(),
+    localDate: text('local_date').notNull(),
+    durationMin: real('duration_min').notNull(),
+    intensity: text('intensity').$type<WorkoutIntensity>(),
+    activeKcal: real('active_kcal'),
+    distanceKm: real('distance_km'),
+    avgHeartRate: real('avg_heart_rate'),
+    source: text('source', { enum: ['healthkit', 'health_connect', 'manual'] }).notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('workouts_user_date').on(t.userId, t.localDate),
+    // SQLite treats NULLs as distinct: manual entries without an external id never collide.
+    uniqueIndex('workouts_user_external').on(t.userId, t.externalId),
+  ],
+);
+
 export const cravings = sqliteTable(
   'cravings',
   {
@@ -126,4 +153,5 @@ export type MealRow = typeof meals.$inferSelect;
 export type CravingRow = typeof cravings.$inferSelect;
 export type ActivityRow = typeof activity.$inferSelect;
 export type WeightRow = typeof weights.$inferSelect;
+export type WorkoutRow = typeof workouts.$inferSelect;
 export type CoachMessageRow = typeof coachMessages.$inferSelect;

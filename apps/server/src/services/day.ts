@@ -1,4 +1,5 @@
 import {
+  activityGoalsFor,
   addDays,
   computeProgress,
   computeTargets,
@@ -19,6 +20,9 @@ import {
   type NutrientKey,
   type NutrientSource,
   type FoodSuggestion,
+  type InsightsActivity,
+  type Workout,
+  type WorkoutType,
 } from '@symbiose/shared';
 import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 
@@ -27,6 +31,7 @@ import { activity, cravings, meals, type ActivityRow, type CravingRow } from '..
 import { toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
 import { weightTrend } from './weights';
+import { activeMinutes, activityWeek, workoutsBetween, workoutsKcal } from './workouts';
 
 export function toActivity(row: ActivityRow): DayActivity {
   return {
@@ -109,6 +114,8 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
     progress: computeProgress(totals, resolved.targets, order),
     meals: dayMeals,
     activity: activityRow ? toActivity(activityRow) : null,
+    workouts: workoutsBetween(db, userId, date, date),
+    activityWeek: activityWeek(db, userId, date, resolved.row.plan ?? null),
     cravings: {
       total: dayCravings.length,
       resisted: dayCravings.filter((c) => c.outcome === 'resisted').length,
@@ -142,8 +149,11 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     .from(cravings)
     .where(and(eq(cravings.userId, userId), gte(cravings.localDate, from), lte(cravings.localDate, to)))
     .all();
+  const rangeWorkouts = workoutsBetween(db, userId, from, to);
 
   const activityByDay = new Map(activityRows.map((row) => [row.localDate, row]));
+  const workoutsByDay = new Map<string, Workout[]>();
+  for (const workout of rangeWorkouts) workoutsByDay.set(workout.localDate, [...(workoutsByDay.get(workout.localDate) ?? []), workout]);
   // Weight is shown over at least 30 days: a week is too short to see a trend.
   const weight = weightTrend(db, userId, to, Math.max(dateRange(from, to).length, 30));
   const weightByDay = new Map(weight.points.map((p) => [p.date, p.kg]));
@@ -155,12 +165,15 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
   watched.delete('kcal');
 
   const days: InsightsDay[] = [];
+  const activityDays: InsightsActivity['days'] = [];
   const adherence = new Map<NutrientKey, { kind: 'target' | 'min' | 'max'; target: number; ok: number; logged: number }>();
 
   for (const date of dateRange(from, to)) {
     const dayMeals = mealsByDay.get(date) ?? [];
     const act = activityByDay.get(date);
-    const { targets } = computeTargets(profile, plan, { activeKcal: act?.activeKcal ?? null });
+    const dayWorkouts = workoutsByDay.get(date) ?? [];
+    const activeKcal = act?.activeKcal ?? workoutsKcal(dayWorkouts);
+    const { targets } = computeTargets(profile, plan, { activeKcal });
     const totals = roundNutrients(sumNutrients(dayMeals.map((m) => m.totals)));
     const logged = dayMeals.length > 0;
     days.push({
@@ -168,9 +181,10 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       logged,
       totals,
       kcalTarget: targets.kcal.value,
-      activeKcal: act?.activeKcal ?? null,
+      activeKcal,
       weightKg: weightByDay.get(date) ?? null,
     });
+    activityDays.push({ date, activeMinutes: activeMinutes(dayWorkouts), steps: act?.steps ?? null, workouts: dayWorkouts.length });
     if (!logged) continue;
     for (const key of watched) {
       const target = targets[key];
@@ -220,6 +234,22 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
     whatCounts.set(k, entry);
   }
 
+  const byType = new Map<WorkoutType, InsightsActivity['byType'][number]>();
+  for (const workout of rangeWorkouts) {
+    const entry = byType.get(workout.type) ?? { type: workout.type, sessions: 0, minutes: 0 };
+    entry.sessions++;
+    entry.minutes += workout.durationMin;
+    byType.set(workout.type, entry);
+  }
+  // Sum of the rounded daily minutes, so it matches the daily chart.
+  const totalMinutes = activityDays.reduce((sum, d) => sum + d.activeMinutes, 0);
+
+  const cravingsByDay = new Map<string, number>();
+  for (const c of rangeCravings) cravingsByDay.set(c.localDate, (cravingsByDay.get(c.localDate) ?? 0) + 1);
+  const cravingsPerDay = (list: InsightsDay[]) => Math.round((list.reduce((sum, d) => sum + (cravingsByDay.get(d.date) ?? 0), 0) / list.length) * 10) / 10;
+  const activeDays = loggedDays.filter((d) => workoutsByDay.has(d.date));
+  const restDays = loggedDays.filter((d) => !workoutsByDay.has(d.date));
+
   return {
     from,
     to,
@@ -242,6 +272,14 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       topWhat: [...whatCounts.values()].sort((a, b) => b.count - a.count).slice(0, 3).map((w) => w.label),
     },
     weight,
+    activity: {
+      goals: activityGoalsFor(plan),
+      days: activityDays,
+      byType: [...byType.values()].map((t) => ({ ...t, minutes: Math.round(t.minutes) })).sort((a, b) => b.minutes - a.minutes),
+      totalMinutes,
+      weeklyMinutes: Math.round((totalMinutes / days.length) * 7),
+      cravingsOnActiveDays: activeDays.length >= 2 && restDays.length >= 2 ? { active: cravingsPerDay(activeDays), inactive: cravingsPerDay(restDays) } : null,
+    },
     streak: streakFor(db, userId, to),
   };
 }

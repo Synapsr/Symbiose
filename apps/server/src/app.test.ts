@@ -2,14 +2,26 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { addDays, toLocalDate, toLocalDateTime, type AuthResponse, type DaySummary, type GoalsResponse, type Meal, type Profile } from '@symbiose/shared';
+import {
+  addDays,
+  toLocalDate,
+  toLocalDateTime,
+  type AuthResponse,
+  type DaySummary,
+  type GoalsResponse,
+  type InsightsResponse,
+  type Meal,
+  type Profile,
+  type Workout,
+} from '@symbiose/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createDisabledAi } from './ai/claude';
-import type { Ai, MealAnalysis } from './ai/types';
+import type { Ai, CoachInput, MealAnalysis, MealAnalysisInput } from './ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
 import type { Config } from './env';
+import { heuristicPlan, planFromDraft } from './services/goals';
 import { PhotoStore } from './services/photos';
 
 const dir = mkdtempSync(join(tmpdir(), 'symbiose-test-'));
@@ -71,6 +83,7 @@ const fakeAi: Ai = {
       habits: [{ id: 'Pas de soda', label: 'Pas de soda', kind: 'avoid' }],
       coachTone: 'gentle',
       adjustForActivity: false,
+      activity: { weeklyActiveMinutes: 2000, dailySteps: 500, weeklyStrengthSessions: 12 },
     };
   },
   async coach(input, onText) {
@@ -193,6 +206,7 @@ describe('Symbiose API', () => {
     expect(plan.proteinPerKg).toBe(2.4);
     expect(plan.rules.find((r) => r.nutrient === 'sodium')?.value).toBe(500);
     expect(plan.habits[0]?.id).toBe('pas-de-soda');
+    expect(plan.activity).toEqual({ weeklyActiveMinutes: 600, dailySteps: 3000, weeklyStrengthSessions: 6 });
     expect(draft.body.targets?.addedSugar).toEqual({ value: 25, kind: 'max' });
 
     const saved = await request<GoalsResponse>('PUT', '/api/goals', { plan });
@@ -403,5 +417,172 @@ describe('without AI', () => {
       body: JSON.stringify({ eatenAt: toLocalDateTime(), localDate: toLocalDate(), text: 'une pomme' }),
     });
     expect(ai.status).toBe(424);
+  });
+});
+
+describe('activity guardrails in plans', () => {
+  it('derives them from the goals and clamps what the AI proposes', () => {
+    expect(heuristicPlan('Je veux faire une prise de muscle', 'fr').activity).toEqual({ weeklyActiveMinutes: 150, dailySteps: null, weeklyStrengthSessions: 3 });
+    expect(heuristicPlan('Perdre du poids', 'fr').activity?.dailySteps).toBe(8000);
+    const draft = { ...heuristicPlan('Manger équilibré', 'fr'), activity: { weeklyActiveMinutes: 20, dailySteps: 0, weeklyStrengthSessions: 2.4 } };
+    expect(planFromDraft(draft, 'Manger équilibré').activity).toEqual({ weeklyActiveMinutes: 60, dailySteps: null, weeklyStrengthSessions: 2 });
+  });
+});
+
+describe('physical activity', () => {
+  const mealInputs: MealAnalysisInput[] = [];
+  const coachInputs: CoachInput[] = [];
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async analyzeMeal(input) {
+        mealInputs.push(input);
+        return croissantAnalysis;
+      },
+      async coach(input) {
+        coachInputs.push(input);
+        return { reply: 'ok', planChange: null };
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const yesterday = addDays(today, -1);
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  let owner = '';
+  let stranger = '';
+
+  const request = async <T,>(method: string, path: string, body?: unknown, token = owner) => {
+    const res = await app.request(path, {
+      method,
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
+  };
+  const register = async (email: string) => {
+    const res = await app.request('/api/auth/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email, password: 'password123' }),
+    });
+    return ((await res.json()) as AuthResponse).token;
+  };
+  const list = (from: string) => request<Workout[]>('GET', `/api/workouts?from=${from}&to=${today}`);
+
+  beforeAll(async () => {
+    owner = await register('runner@example.com');
+    stranger = await register('stranger@example.com');
+    expect((await request('PUT', '/api/me/profile', { ...profile, weightKg: 80 })).status).toBe(200);
+  });
+
+  it('imports workouts from the health store without duplicates', async () => {
+    const run = { externalId: 'hk-run', type: 'running', startedAt: at(yesterday, '07:00'), localDate: yesterday, durationMin: 30, activeKcal: 300, source: 'healthkit' };
+    const yoga = { ...run, externalId: null, type: 'yoga', startedAt: at(yesterday, '19:00'), durationMin: 20, activeKcal: 50 };
+    const first = await request<{ written: number }>('PUT', '/api/workouts', { workouts: [run, yoga] });
+    expect(first.body.written).toBe(2);
+    const again = await request<{ written: number }>('PUT', '/api/workouts', { workouts: [{ ...run, durationMin: 32, activeKcal: 310 }] });
+    expect(again.body.written).toBe(1);
+
+    const stored = await list(yesterday);
+    expect(stored.body.map((w) => w.type)).toEqual(['running', 'yoga']);
+    expect(stored.body[0]).toMatchObject({ externalId: 'hk-run', durationMin: 32, activeKcal: 310, intensity: null, distanceKm: null });
+    expect((await request('GET', `/api/workouts?from=${today}&to=${yesterday}`)).status).toBe(400);
+  });
+
+  it('estimates the energy of manual workouts from the profile weight', async () => {
+    const manual = { source: 'manual', localDate: today };
+    // Running, moderate: (9.8 − 1 MET) × 80 kg × 0.5 h = 352 kcal.
+    const run = await request<Workout>('POST', '/api/workouts', { ...manual, type: 'running', startedAt: at(today, '07:00'), durationMin: 30 });
+    expect(run.status).toBe(201);
+    expect(run.body).toMatchObject({ activeKcal: 352, intensity: null, externalId: null });
+    // (6 − 1) × 80 × 0.75 = 300 and (2.8 − 1) × 80 × 2/3 = 96.
+    const lift = await request<Workout>('POST', '/api/workouts', { ...manual, type: 'strength', intensity: 'vigorous', startedAt: at(today, '18:00'), durationMin: 45 });
+    expect(lift.body.activeKcal).toBe(300);
+    const stroll = await request<Workout>('POST', '/api/workouts', { ...manual, type: 'walking', intensity: 'light', startedAt: at(today, '12:00'), durationMin: 40 });
+    expect(stroll.body.activeKcal).toBe(96);
+  });
+
+  it('summarizes the day and the week, and budgets manual workouts only without watch data', async () => {
+    await request('PUT', '/api/activity', { localDate: yesterday, steps: 6000, source: 'healthkit' });
+    await request('PUT', '/api/activity', { localDate: addDays(today, -2), steps: 9000, source: 'healthkit' });
+    const plan = heuristicPlan('Prise de muscle', 'fr');
+    expect(plan.adjustForActivity).toBe(true);
+    await request('PUT', '/api/goals', { plan });
+
+    const day = await request<DaySummary>('GET', `/api/days/${today}`);
+    expect(day.body.workouts.map((w) => w.type)).toEqual(['running', 'walking', 'strength']);
+    // 32 + 20 yesterday, 30 + 45 today: the easy stroll doesn't count.
+    expect(day.body.activityWeek).toEqual({
+      activeMinutes: 127,
+      strengthSessions: 1,
+      workouts: 5,
+      avgSteps: 7500,
+      goals: { weeklyActiveMinutes: 150, dailySteps: null, weeklyStrengthSessions: 3 },
+    });
+    expect(day.body.energy).toMatchObject({ source: 'activity', activeKcal: 748 });
+
+    // The watch total already includes the workouts: it replaces them.
+    await request('PUT', '/api/activity', { localDate: today, steps: 3000, activeKcal: 500, source: 'healthkit' });
+    const synced = await request<DaySummary>('GET', `/api/days/${today}`);
+    expect(synced.body.energy.activeKcal).toBe(500);
+    expect(synced.body.activityWeek.avgSteps).toBe(6000);
+  });
+
+  it('tells the meal analyst about a recent workout', async () => {
+    await request('POST', '/api/meals', { eatenAt: at(today, '19:30'), localDate: today, text: 'poulet riz' });
+    expect(mealInputs.at(-1)).toMatchObject({
+      recentWorkout: { type: 'strength', durationMin: 45, activeKcal: 300, endedMinutesAgo: 45 },
+      activityToday: { steps: 3000, activeKcal: 500, workouts: 3 },
+    });
+    await request('POST', '/api/meals', { eatenAt: at(today, '23:00'), localDate: today, text: 'tisane' });
+    expect(mealInputs.at(-1)?.recentWorkout).toBeNull();
+
+    await request('POST', '/api/coach/messages', { text: 'Et ce soir ?', localDate: today });
+    const coach = coachInputs.at(-1)!;
+    expect(coach.today.workouts.map((w) => w.type)).toEqual(['running', 'walking', 'strength']);
+    expect(coach.week.workouts).toHaveLength(5);
+    expect(coach.week.activity.activeMinutes).toBe(127);
+  });
+
+  it('relates activity to cravings in insights', async () => {
+    const item = { ...croissantAnalysis.items[0]!, id: 'croissant', source: 'manual' };
+    for (const date of [yesterday, addDays(today, -3), addDays(today, -4)]) {
+      await request('POST', '/api/meals', { eatenAt: at(date, '12:00'), localDate: date, items: [item] });
+    }
+    const crave = (date: string) => request('POST', '/api/cravings', { at: at(date, '16:00'), localDate: date, what: 'chocolat', intensity: 2 });
+    await crave(today);
+    await crave(addDays(today, -3));
+    await crave(addDays(today, -3));
+    await crave(addDays(today, -4));
+
+    const { body } = await request<InsightsResponse>('GET', '/api/insights?days=28');
+    expect(body.activity.byType).toEqual([
+      { type: 'running', sessions: 2, minutes: 62 },
+      { type: 'strength', sessions: 1, minutes: 45 },
+      { type: 'walking', sessions: 1, minutes: 40 },
+      { type: 'yoga', sessions: 1, minutes: 20 },
+    ]);
+    expect(body.activity.totalMinutes).toBe(127);
+    // 127 min over 28 days ≈ 32 min per week.
+    expect(body.activity.weeklyMinutes).toBe(32);
+    expect(body.activity.days.find((d) => d.date === today)).toEqual({ date: today, activeMinutes: 75, steps: 3000, workouts: 3 });
+    // Workout days: today (1 craving) and yesterday (0); rest days: 2 and 1.
+    expect(body.activity.cravingsOnActiveDays).toEqual({ active: 0.5, inactive: 1.5 });
+    expect(body.activity.goals.weeklyStrengthSessions).toBe(3);
+    // Without a watch total, yesterday's budget counts its workouts.
+    expect(body.days.find((d) => d.date === yesterday)?.activeKcal).toBe(360);
+  });
+
+  it('only lets the owner delete a workout, and exports workouts', async () => {
+    const [first] = (await list(yesterday)).body;
+    expect((await request('DELETE', `/api/workouts/${first!.id}`, undefined, stranger)).status).toBe(404);
+    expect((await list(yesterday)).body).toHaveLength(5);
+    expect((await request('DELETE', `/api/workouts/${first!.id}`)).status).toBe(204);
+    expect((await request('DELETE', `/api/workouts/${first!.id}`)).status).toBe(404);
+
+    const exported = await request<{ workouts: Workout[] }>('GET', '/api/me/export');
+    expect(exported.body.workouts).toHaveLength(4);
   });
 });
