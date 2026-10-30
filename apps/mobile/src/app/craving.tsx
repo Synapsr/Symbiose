@@ -13,6 +13,7 @@ import { dismiss } from '@/lib/nav';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
+import { endCravingActivity, startCravingActivity } from '@/lib/live-activity';
 import { useApi } from '@/lib/session';
 import { Space, useTheme } from '@/theme';
 
@@ -35,12 +36,14 @@ export default function CravingSheet() {
     onSuccess: (res) => {
       haptics.success();
       setResult(res);
+      startCravingActivity(res.craving.id, t);
       void queryClient.invalidateQueries({ queryKey: ['day', today] });
     },
   });
   const settle = useMutation({
     mutationFn: (outcome: 'resisted' | 'gave_in') => api.updateCraving(result!.craving.id, outcome),
     onSuccess: (craving) => {
+      if (craving.outcome !== 'pending') endCravingActivity(craving.id, craving.outcome);
       void queryClient.invalidateQueries({ queryKey: ['day', today] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       if (craving.outcome === 'resisted') {

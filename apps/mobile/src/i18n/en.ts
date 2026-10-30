@@ -444,4 +444,13 @@ export const en: Record<TranslationKey, string> = {
   'outbox.signOutTitle': 'Meals are waiting for the network',
   'outbox.signOutOne': '1 meal hasn’t been sent yet. It will be lost if you sign out.',
   'outbox.signOutMany': '{count} meals haven’t been sent yet. They’ll be lost if you sign out.',
+  // Craving Live Activity (« surfer l'envie »)
+  'craving.activity.title': 'Surf the urge',
+  'craving.activity.line1': 'A craving often eases within a few minutes.',
+  'craving.activity.line2': 'Breathe. The urge rises, then it fades.',
+  'craving.activity.line3': 'Some water, a few steps: let the wave pass.',
+  'craving.activity.staleTitle': 'Did it pass?',
+  'craving.activity.staleLine': 'Ten minutes in. How’s the urge now?',
+  'craving.activity.resistedDone': 'Nice, wave surfed.',
+  'craving.activity.gaveInDone': 'Noted. Moving on, guilt-free.',
 };

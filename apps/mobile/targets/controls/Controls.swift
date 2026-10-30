@@ -5,14 +5,6 @@ import WidgetKit
 // Controls appear in Control Center, on the Lock Screen and can be assigned
 // to the Action Button. Each one deep-links into the app.
 
-@main
-struct SymbioseControls: WidgetBundle {
-  var body: some Widget {
-    CaptureMealControl()
-    CravingControl()
-  }
-}
-
 struct CaptureMealControl: ControlWidget {
   var body: some ControlWidgetConfiguration {
     StaticControlConfiguration(kind: "io.synapsr.symbiose.control.capture") {
