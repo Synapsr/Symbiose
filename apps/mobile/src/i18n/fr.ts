@@ -361,6 +361,15 @@ export const fr = {
   'status.reached': 'atteint',
   'status.left': 'restant',
   'status.toGo': 'à atteindre',
+  // Craving Live Activity (« surfer l'envie »)
+  'craving.activity.title': 'Surfer l’envie',
+  'craving.activity.line1': 'Souvent, une envie redescend en quelques minutes.',
+  'craving.activity.line2': 'Respire. L’envie monte, puis elle redescend.',
+  'craving.activity.line3': 'Un verre d’eau, quelques pas : laisse passer la vague.',
+  'craving.activity.staleTitle': 'C’est passé ?',
+  'craving.activity.staleLine': 'Dix minutes déjà. Où en est l’envie ?',
+  'craving.activity.resistedDone': 'Bravo, vague surfée.',
+  'craving.activity.gaveInDone': 'C’est noté. On continue, sans culpabilité.',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

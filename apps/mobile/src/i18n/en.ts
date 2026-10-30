@@ -348,4 +348,13 @@ export const en: Record<TranslationKey, string> = {
   'status.reached': 'reached',
   'status.left': 'left',
   'status.toGo': 'to go',
+  // Craving Live Activity (« surfer l'envie »)
+  'craving.activity.title': 'Surf the urge',
+  'craving.activity.line1': 'A craving often eases within a few minutes.',
+  'craving.activity.line2': 'Breathe. The urge rises, then it fades.',
+  'craving.activity.line3': 'Some water, a few steps: let the wave pass.',
+  'craving.activity.staleTitle': 'Did it pass?',
+  'craving.activity.staleLine': 'Ten minutes in. How’s the urge now?',
+  'craving.activity.resistedDone': 'Nice, wave surfed.',
+  'craving.activity.gaveInDone': 'Noted. Moving on, guilt-free.',
 };

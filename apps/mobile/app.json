@@ -18,7 +18,11 @@
       "infoPlist": {
         "NSCameraUsageDescription": "Symbiose uses the camera to photograph your meals and scan barcodes.",
         "NSPhotoLibraryUsageDescription": "Symbiose lets you pick a meal photo from your library.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSSupportsLiveActivities": true
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.io.synapsr.symbiose"]
       },
       "buildNumber": "6",
       "appleTeamId": "3RZSUHDN87"
