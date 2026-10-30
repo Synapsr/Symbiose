@@ -50,6 +50,13 @@
       "when": 1793397055131,
       "tag": "0006_health_journal",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793399669701,
+      "tag": "0007_proactive_coach",
+      "breakpoints": true
     }
   ]
 }

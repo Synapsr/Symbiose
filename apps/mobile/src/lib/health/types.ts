@@ -9,6 +9,8 @@ import {
   type Profile,
   type Sex,
   type SleepNightInput,
+  type VitalDayInput,
+  type VitalMetric,
   type SleepSegment,
   type WaterInput,
   type WorkoutInput,
@@ -48,6 +50,8 @@ export const BP_SCOPES = 1;
 /** And for the opt-in sleep and water types. */
 export const SLEEP_SCOPES = 1;
 export const WATER_SCOPES = 1;
+/** And for the nightly vitals (HRV, resting heart rate), asked once the morning check-in is on. */
+export const VITALS_SCOPES = 1;
 
 /** Marks the readings Symbiose writes to the store, so they're not imported back as duplicates. */
 export const OWN_READING_KEY = 'SymbioseReadingId';
@@ -74,18 +78,27 @@ export interface HealthModules {
   bloodPressure?: boolean;
   sleep?: boolean;
   hydration?: boolean;
+  /** Nightly HRV and resting heart rate, for the morning check-in's recovery line. */
+  vitals?: boolean;
 }
 
 export function healthModules(profile: Profile | null | undefined): HealthModules {
-  return { bloodPressure: profile?.trackBloodPressure === true, sleep: profile?.trackSleep === true, hydration: profile?.trackHydration === true };
+  const proactive = profile?.proactive;
+  return {
+    bloodPressure: profile?.trackBloodPressure === true,
+    sleep: profile?.trackSleep === true,
+    hydration: profile?.trackHydration === true,
+    vitals: proactive?.enabled === true && proactive.morning !== false,
+  };
 }
 
 /** The settings to save once the store was asked for these modules. */
-export function grantedScopes(modules: HealthModules): { bpScopes?: number; sleepScopes?: number; waterScopes?: number } {
+export function grantedScopes(modules: HealthModules): { bpScopes?: number; sleepScopes?: number; waterScopes?: number; vitalsScopes?: number } {
   return {
     ...(modules.bloodPressure ? { bpScopes: BP_SCOPES } : null),
     ...(modules.sleep ? { sleepScopes: SLEEP_SCOPES } : null),
     ...(modules.hydration ? { waterScopes: WATER_SCOPES } : null),
+    ...(modules.vitals ? { vitalsScopes: VITALS_SCOPES } : null),
   };
 }
 
@@ -122,6 +135,11 @@ export interface HealthBridge {
   writeWater(entry: WaterWrite): Promise<void>;
   /** Removes a glass Symbiose wrote (an undo in the app). */
   deleteWater(id: string): Promise<void>;
+  /**
+   * Nightly HRV (in the sleep windows of `nights` when known) and daily resting
+   * heart rate between two dates, one value per day and metric.
+   */
+  readVitals(from: Date, to: Date, nights: SleepNightInput[]): Promise<VitalDayInput[]>;
 }
 
 export function dayBounds(day: Date): { start: Date; end: Date } {
@@ -230,4 +248,49 @@ export function inferWalkIntensity(workout: WorkoutInput, weightKg: number | nul
     intensity = met < 3.15 ? 'light' : met >= 4.25 ? 'vigorous' : 'moderate';
   }
   return intensity ? { ...workout, intensity } : workout;
+}
+
+/** Before any night is known, HRV measured between midnight and this hour counts for that night. */
+const FALLBACK_NIGHT_END_HOUR = 7;
+
+const middle = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+};
+
+/**
+ * HRV readings → one value per night (the median of the readings taken
+ * while asleep), keyed by the wake-up day. Without a known night that day,
+ * the readings between midnight and 07:00 stand in for it. Readings taken
+ * during the day (a workout, a breathing session) are left out.
+ */
+export function nightlyHrv(
+  samples: { at: Date; value: number }[],
+  nights: Pick<SleepNightInput, 'localDate' | 'bedtime' | 'wakeTime'>[],
+  metric: Extract<VitalMetric, 'hrv_sdnn' | 'hrv_rmssd'>,
+): VitalDayInput[] {
+  const windows = nights.map((n) => ({ day: n.localDate, from: Date.parse(n.bedtime), to: Date.parse(n.wakeTime) }));
+  const byDay = new Map<string, number[]>();
+  for (const sample of samples) {
+    if (!(sample.value >= 1 && sample.value <= 300)) continue;
+    const t = sample.at.getTime();
+    const date = toLocalDate(sample.at);
+    const early = sample.at.getHours() < FALLBACK_NIGHT_END_HOUR && !windows.some((w) => w.day === date);
+    const day = windows.find((w) => t >= w.from && t <= w.to)?.day ?? (early ? date : null);
+    if (day) byDay.set(day, [...(byDay.get(day) ?? []), sample.value]);
+  }
+  return [...byDay.entries()].map(([localDate, values]) => ({ localDate, metric, value: Math.round(middle(values) * 10) / 10, samples: values.length }));
+}
+
+/** Resting heart rate: the store computes one a day; keep the latest of each day. */
+export function dailyRestingHr(samples: { at: Date; value: number }[]): VitalDayInput[] {
+  const byDay = new Map<string, { at: number; value: number }>();
+  for (const sample of samples) {
+    if (!(sample.value >= 25 && sample.value <= 220)) continue;
+    const day = toLocalDate(sample.at);
+    const kept = byDay.get(day);
+    if (!kept || sample.at.getTime() >= kept.at) byDay.set(day, { at: sample.at.getTime(), value: sample.value });
+  }
+  return [...byDay.entries()].map(([localDate, { value }]) => ({ localDate, metric: 'resting_hr' as const, value: Math.round(value), samples: 1 }));
 }

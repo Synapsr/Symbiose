@@ -5,7 +5,7 @@ import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, waterLogs, weights, workouts } from '../db/schema';
+import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, vitals, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
 import { toReading } from '../services/blood-pressure';
@@ -16,6 +16,7 @@ import { toMeal } from '../services/meals';
 import { toMood } from '../services/mood';
 import { toNight } from '../services/sleep';
 import { getUserRow, toUser } from '../services/users';
+import { toVital } from '../services/vitals';
 import { toWorkout } from '../services/workouts';
 
 /** Opt-in switches: profile forms that predate one don't send it, and must not turn it off. */
@@ -71,6 +72,8 @@ export function meRoutes({ db, config, photos }: Deps) {
     const profile = { ...c.req.valid('json') };
     const stored = getUserRow(db, c.get('userId')).profile;
     for (const key of OPT_INS) if (profile[key] === undefined && stored?.[key] !== undefined) profile[key] = stored[key];
+    // Same for the proactive coach, set from its own screen.
+    if (profile.proactive === undefined && stored?.proactive) profile.proactive = stored.proactive;
     const row = db
       .update(users)
       .set({ profile, name: profile.name })
@@ -97,6 +100,7 @@ export function meRoutes({ db, config, photos }: Deps) {
       mood: db.select().from(moods).where(eq(moods.userId, userId)).all().map(toMood),
       cravings: db.select().from(cravings).where(eq(cravings.userId, userId)).all().map(toCraving),
       journal: db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).all().map(toJournalEntry),
+      vitals: db.select().from(vitals).where(eq(vitals.userId, userId)).all().map(toVital),
       coach: db.select().from(coachMessages).where(eq(coachMessages.userId, userId)).all(),
     };
     c.header('Content-Disposition', `attachment; filename="symbiose-export-${payload.exportedAt.slice(0, 10)}.json"`);

@@ -19,8 +19,10 @@ import { hydrationRoutes } from './routes/hydration';
 import { journalRoutes } from './routes/journal';
 import { mealRoutes } from './routes/meals';
 import { moodRoutes } from './routes/mood';
+import { proactiveRoutes } from './routes/proactive';
 import { sleepRoutes } from './routes/sleep';
 import { trackingRoutes } from './routes/tracking';
+import { vitalsRoutes } from './routes/vitals';
 import { workoutRoutes } from './routes/workouts';
 
 export function createApp(deps: Deps, options: { log?: boolean } = {}) {
@@ -71,6 +73,8 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/mood', moodRoutes(deps));
   app.route('/api/glance', glanceRoutes(deps));
   app.route('/api/journal', journalRoutes(deps));
+  app.route('/api/proactive', proactiveRoutes(deps));
+  app.route('/api/vitals', vitalsRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 
   return app;
