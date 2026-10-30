@@ -916,3 +916,46 @@ describe('coach meal actions', () => {
     expect(history.body[0]).toMatchObject({ id: 'legacy', suggestion: null, mealActions: [] });
   });
 });
+
+describe('meals sent late from the offline queue', () => {
+  const mealInputs: MealAnalysisInput[] = [];
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async analyzeMeal(input) {
+        mealInputs.push(input);
+        return croissantAnalysis;
+      },
+    },
+    { allowSignup: true },
+  );
+  const { request: call, register } = clientFor(app);
+  let token = '';
+  const request = <T,>(method: string, path: string, body?: unknown) => call<T>(method, path, token, body);
+  const day = '2026-10-30';
+
+  beforeAll(async () => {
+    token = await register('offline@example.com');
+    expect((await request('PUT', '/api/me/profile', profile)).status).toBe(200);
+  });
+
+  it('keeps the exact capture time, which is what the app matches a lost response on', async () => {
+    const eatenAt = `${day}T12:30:07+01:00`;
+    expect((await request<Meal>('POST', '/api/meals', { eatenAt, localDate: day, text: 'une salade' })).status).toBe(201);
+    const listed = await request<Meal[]>('GET', `/api/meals?date=${day}`);
+    expect(listed.body.filter((m) => m.eatenAt === eatenAt)).toHaveLength(1);
+  });
+
+  it('analyses a late meal with only what was eaten before it', async () => {
+    await request('POST', '/api/meals', { eatenAt: `${day}T20:00:00+01:00`, localDate: day, text: 'le dîner' });
+    // The breakfast captured offline arrives after dinner.
+    await request('POST', '/api/meals', { eatenAt: `${day}T08:00:00+01:00`, localDate: day, text: 'le petit-déjeuner' });
+    const breakfast = mealInputs.find((i) => i.text === 'le petit-déjeuner')!;
+    expect(breakfast.dayTotalsBefore.kcal).toBe(0);
+    const dinner = mealInputs.find((i) => i.text === 'le dîner')!;
+    expect(dinner.dayTotalsBefore.kcal).toBeGreaterThan(0); // the 12:30 salad
+    await request('POST', '/api/meals', { eatenAt: `${day}T22:00:00+01:00`, localDate: day, text: 'une tisane' });
+    const late = mealInputs.find((i) => i.text === 'une tisane')!;
+    expect(late.dayTotalsBefore.kcal).toBeGreaterThan(dinner.dayTotalsBefore.kcal);
+  });
+});
