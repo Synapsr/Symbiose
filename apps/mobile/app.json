@@ -20,7 +20,7 @@
         "NSPhotoLibraryUsageDescription": "Symbiose lets you pick a meal photo from your library.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "buildNumber": "2",
+      "buildNumber": "3",
       "appleTeamId": "3RZSUHDN87"
     },
     "android": {
@@ -91,7 +91,8 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,
