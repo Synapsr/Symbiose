@@ -21,6 +21,7 @@ struct RelogSheet: View {
         .font(.rounded(16, .semibold))
         .multilineTextAlignment(.center)
         .lineLimit(2)
+        .fixedSize(horizontal: false, vertical: true)
       MealDetail(kcal: meal.kcal, hero: meal.hero, glance: model.glance, hideCalories: model.hideCalories, copy: copy)
       Group {
         switch phase {

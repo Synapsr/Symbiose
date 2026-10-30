@@ -133,10 +133,6 @@ struct Copy {
     lang == .fr ? "«\u{00A0}\(text)\u{00A0}»" : "“\(text)”"
   }
 
-  func meals(_ count: Int) -> String {
-    lang == .fr ? "\(count) repas" : "\(count) \(count == 1 ? "meal" : "meals")"
-  }
-
   func updated(_ date: Date) -> String {
     let time = date.formatted(Date.FormatStyle(date: .omitted, time: .shortened).locale(lang.locale))
     return t("À jour à \(time)", "Updated \(time)")

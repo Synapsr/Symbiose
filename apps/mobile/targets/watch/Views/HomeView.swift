@@ -127,7 +127,7 @@ struct HomeView: View {
 }
 
 /// The hero ring, with the two metrics that follow it on its right (as on the
-/// phone's Today card), or alone and larger when the plan has a single focus.
+/// phone's Today card), or alone and larger when there is nothing else to show.
 private struct Today: View {
   let glance: Glance
   let copy: Copy

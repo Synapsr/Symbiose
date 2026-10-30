@@ -81,5 +81,9 @@ enum PhoneContext {
     }
     GlanceCache.reloadComplications()
     WatchModel.shared.reload()
+    // The phone's glance may predate something logged from the wrist: check with the server while on screen.
+    if WKApplication.shared().applicationState == .active {
+      Task { await WatchModel.shared.refresh() }
+    }
   }
 }
