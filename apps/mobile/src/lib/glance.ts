@@ -35,9 +35,22 @@ export function useGlanceSync() {
 
   const data = glance.data ?? null;
   useEffect(() => {
-    const context: GlanceContext | null =
-      session && data ? { glance: data, serverUrl: session.serverUrl, token: session.token, locale, hideCalories } : null;
+    // Still loading (or offline): keep what the watch and the widgets show. `null` means signed out only.
+    if (!session || !data) return;
+    const context: GlanceContext = { glance: data, serverUrl: session.serverUrl, token: session.token, locale, hideCalories };
     syncWidgets(context);
     syncWatch(context);
   }, [session, data, locale, hideCalories]);
+}
+
+/**
+ * Signing out unmounts the tabs (and useGlanceSync with them), so the root
+ * tells the watch and the widgets to forget the session.
+ */
+export function useSignedOutSync(signedOut: boolean) {
+  useEffect(() => {
+    if (!signedOut) return;
+    syncWidgets(null);
+    syncWatch(null);
+  }, [signedOut]);
 }
