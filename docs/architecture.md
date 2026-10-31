@@ -27,7 +27,7 @@ The model never sets a number the user sees directly without a deterministic pas
 
 Without an API key, a keyword-based planner produces a reasonable plan so the app stays usable.
 
-**Meals.** `POST /api/meals` with a photo and/or text runs one vision call with structured output (`ai/claude.ts`, `ai/prompts.ts`). The prompt asks for edible grams and nutrients **per 100 g as served** from reference tables, with explicit rules for added vs total sugars and hidden fats. The server then:
+**Meals.** `POST /api/meals` with a photo and/or text runs one vision call with structured output (`ai/prompts.ts`, `ai/shared.ts`, then `ai/claude.ts` or `ai/openai.ts`). The prompt asks for edible grams and nutrients **per 100 g as served** from reference tables, with explicit rules for added vs total sugars and hidden fats. The server then:
 
 1. sanitizes each item (`sanitizePer100g`): physical bounds, added sugar ⊂ sugar ⊂ carbs, saturated ⊂ fat, and an Atwater energy check that replaces a kcal value inconsistent with the macros by more than 35 %;
 2. stores items per 100 g, so any portion change is an exact rescale;
@@ -39,6 +39,8 @@ Answering the question or typing a correction calls `/refine`, which re-runs the
 **Barcodes** go to Open Food Facts. When a product doesn't report added sugars, they are inferred from the ingredient list.
 
 All Claude calls use structured outputs, adaptive thinking with per-task effort, and server-side refusal fallbacks (`fallbacks: "default"`).
+
+Claude is the default and the reference. `AI_PROVIDER` can pick another provider (`ai/providers.ts`): they all go through one adapter on the OpenAI Chat Completions API (`ai/openai.ts`), with the same prompts, context, zod schemas and checks (`ai/shared.ts`), a strict JSON schema for structured answers, and the same error codes. A model that can't read photos answers photo meals with `ai_no_vision`; one that can't call tools gets a coach without proposals.
 
 ## Data model
 

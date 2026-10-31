@@ -34,15 +34,59 @@ Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Sc
 
 | Variable | Default | |
 | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | — | Enables photo/text analysis, plans, coach, reviews. Without it, the app still works (barcodes, manual logging, keyword-based plans). |
+| `ANTHROPIC_API_KEY` | — | Enables photo/text analysis, plans, coach, reviews with Claude. Without any AI, the app still works (barcodes, manual logging, keyword-based plans). |
 | `ANTHROPIC_WORKSPACE_ID` | — | Only for API keys that aren't scoped to a workspace (Claude Console → Settings → Workspaces). |
-| `AI_MODEL` | `claude-opus-5-5` | Any Claude model id. |
+| `AI_PROVIDER` | `anthropic` | Another AI provider: see [below](#other-ai-providers). |
+| `AI_MODEL` | per provider | Any model id of the provider (`claude-opus-5-5` for Claude). |
+| `AI_API_KEY` | — | The provider's key. Its own variable works too (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`…). |
+| `AI_BASE_URL` | per provider | Where an OpenAI-compatible server listens (Ollama, LM Studio, vLLM…). |
+| `AI_VISION` | `true` | `false` for a model that can't read photos: photo meals then ask for a description, text meals work. |
 | `PUBLIC_URL` | derived from the request | URL encoded in the QR code (set it behind a reverse proxy). |
 | `ALLOW_SIGNUP` | `false` | Allow more accounts after the first one (family server). |
 | `DATA_DIR` | `/data` | SQLite database, photos and generated JWT secret. Back up this folder. |
 | `JWT_SECRET` | generated once | Override the token signing secret. |
 | `PORT` | `3000` | |
 | `AI_MOCK` | `false` | **Development only**: canned AI answers so you can work on the UI without a key. |
+
+### Other AI providers
+
+Claude is the default, and the reference: Symbiose's prompts were written and tuned on it. Other models work, but may be less precise on portions and nutrients, and small local models much less so. Photo meals need a model that reads images; the coach's proposals (log a meal, change goals) need one that calls tools, otherwise it answers in plain text. The server log says at start-up which provider and model answer, or what is missing.
+
+| `AI_PROVIDER` | Default `AI_MODEL` | Key |
+| --- | --- | --- |
+| `anthropic` | `claude-opus-5-5` | `ANTHROPIC_API_KEY` |
+| `openai` | `gpt-6-astra` | `OPENAI_API_KEY` |
+| `mistral` | `mistral-large-4` | `MISTRAL_API_KEY` |
+| `gemini` | `gemini-3.8-flash` | `GEMINI_API_KEY` |
+| `openrouter` | `anthropic/claude-opus-5.5` | `OPENROUTER_API_KEY` |
+| `ollama` | `gemma4` | none (`AI_BASE_URL` defaults to `http://localhost:11434/v1`) |
+| `openai-compatible` | required | optional (`AI_BASE_URL` required) |
+
+```bash
+# OpenAI
+docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
+  -e AI_PROVIDER=openai -e AI_API_KEY=sk-... ghcr.io/synapsr/symbiose:latest
+
+# Mistral
+docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
+  -e AI_PROVIDER=mistral -e AI_API_KEY=... ghcr.io/synapsr/symbiose:latest
+
+# Google Gemini
+docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
+  -e AI_PROVIDER=gemini -e AI_API_KEY=... ghcr.io/synapsr/symbiose:latest
+
+# OpenRouter, here with another model than the default
+docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
+  -e AI_PROVIDER=openrouter -e AI_API_KEY=sk-or-... -e AI_MODEL=openai/gpt-6.1-sol ghcr.io/synapsr/symbiose:latest
+
+# Ollama on the same machine: `ollama pull gemma4` first (on Linux, start Ollama with OLLAMA_HOST=0.0.0.0)
+docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data --add-host=host.docker.internal:host-gateway \
+  -e AI_PROVIDER=ollama -e AI_BASE_URL=http://host.docker.internal:11434/v1 -e AI_MODEL=gemma4 ghcr.io/synapsr/symbiose:latest
+
+# Any OpenAI-compatible server: LM Studio, vLLM, llama.cpp…
+docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
+  -e AI_PROVIDER=openai-compatible -e AI_BASE_URL=http://192.168.1.20:1234/v1 -e AI_MODEL=my-model ghcr.io/synapsr/symbiose:latest
+```
 
 Updating is `docker pull` + restart: migrations run automatically at start-up. Before applying new migrations, the server copies the database to `DATA_DIR/backups/` (the last three copies are kept), so an update can always be rolled back.
 

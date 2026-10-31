@@ -66,6 +66,7 @@ export function createMockAi(): Ai {
   return {
     enabled: true,
     model: 'mock',
+    provider: 'mock',
 
     async analyzeMeal(input) {
       await new Promise((r) => setTimeout(r, 1200));
