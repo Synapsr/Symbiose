@@ -255,7 +255,7 @@ const fr = {
     steps: [
       { title: 'Lance le serveur', body: 'Une commande. Ta clé Anthropic active les photos, les plans, le coach et les bilans.' },
       { title: 'Ouvre sa page', body: 'http://ton-serveur:3000 affiche un QR code.' },
-      { title: 'Scanne-le avec l’app', body: '« Scanner le QR du serveur », puis crée ton compte. Le premier compte est administrateur.' },
+      { title: 'Scanne-le avec l’app', body: '« Scanner le QR du serveur », puis crée ton compte, le premier du serveur.' },
     ],
     facts: [
       'Une base SQLite et un dossier de photos, dans un seul volume. Sauvegarde-le, c’est tout.',
@@ -360,7 +360,7 @@ const fr = {
       },
       {
         q: 'Plusieurs personnes sur un serveur ?',
-        a: 'Oui. Le premier compte est administrateur ; ALLOW_SIGNUP=true ouvre les inscriptions, pour un serveur de famille par exemple.',
+        a: 'Oui. SIGNUP=request : chacun peut faire sa demande et tu valides depuis l’espace admin (SIGNUP=open pour un serveur de famille). Les admins sont les e-mails de ADMIN_EMAILS ; ils voient la consommation d’IA et l’usage global, jamais les données de quelqu’un.',
       },
       {
         q: 'C’est un dispositif médical ?',
@@ -630,7 +630,7 @@ const en: Dict = {
     steps: [
       { title: 'Start the server', body: 'One command. Your Anthropic key enables photos, plans, the coach and reviews.' },
       { title: 'Open its page', body: 'http://your-server:3000 shows a QR code.' },
-      { title: 'Scan it with the app', body: '“Scan the server QR code”, then create your account. The first account is the admin.' },
+      { title: 'Scan it with the app', body: '“Scan the server QR code”, then create your account, the server’s first.' },
     ],
     facts: [
       'One SQLite database and a photos folder, in a single volume. Back it up and you’re done.',
@@ -735,7 +735,7 @@ const en: Dict = {
       },
       {
         q: 'Several people on one server?',
-        a: 'Yes. The first account is the admin; ALLOW_SIGNUP=true opens sign-ups, for a family server for instance.',
+        a: 'Yes. With SIGNUP=request anyone can ask and you approve from the admin space (SIGNUP=open for a family server). Admins are the emails in ADMIN_EMAILS; they see AI usage and overall activity, never anyone’s data.',
       },
       {
         q: 'Is it a medical device?',
