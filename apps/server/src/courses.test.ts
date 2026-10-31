@@ -184,6 +184,20 @@ describe('meals in courses', () => {
     await request('DELETE', `/api/meals/${lunch.id}/courses/${res.body.courses![3]!.id}`);
   });
 
+  it('keeps both of two scans sent at the same moment', async () => {
+    const scan = (name: string, time: string): FoodItem => ({ id: name, name, emoji: '', portion: '', grams: 100, per100g: per100g(50), source: 'barcode', confidence: null, brand: null, barcode: name });
+    const [first, second] = await Promise.all([
+      log({ eatenAt: at('13:01'), items: [scan('Compote', '13:01')], course: 'auto' }),
+      log({ eatenAt: at('13:02'), items: [scan('Biscuit', '13:02')], course: 'auto' }),
+    ]);
+    expect([first.body.id, second.body.id]).toEqual([lunch.id, lunch.id]);
+    const both = (await request<Meal>('GET', `/api/meals/${lunch.id}`)).body;
+    expect(both.items.map((i) => i.name)).toEqual(expect.arrayContaining(['Compote', 'Biscuit']));
+    expect(both.courses).toHaveLength(5);
+    for (const course of both.courses!.slice(3)) await request('DELETE', `/api/meals/${lunch.id}/courses/${course.id}`);
+    expect((await request<Meal>('GET', `/api/meals/${lunch.id}`)).body.courses).toHaveLength(3);
+  });
+
   it('applies one correction to the whole meal: every course, every photo, sent once', async () => {
     answer = (input) => {
       const courses = input.previous!.courses!;

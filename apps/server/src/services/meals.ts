@@ -336,22 +336,63 @@ async function addCourse(deps: MealDeps, userId: string, row: MealRow, input: Cr
   }
 
   course.photoId = photo ? await photos.save(userId, photo.buffer, photo.mime) : null;
-  const items = [...earlier, ...added.map((item) => ({ ...item, courseId }))];
-  const next = withLabels([...courses, course], analysis?.courses);
+
+  // Another course may have joined while the AI looked (two quick scans): build on the meal as it is now.
+  const current = db.select().from(meals).where(and(eq(meals.id, row.id), eq(meals.userId, userId))).get();
+  if (!current) return aloneAfterAll(db, userId, row, input, { course, items: added, analysis, resolved });
+  const now = storedCourses(current);
+  const items = [...tagItems(current.items, now[0]!.id), ...added.map((item) => ({ ...item, courseId }))];
+  const next = withLabels([...now, course], analysis?.courses);
+  // A scan is judged with the meal's words only: no question about it.
+  const words = analysis && !(photo || input.text) ? { ...analysis, clarification: null } : analysis;
   const updated = db
     .update(meals)
     .set({
       ...courseColumns(next, items),
-      title: analysis?.title.trim().slice(0, 120) || row.title,
+      title: analysis?.title.trim().slice(0, 120) || current.title,
       // The AI may ask about the new course: its question stays.
-      insight: analysis ? buildInsight(mealTotals(items), resolved.targets, resolved.context.plan, analysis) : refreshedInsight(row.insight, items, resolved),
-      mealType: input.mealType ?? analysis?.mealType ?? row.mealType,
+      insight: words ? buildInsight(mealTotals(items), resolved.targets, resolved.context.plan, words) : refreshedInsight(current.insight, items, resolved),
+      mealType: input.mealType ?? analysis?.mealType ?? current.mealType,
       updatedAt: nowIso(),
     })
     .where(eq(meals.id, row.id))
     .returning()
     .get();
   return toMeal(updated);
+}
+
+/** The meal a course was joining went (deleted meanwhile): the course stands as a meal of its own. */
+function aloneAfterAll(
+  db: Db,
+  userId: string,
+  row: MealRow,
+  input: CreateInput,
+  { course, items, analysis, resolved }: { course: MealCourseRow; items: FoodItem[]; analysis: MealAnalysis | undefined; resolved: Resolved },
+): Meal {
+  const own = items.map(({ courseId: _course, ...item }) => item);
+  const now = nowIso();
+  const inserted = db
+    .insert(meals)
+    .values({
+      id: randomUUID(),
+      userId,
+      eatenAt: input.eatenAt,
+      localDate: row.localDate,
+      mealType: input.mealType ?? mealTypeForHour(localHour(input.eatenAt)),
+      title: own.map((i) => i.name).join(', ').slice(0, 120) || row.title,
+      items: own,
+      photoId: course.photoId,
+      inputText: course.text,
+      note: null,
+      insight: buildInsight(mealTotals(own), resolved.targets, resolved.context.plan, analysis && (input.photoBase64 || input.text) ? analysis : undefined),
+      favorite: false,
+      courses: course.basedOn ? [{ ...course, id: FIRST_COURSE_ID }] : null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning()
+    .get();
+  return toMeal(inserted);
 }
 
 // ---------------------------------------------------------------- Editing
@@ -424,7 +465,7 @@ export async function refineMeal({ db, ai, photos }: MealDeps, userId: string, i
   // Each item back in its course: a number the meal doesn't have goes to the first.
   const courseFor = multi ? (n: number | undefined) => (n && n >= 1 && n <= courses.length ? courses[n - 1]!.id : courses[0]!.id) : undefined;
   const reused = reusePast(itemsFromAnalysis(analysis, courseFor), analysis.reusedMeal, history);
-  const items = reused.items;
+  let items = reused.items;
   let next = withLabels(courses, analysis.courses);
   let removed: MealCourseRow[] = [];
   if (multi) ({ courses: next, removed } = pruneCourses(next, items));
@@ -433,7 +474,15 @@ export async function refineMeal({ db, ai, photos }: MealDeps, userId: string, i
     const from = new Set(items.filter((i) => reused.reused.has(i.id)).map((i) => i.courseId ?? next[0]!.id));
     next = next.map((c) => (from.has(c.id) || !multi ? { ...c, basedOn: reused.basedOn } : c));
   }
-  const keepColumns = !existing.courses && next.length === 1 && !next[0]!.basedOn;
+  // A course that joined while the AI looked stays, as it is.
+  const current = getMealRow(db, userId, existing.id);
+  const joined = storedCourses(current).filter((c) => !courses.some((o) => o.id === c.id));
+  if (joined.length) {
+    const latest = tagItems(current.items, storedCourses(current)[0]!.id);
+    next = [...next, ...joined];
+    items = [...tagItems(items, courses[0]!.id), ...latest.filter((item) => joined.some((c) => c.id === item.courseId))];
+  }
+  const keepColumns = !current.courses && next.length === 1 && !next[0]!.basedOn;
   const row = db
     .update(meals)
     .set({
