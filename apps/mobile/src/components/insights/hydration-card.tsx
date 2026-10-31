@@ -24,7 +24,7 @@ export function WaterTrendRow({ trend, today, first }: { trend: HydrationTrend; 
       label={t('water.title')}
       value={trend.averageMl !== null ? t('life.perDay', { value: formatLiters(trend.averageMl, locale) }) : '—'}
       caption={plural('water.daysReached', trend.daysReached, { total: trend.windowDays })}
-      captionColor={trend.daysReached > 0 ? colors.accent : undefined}
+      captionColor={trend.daysReached > 0 ? colors.accentText : undefined}
       chart={<MiniBars values={values} color={LIFE_COLORS.water} max={baseGoal} />}>
       <DayBars values={values} labels={trend.days.map((d) => weekdayInitial(d.date, locale))} target={baseGoal} kind="min" color={LIFE_COLORS.water} softUnder />
       <Txt variant="caption" tone="tertiary">

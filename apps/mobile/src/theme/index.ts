@@ -9,8 +9,11 @@ const light = {
   text2: '#6E6E73',
   text3: '#A1A1A6',
   border: 'rgba(0,0,0,0.07)',
-  accent: '#1F8A5B',
-  accentSoft: '#E1F0E7',
+  /** Fills: buttons, rings, active states. */
+  accent: '#00803F',
+  /** Accent-coloured text and small glyphs: a shade deeper so it reads on every surface. */
+  accentText: '#00753B',
+  accentSoft: '#E2F9EA',
   /** Text and icons on an accent background. */
   onAccent: '#FFFFFF',
   warning: '#E8890C',
@@ -29,8 +32,9 @@ const dark: typeof light = {
   text2: '#9A9AA0',
   text3: '#5F5F66',
   border: 'rgba(255,255,255,0.08)',
-  accent: '#3DD68C',
-  accentSoft: '#12301F',
+  accent: '#2EE68A',
+  accentText: '#2EE68A',
+  accentSoft: '#0D3320',
   onAccent: '#0A0A0B',
   warning: '#FFB224',
   warningSoft: '#3A2A0E',
@@ -44,7 +48,7 @@ export type Palette = typeof light;
 
 /** One color per nutrient, used consistently in rings, bars and chips. */
 export const NUTRIENT_COLORS: Record<NutrientKey, string> = {
-  kcal: '#1F8A5B',
+  kcal: '#009A4E',
   protein: '#FF7A59',
   carbs: '#F2B23A',
   fat: '#4F8EF7',

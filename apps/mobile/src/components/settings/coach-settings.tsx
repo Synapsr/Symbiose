@@ -2,10 +2,10 @@ import { clockMinutes, formatClock, type ProactiveSchedule, type ProactiveSettin
 import { BellOff, BellRing, CalendarCheck, Candy, Minus, Moon, Plus, Sparkle, Sun } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Image } from 'expo-image';
-import { AppState, Switch, View } from 'react-native';
+import { AppState, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-import { Card, Pressy, Row, Segmented, Skeleton, Txt } from '@/components/ui';
+import { Card, Pressy, Row, Segmented, Skeleton, Toggle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatClockTime } from '@/lib/format';
 import { notificationPermission, notificationsSupported, openNotificationSettings, type NotificationPermission } from '@/lib/notify';
@@ -56,7 +56,7 @@ export function CoachSettings() {
           icon={<Sparkle size={20} color={colors.accent} fill={colors.accent} />}
           title={t('proactive.title')}
           subtitle={s.enabled ? t(s.maxPerDay > 1 ? 'proactive.onHint.other' : 'proactive.onHint.one', { count: s.maxPerDay }) : t('proactive.offHint')}
-          right={<Switch value={s.enabled} onValueChange={(enabled) => set({ enabled })} />}
+          right={<Toggle value={s.enabled} onValueChange={(enabled) => set({ enabled })} />}
         />
         {s.enabled && notificationsSupported && permission === 'denied' ? (
           <SettingRow
@@ -79,7 +79,7 @@ export function CoachSettings() {
                 <SettingRow icon={<Sun size={20} color={colors.text} />} title={t('proactive.morning')} subtitle={morningSubtitle(data, t, clock)} />
               </Pressy>
               <View style={{ paddingRight: Space.xl }}>
-                <Switch value={s.morning} onValueChange={(morning) => set({ morning })} />
+                <Toggle value={s.morning} onValueChange={(morning) => set({ morning })} />
               </View>
             </Row>
             {s.morning && timeOpen ? (
@@ -97,10 +97,10 @@ export function CoachSettings() {
               icon={<Candy size={20} color={colors.text} />}
               title={t('proactive.cravings')}
               subtitle={data.cravings ? t('proactive.cravingsAt', { time: clock(data.cravings.notifyAt) }) : t('proactive.cravingsPending')}
-              right={<Switch value={s.cravings} onValueChange={(cravings) => set({ cravings })} />}
+              right={<Toggle value={s.cravings} onValueChange={(cravings) => set({ cravings })} />}
             />
             <Divider />
-            <SettingRow icon={<CalendarCheck size={20} color={colors.text} />} title={t('proactive.weekly')} subtitle={t('proactive.weeklyHint')} right={<Switch value={s.weekly} onValueChange={(weekly) => set({ weekly })} />} />
+            <SettingRow icon={<CalendarCheck size={20} color={colors.text} />} title={t('proactive.weekly')} subtitle={t('proactive.weeklyHint')} right={<Toggle value={s.weekly} onValueChange={(weekly) => set({ weekly })} />} />
             <Divider />
             <SettingRow
               icon={<BellRing size={20} color={colors.text} />}
@@ -242,7 +242,7 @@ function Example() {
       <NotificationMock title={t('proactive.notif.morningReadyTitle')} body={lines[0]!} />
       <Row gap={Space.sm} style={{ alignItems: 'flex-start', paddingHorizontal: Space.sm }}>
         <View style={{ paddingTop: 5 }}>
-          <Sparkle size={15} color={colors.accent} fill={colors.accent} />
+          <Sparkle size={15} color={colors.accentText} fill={colors.accentText} />
         </View>
         <Txt variant="accent" style={{ flex: 1, fontSize: 19, lineHeight: 26 }}>
           {lines.at(-1)}
