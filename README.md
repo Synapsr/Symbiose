@@ -1,32 +1,88 @@
+<h1 align="center">
+  <a href="https://symbiose.synapsr.io">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg" />
+      <img src="docs/brand/lockup.svg" width="280" alt="Symbiose" />
+    </picture>
+  </a>
+</h1>
+
+<div align="center">
+
+**Your health goals, in your own words.**<br />
+Snap, say or scan a meal: an AI follows *your* goal, on *your* server.
+
+[![CI](https://img.shields.io/github/actions/workflow/status/Synapsr/Symbiose/ci.yml?branch=main&label=CI)](https://github.com/Synapsr/Symbiose/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![Platforms: iOS, Android, watchOS](https://img.shields.io/badge/platforms-iOS%20%7C%20Android%20%7C%20watchOS-lightgrey)](#get-the-app)
+[![Self-hosted with Docker](https://img.shields.io/badge/self--hosted-Docker-2496ED?logo=docker&logoColor=white)](#self-host-in-one-command)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
+
+[**Website**](https://symbiose.synapsr.io) · [**Self-host**](#self-host-in-one-command) · [**Docs**](docs/) · [**Contributing**](CONTRIBUTING.md)
+
+</div>
+
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg" />
-    <img src="docs/brand/lockup.svg" width="300" alt="Symbiose" />
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.webp" />
+    <img src="docs/screenshots/hero-light.webp" width="760" alt="Symbiose on an iPhone: Today centred on added sugar against a 25 g limit, Trends with the weekly review, and the coach answering about the week" />
+  </picture>
+</p>
+
+## What is Symbiose?
+
+Symbiose is an open-source app for eating the way **you** decided to. Write your goal as you'd say it, "cut the afternoon sugar" or "lose 3 kg without feeling deprived", and it becomes a precise, safe plan, with the numbers that matter to you first.
+
+Log a meal with a photo, a sentence or a barcode. The AI works out portions and nutrients, plain code checks every number, and each meal gets one line of feedback that fits your goal. A coach that knows your day answers your questions, and helps you ride out a craving.
+
+It runs on your own server: one Docker container, one SQLite file, with Claude or the AI provider of your choice. iPhone, Android, Apple Watch, widgets, in French and English. No subscription, no ads, no tracking.
+
+## How it works
+
+1. **Say what you want to change**, in your own words. Symbiose drafts the plan: an energy budget, a few guardrails (say, added sugar under 25 g), small habits. Adjust anything.
+2. **Snap, say or scan a meal.** A photo, a sentence you type or dictate, or a barcode. The meal shows up at once and is analysed in the background, even if you were offline.
+3. **See what counts for you.** Today puts your goal's number first, each meal gets feedback and a tip, and the coach knows your goals, your meals and your week.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/how-dark.webp" />
+    <img src="docs/screenshots/how-light.webp" width="760" alt="The goal written in your own words, a meal described in a sentence with the microphone ready, and the meal's feedback: 27 g of added sugar, mostly from the latte's syrup, with two tips" />
+  </picture>
+</p>
+
+## Features
+
+| Feature | What it does |
+| --- | --- |
+| **Goal-first home** | Today shows the number your goal is about: added sugar if you're cutting sugar, energy to lose weight, protein to build muscle. Calories can be hidden altogether. |
+| **Precise numbers** | Nutrients are stored per 100 g and rescaled exactly. AI estimates are checked by code (energy against macros, added sugar within sugar within carbs), and the AI asks at most one question, only when the answer changes the result. Barcodes come from Open Food Facts. |
+| **Fix a meal in one sentence** | "No sugar in the coffee, half the fries", and the meal is analysed again. |
+| **Cravings, not guilt** | « I have a craving » gives a tip and an alternative right away, and a ten-minute Live Activity to ride it out. Trends show which foods and which hours your sugar comes from. |
+| **Coach and morning check-in** | Ask anything: the coach knows your goals, meals, sleep and activity, and can log or fix a meal once you confirm. If you like, it writes a short check-in each morning and a heads-up before your usual craving hour. |
+| **Weekly review** | What went well, what keeps coming back, and what to try next. |
+| **Life modules, opt-in** | Sleep, water, mood and blood pressure, plus a private health journal. The coach only hears about what you turned on. |
+| **Health and adaptive energy** | Apple Health and Health Connect: steps, workouts and weight in, meals out. Your budget can follow your activity and, over the weeks, what you really burn. |
+| **Apple Watch, widgets, Live Activity** | Your number on the wrist, the Home Screen and the Lock Screen. Eat again in one tap, dictate a meal from the watch, log a craving from Control Center. |
+| **Offline queue** | No network? Meals wait on the phone with their time, then send themselves. |
+| **Voice dictation** | Dictate meals, notes and questions. On iPhone, recognition stays on the device whenever it can. |
+| **French and English, light and dark** | It follows your phone. |
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/more-dark.webp" />
+    <img src="docs/screenshots/more-light.webp" width="760" alt="The plan built from the goal, the craving sheet with a tip and an alternative, and the health journal" />
   </picture>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/today.png" width="240" alt="Today screen" />
-  <img src="docs/screenshots/meal.png" width="240" alt="Meal detail" />
-  <img src="docs/screenshots/insights-dark.png" width="240" alt="Trends, dark mode" />
+  <br />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/devices-dark.webp" />
+    <img src="docs/screenshots/devices-light.webp" width="760" alt="The Apple Watch app with 16 g of added sugar left, and the medium and small Home Screen widgets" />
+  </picture>
 </p>
 
-# Symbiose
-
-**Eat mindfully, not by counting.** Symbiose is an open-source, AI-first companion for your daily life. Its first module is meal tracking that adapts to *your* goals: snap your plate, and it works out the rest.
-
-Tell it what you want in your own words ("I want to cut sugar, I eat it by reflex in the afternoon", "lean bulk", "lose weight without frustration") and Symbiose turns it into a precise, safe plan, puts the numbers that matter for *you* first, and gives goal-aware feedback on every meal.
-
-- **Two gestures to log a meal.** Tap the camera, shoot. The meal appears at once while the AI analyses it in the background.
-- **Goal-driven, not calorie-driven.** If your goal is cutting sugar, the home screen shows your added-sugar budget, not calories. Weight goals put energy first.
-- **Precise where it matters.** Nutrients are stored per 100 g and rescaled exactly when you change a portion; AI output is sanity-checked (Atwater energy check, sugar ⊂ carbs, etc.); the AI asks at most one question when the answer would change the estimate ("How many sugars in the coffee?"); barcodes use Open Food Facts.
-- **Fix anything in one sentence.** "No sugar in the coffee, half the fries" and the meal is re-analysed.
-- **Cravings, not guilt.** "I have a craving" gives you a tip and an alternative right now, tracks what you resisted, and shows *where* and *when* your sugar comes from.
-- **Your watch, connected.** Apple Watch via Apple Health, Wear OS / Garmin / Fitbit / Samsung via Health Connect: steps, active energy and weight flow in, your meals flow out, and your energy budget can follow your real activity.
-- **A coach that knows your day**, and a weekly AI review with concrete experiments.
-- **Self-hosted, one container.** Your data lives on your server, in one SQLite file and a photos folder.
-
-## Self-host the server
+## Self-host in one command
 
 ```bash
 docker run -d --name symbiose -p 3000:3000 \
@@ -35,35 +91,34 @@ docker run -d --name symbiose -p 3000:3000 \
   ghcr.io/synapsr/symbiose:latest
 ```
 
-Or with Compose: `docker compose up -d` (see [docker-compose.yml](docker-compose.yml)).
+Or with Compose: `curl -O https://raw.githubusercontent.com/Synapsr/Symbiose/main/docker-compose.yml`, then `ANTHROPIC_API_KEY=sk-ant-... docker compose up -d`.
 
-Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Scan the server QR code** and create your account. Sign-ups then close, unless `SIGNUP` says otherwise.
+**That's it.** Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Scan the server QR code**, then create your account.
 
-| Variable | Default | |
-| --- | --- | --- |
-| `ANTHROPIC_API_KEY` | — | Enables photo/text analysis, plans, coach, reviews with Claude. Without any AI, the app still works (barcodes, manual logging, keyword-based plans). |
-| `ANTHROPIC_WORKSPACE_ID` | — | Only for API keys that aren't scoped to a workspace (Claude Console → Settings → Workspaces). |
-| `AI_PROVIDER` | `anthropic` | Another AI provider: see [below](#other-ai-providers). |
-| `AI_MODEL` | per provider | Any model id of the provider (`claude-opus-5-5` for Claude). |
-| `AI_API_KEY` | — | The provider's key. Its own variable works too (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`…). |
-| `AI_BASE_URL` | per provider | Where an OpenAI-compatible server listens (Ollama, LM Studio, vLLM…). |
-| `AI_VISION` | `true` | `false` for a model that can't read photos: photo meals then ask for a description, text meals work. |
-| `PUBLIC_URL` | derived from the request | URL encoded in the QR code (set it behind a reverse proxy). |
-| `SIGNUP` | `closed` | Who gets an account after the first one: `closed` (nobody), `request` (anyone can ask; an admin accepts or refuses in the app, and until then the account reaches neither the AI nor any data) or `open` (anyone, for a family server). The older `ALLOW_SIGNUP=true` still means `open`. |
-| `DATA_DIR` | `/data` | SQLite database, photos and generated JWT secret. Back up this folder. |
-| `JWT_SECRET` | generated once | Override the token signing secret. |
-| `PORT` | `3000` | |
-| `ADMIN_EMAILS` | — | Comma-separated emails of the accounts that get the admin view (see below). |
-| `AI_PRICES` | — | Prices for the admin view's cost estimate, for models other than Claude: `model=input/output[/cacheRead[/cacheWrite]]` in USD per million tokens, comma-separated (`my-model=1.25/10/0.125,gemma4=0/0`). Claude's prices are built in; a dated id (`-2026-09-01`) takes its alias's price. |
-| `AI_MOCK` | `false` | **Development only**: canned AI answers so you can work on the UI without a key. |
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/server-dark.webp" />
+    <img src="docs/screenshots/server-light.webp" width="280" alt="The server's page: a QR code to scan from the app, the server's address and the AI model" />
+  </picture>
+</p>
 
-**Admin view.** List your email in `ADMIN_EMAILS` and an « Admin » row shows up in « Moi »: a glance at the whole server, with the AI's calls, tokens and estimated cost, how much the app is used, and the server's health. Counts and totals only: never anyone's email, name, meals or notes, and no per-person figure. Each AI call is kept as numbers alone (feature, model, tokens, duration, error code; no account, no content) for 13 months. With `SIGNUP=request`, it also lists the requests to accept or refuse, with only the email, first name and date (refusing deletes the account).
+A handful of variables cover most setups:
 
-Accounts aren't verified by email, so someone could sign up with a listed email before its owner. On request, that account waits like any other and is no admin until approved. With open sign-up, a listed email is refused unless it is the server's first account: create the account, then list it (the server warns at start-up about listed emails without one).
+| Variable | |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Claude, the default AI. |
+| `AI_PROVIDER`, `AI_API_KEY` | Another provider instead (below). |
+| `PUBLIC_URL` | The address phones use, behind a reverse proxy. |
+| `SIGNUP` | `closed` (default: only the first account), `request` (an admin approves) or `open`. |
+| `ADMIN_EMAILS` | Accounts that see the admin view: AI cost, usage, server health. |
+| `DATA_DIR` | Where the database and photos live (`/data`). |
 
-### Other AI providers
+To update, pull the image and start the container again: migrations run on their own, after a backup of the database in `DATA_DIR/backups/`. Every setting, reverse proxies and backups are in **[docs/self-hosting.md](docs/self-hosting.md)**.
 
-Claude is the default, and the reference: Symbiose's prompts were written and tuned on it. Other models work, but may be less precise on portions and nutrients, and small local models much less so. Photo meals need a model that reads images; the coach's proposals (log a meal, change goals) need one that calls tools, otherwise it answers in plain text. The server log says at start-up which provider and model answer, or what is missing.
+<details>
+<summary><b>Other AI providers</b></summary>
+
+Claude is the default and the reference: Symbiose's prompts were tuned on it. Other models work, but may be less precise on portions and nutrients, and small local models much less so. Photo meals need a model that reads images; the coach's proposals need one that calls tools.
 
 | `AI_PROVIDER` | Default `AI_MODEL` | Key |
 | --- | --- | --- |
@@ -72,86 +127,126 @@ Claude is the default, and the reference: Symbiose's prompts were written and tu
 | `mistral` | `mistral-large-4` | `MISTRAL_API_KEY` |
 | `gemini` | `gemini-3.8-flash` | `GEMINI_API_KEY` |
 | `openrouter` | `anthropic/claude-opus-5.5` | `OPENROUTER_API_KEY` |
-| `ollama` | `gemma4` | none (`AI_BASE_URL` defaults to `http://localhost:11434/v1`) |
-| `openai-compatible` | required | optional (`AI_BASE_URL` required) |
+| `ollama` | `gemma4` | none |
+| `openai-compatible` | required | optional, with `AI_BASE_URL` |
 
 ```bash
-# OpenAI
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
   -e AI_PROVIDER=openai -e AI_API_KEY=sk-... ghcr.io/synapsr/symbiose:latest
-
-# Mistral
-docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=mistral -e AI_API_KEY=... ghcr.io/synapsr/symbiose:latest
-
-# Google Gemini
-docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=gemini -e AI_API_KEY=... ghcr.io/synapsr/symbiose:latest
-
-# OpenRouter, here with another model than the default
-docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=openrouter -e AI_API_KEY=sk-or-... -e AI_MODEL=openai/gpt-6.1-sol ghcr.io/synapsr/symbiose:latest
-
-# Ollama on the same machine: `ollama pull gemma4` first (on Linux, start Ollama with OLLAMA_HOST=0.0.0.0)
-docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data --add-host=host.docker.internal:host-gateway \
-  -e AI_PROVIDER=ollama -e AI_BASE_URL=http://host.docker.internal:11434/v1 -e AI_MODEL=gemma4 ghcr.io/synapsr/symbiose:latest
-
-# Any OpenAI-compatible server: LM Studio, vLLM, llama.cpp…
-docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=openai-compatible -e AI_BASE_URL=http://192.168.1.20:1234/v1 -e AI_MODEL=my-model ghcr.io/synapsr/symbiose:latest
 ```
 
-Updating is `docker pull` + restart: migrations run automatically at start-up. Before applying new migrations, the server copies the database to `DATA_DIR/backups/` (the last three copies are kept), so an update can always be rolled back.
+Ollama, LM Studio and other local servers: see [docs/self-hosting.md](docs/self-hosting.md#ai-providers).
 
-## The mobile app
+</details>
 
-The app is built with Expo (React Native). It needs a development build because it uses native modules (camera, HealthKit, Health Connect):
+## Get the app
+
+Symbiose isn't on the App Store or Google Play yet. Until then, build it from source on a Mac with Xcode, or with Android Studio:
 
 ```bash
+git clone https://github.com/Synapsr/Symbiose.git && cd Symbiose
 pnpm install
-pnpm --filter @symbiose/mobile ios       # or: android
-# or in the cloud: cd apps/mobile && npx eas-cli@latest build --profile development
+pnpm --filter @symbiose/mobile ios        # or: android
 ```
 
-It also runs in a browser for UI work (`pnpm dev:mobile` then press `w`); health features are disabled there.
-
-## Develop
-
-Requirements: Node 22+ (`nvm use`), pnpm 10, Docker (optional).
-
-```bash
-pnpm install
-cp apps/server/.env.example apps/server/.env   # add your key, or set AI_MOCK=true
-pnpm dev:server                                # http://localhost:3000
-pnpm dev:mobile                                # Expo dev server
-pnpm typecheck && pnpm test && pnpm lint
-docker build -t symbiose .                     # the production image
-```
-
-```
-apps/server     Hono + SQLite (Drizzle) API, Claude integration, one Docker image
-apps/mobile     Expo Router app (iOS, Android, web)
-packages/shared Types, zod schemas, nutrition math shared by both
-docs/           Architecture, wearables, competitive analysis
-```
-
-Read [docs/architecture.md](docs/architecture.md) for how meals are analysed and how targets are computed, and [docs/wearables.md](docs/wearables.md) for the watch integration.
+This builds the app, with its watch app and widgets on iOS, and opens it in the simulator. Installing it on your own iPhone needs your own Apple signing team.
 
 ## Privacy
 
-Meal photos and descriptions are sent to the AI provider (Anthropic) for analysis and nothing else; everything else stays on your server. You can export all your data as JSON or delete your account from the app.
+- **Your data stays on your server**, in one SQLite file and a photos folder.
+- **Only what an answer needs goes to the AI provider you chose**: the meal's photo or words, and the context for that answer (your goal, your day's numbers). Never your name, email or password. Barcodes go to Open Food Facts.
+- **No analytics, no tracking, no ads**, in the app or on the server.
+- **Export everything** as JSON, or **delete your account**, from the app.
+- **Not a medical device.** Plans are conservative by design (calorie floors, capped deficits), but if you have a medical condition, are pregnant, or have a history of eating disorders, ask a professional before following any nutrition target.
 
-Symbiose is not a medical device. Plans are conservative by design (calorie floors, capped deficits), but if you have a medical condition, are pregnant or have a history of eating disorders, ask a professional before following any nutrition target.
+## FAQ
 
-## Roadmap
+<details>
+<summary><b>Do I need an API key?</b></summary>
 
-- watchOS / Wear OS companion: complication with your focus metric, one-tap re-log, voice logging from the wrist
-- Home-screen widgets and Live Activities
-- Offline queue for meals taken without network
-- CIQUAL (ANSES) food database for generic foods; pluggable AI providers (local models)
-- Adaptive energy expenditure from weight trend (MacroFactor-style)
-- More life modules: sleep, hydration, training, mood
+For the AI, yes: a key from Anthropic or another provider, which you pay per use, directly. Symbiose takes nothing. A local model through Ollama needs no key at all.
+
+</details>
+
+<details>
+<summary><b>Which AI should I use?</b></summary>
+
+Claude, the default: the prompts were written and tuned on it. OpenAI, Mistral, Gemini, OpenRouter, Ollama and any OpenAI-compatible server work too, through one setting. The server's start-up log says which model answers.
+
+</details>
+
+<details>
+<summary><b>Does it work without AI?</b></summary>
+
+Yes. Barcodes, manual logging, portions, Trends, Health sync, the watch and widgets all work, and a keyword-based planner turns your goal into a reasonable plan. Photo and text meals, the coach and the reviews need an AI.
+
+</details>
+
+<details>
+<summary><b>Can my family share one server?</b></summary>
+
+Yes. With `SIGNUP=open`, anyone who can reach the server gets an account, fine on a home network. With `SIGNUP=request`, you approve each person from the admin view. Each account only ever sees its own data, and the admin view shows totals, never anyone's meals.
+
+</details>
+
+<details>
+<summary><b>How is it different from MyFitnessPal or Cal AI?</b></summary>
+
+Symbiose starts from your goal rather than from calories: if you're cutting sugar, sugar is the number you see. AI estimates are checked by code before you see them, a coach knows your whole day, and everything runs on your server. It's open source, with no subscription, no ads and no paywall.
+
+</details>
+
+## Architecture
+
+```mermaid
+flowchart LR
+  app["App<br/>iOS · Android"] -->|JSON| api
+  wrist["Apple Watch<br/>widgets"] -->|JSON| api
+  health["Apple Health<br/>Health Connect"] <--> app
+  subgraph server["Your server · one container"]
+    api["Hono API"] --> db[("SQLite<br/>+ photos")]
+    api --> math["Nutrition math<br/>(shared, tested)"]
+  end
+  api --> ai["Claude, or another<br/>AI provider"]
+  api --> off["Open Food Facts"]
+```
+
+```
+apps/server       Hono + SQLite (Drizzle) API, the AI adapters, one Docker image
+apps/mobile       Expo Router app (iOS, Android, web), with the watch app and widgets in targets/
+packages/shared   Types, zod schemas and the nutrition math both sides use
+website/          The public site (Vite + React)
+docs/             Architecture, self-hosting, watch and health, brand
+```
+
+How meals are analysed and targets computed: [docs/architecture.md](docs/architecture.md). The watch, widgets and health stores: [docs/wearables.md](docs/wearables.md).
+
+## Develop
+
+Node.js 22 (`nvm use`) and pnpm 10:
+
+```bash
+pnpm install
+cp apps/server/.env.example apps/server/.env   # add a key, or set AI_MOCK=true
+pnpm dev:server                                # API on http://localhost:3000
+pnpm dev:mobile                                # Expo; press w to open it in the browser
+pnpm typecheck && pnpm test && pnpm lint
+```
+
+## Contributing
+
+Bug reports, translations and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) (setup, checks, conventions). Symbiose aims to stay simple: before adding a step or a setting, ask whether a better default would do.
+
+- [Report a bug](https://github.com/Synapsr/Symbiose/issues/new?template=bug_report.yml)
+- [Suggest an improvement](https://github.com/Synapsr/Symbiose/issues/new?template=feature_request.yml)
+- Found a security issue? See [SECURITY.md](SECURITY.md).
+
+If Symbiose helps you eat the way you want, a star helps other people find it.
+
+## Credits
+
+Built with [Expo](https://expo.dev), [React Native](https://reactnative.dev), [Hono](https://hono.dev), [Drizzle](https://orm.drizzle.team) and SQLite. Food data from [Open Food Facts](https://world.openfoodfacts.org), set in [Fraunces](https://github.com/undercasetype/Fraunces). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Synapsr

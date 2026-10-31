@@ -107,9 +107,14 @@ docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
 
 **Sign-up.** The first account can always be created. With `SIGNUP=request`, anyone can ask for an account; until an admin accepts, the account reaches neither the AI nor any data. With `SIGNUP=open`, anyone who can reach the server gets one: fine for a family server on your home network.
 
+<img src="screenshots/admin-light.webp#gh-light-mode-only" width="240" align="right" alt="The admin view: the AI's estimated cost over 30 days, calls per feature, response times and errors" />
+<img src="screenshots/admin-dark.webp#gh-dark-mode-only" width="240" align="right" alt="The admin view: the AI's estimated cost over 30 days, calls per feature, response times and errors" />
+
 **Admin view.** List your email in `ADMIN_EMAILS` and an « Admin » row shows up in *Me*: a glance at the whole server, with the AI's calls, tokens and estimated cost, how much the app is used, and the server's health. Counts and totals only: never anyone's email, name, meals or notes, and no per-person figure. Each AI call is kept as numbers alone (feature, model, tokens, duration, error code; no account, no content) for 13 months. With `SIGNUP=request`, it also lists the requests to accept or refuse, with only the email, first name and date (refusing deletes the account).
 
 Accounts aren't verified by email, so someone could sign up with a listed email before its owner. On request, that account waits like any other and is no admin until approved. With open sign-up, a listed email is refused unless it is the server's first account: create the account, then list it (the server warns at start-up about listed emails without one).
+
+<br clear="right" />
 
 ## Backups
 
