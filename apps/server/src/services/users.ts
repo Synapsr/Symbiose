@@ -4,16 +4,19 @@ import { and, eq } from 'drizzle-orm';
 import type { UserContext } from '../ai/types';
 import type { Db } from '../db';
 import { activity, users, type UserRow } from '../db/schema';
+import type { Config } from '../env';
 import { HttpError, notFound } from '../errors';
+import { isAdminEmail } from './admin';
 import { adaptiveShiftOn } from './expenditure';
 import { workoutsBetween, workoutsKcal } from './workouts';
 
-export function toUser(row: UserRow): User {
+/** The account as the app sees it; `isAdmin` comes from ADMIN_EMAILS, never from the stored flag. */
+export function toUser(row: UserRow, config?: Pick<Config, 'adminEmails'>): User {
   return {
     id: row.id,
     email: row.email,
     name: row.name,
-    isAdmin: row.isAdmin,
+    isAdmin: config ? isAdminEmail(config, row.email) : false,
     profile: row.profile ?? null,
     plan: row.plan ?? null,
     createdAt: row.createdAt,

@@ -2,6 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { parsePrices, type Rates } from './services/ai-prices';
+
 export const VERSION = '0.1.0';
 
 export interface Config {
@@ -18,6 +20,10 @@ export interface Config {
   /** Development only: canned AI answers, no API key needed. */
   aiMock: boolean;
   corsOrigins: string[];
+  /** Lowercase emails of the accounts that see the admin view (ADMIN_EMAILS); none when unset. */
+  adminEmails?: string[];
+  /** Per-model prices from AI_PRICES, USD per million tokens; Claude's are built in. */
+  aiPrices?: Record<string, Rates>;
 }
 
 function bool(value: string | undefined, fallback: boolean): boolean {
@@ -38,6 +44,8 @@ function loadSecret(dataDir: string): string {
 export function loadConfig(env = process.env): Config {
   const dataDir = resolve(env.DATA_DIR ?? './data');
   mkdirSync(join(dataDir, 'photos'), { recursive: true });
+  const prices = parsePrices(env.AI_PRICES);
+  for (const entry of prices.invalid) console.warn(`AI_PRICES: ignoring "${entry}" (expected model=input/output, USD per million tokens)`);
   return {
     port: Number(env.PORT ?? 3000),
     dataDir,
@@ -49,5 +57,7 @@ export function loadConfig(env = process.env): Config {
     aiModel: env.AI_MODEL || 'claude-opus-5-5',
     aiMock: bool(env.AI_MOCK, false),
     corsOrigins: (env.CORS_ORIGINS ?? '*').split(',').map((s) => s.trim()).filter(Boolean),
+    adminEmails: (env.ADMIN_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    aiPrices: prices.prices,
   };
 }

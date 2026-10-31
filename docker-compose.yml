@@ -11,6 +11,7 @@ services:
       # AI_MODEL: claude-opus-5-5
       # PUBLIC_URL: https://symbiose.example.com
       # ALLOW_SIGNUP: "true"
+      # ADMIN_EMAILS: you@example.com
     volumes:
       - symbiose-data:/data
 

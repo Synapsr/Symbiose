@@ -11,6 +11,7 @@ import { HttpError } from './errors';
 import type { Deps } from './http';
 import { landingPage } from './landing';
 import { authRoutes, meRoutes } from './routes/account';
+import { adminRoutes } from './routes/admin';
 import { bloodPressureRoutes } from './routes/blood-pressure';
 import { coachRoutes } from './routes/coach';
 import { glanceRoutes } from './routes/glance';
@@ -75,6 +76,7 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
   app.route('/api/journal', journalRoutes(deps));
   app.route('/api/proactive', proactiveRoutes(deps));
   app.route('/api/vitals', vitalsRoutes(deps));
+  app.route('/api/admin', adminRoutes(deps));
   app.route('/api', trackingRoutes(deps));
 
   return app;

@@ -8,6 +8,7 @@ import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type 
 import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, vitals, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
+import { isAdminEmail } from '../services/admin';
 import { toReading } from '../services/blood-pressure';
 import { toActivity, toCraving } from '../services/day';
 import { toWaterEntry } from '../services/hydration';
@@ -35,6 +36,10 @@ export function authRoutes({ db, config }: Deps) {
     if (db.select({ id: users.id }).from(users).where(eq(users.email, email)).get()) {
       throw new HttpError(409, 'email_taken', 'An account already exists with this email');
     }
+    // No email verification: an admin email can't be claimed through open sign-up, only as the first account.
+    if (existingUsers > 0 && isAdminEmail(config, email)) {
+      throw new HttpError(403, 'email_reserved', 'This email is reserved on this server');
+    }
     const row = db
       .insert(users)
       .values({
@@ -47,7 +52,7 @@ export function authRoutes({ db, config }: Deps) {
       })
       .returning()
       .get();
-    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row) }, 201);
+    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row, config) }, 201);
   });
 
   app.post('/login', limiter, validate('json', CredentialsSchema.pick({ email: true, password: true })), async (c) => {
@@ -56,7 +61,7 @@ export function authRoutes({ db, config }: Deps) {
     if (!row || !(await verifyPassword(password, row.passwordHash))) {
       throw new HttpError(401, 'invalid_credentials', 'Wrong email or password');
     }
-    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row) });
+    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row, config) });
   });
 
   return app;
@@ -66,7 +71,7 @@ export function meRoutes({ db, config, photos }: Deps) {
   const app = new Hono<AuthEnv>();
   app.use(requireAuth(config.jwtSecret));
 
-  app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')))));
+  app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')), config)));
 
   app.put('/profile', validate('json', ProfileSchema), (c) => {
     const profile = { ...c.req.valid('json') };
@@ -82,13 +87,13 @@ export function meRoutes({ db, config, photos }: Deps) {
       .where(eq(users.id, c.get('userId')))
       .returning()
       .get();
-    return c.json(toUser(row));
+    return c.json(toUser(row, config));
   });
 
   /** Everything we store about the user, as JSON. */
   app.get('/export', (c) => {
     const userId = c.get('userId');
-    const user = toUser(getUserRow(db, userId));
+    const user = toUser(getUserRow(db, userId), config);
     const payload = {
       exportedAt: nowIso(),
       user,
