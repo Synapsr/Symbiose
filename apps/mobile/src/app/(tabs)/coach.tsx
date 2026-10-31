@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { ArrowUp, ChevronRight, Ellipsis, Settings2, Sparkles, Sun, Trash2 } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, Pressable, TextInput, View, type TextInputInstance } from 'react-native';
+import { Alert, FlatList, Platform, Pressable, TextInput, View, type TextInputInstance } from 'react-native';
 import Animated, { FadeIn, FadeInUp, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,10 +11,12 @@ import { MealActionCard } from '@/components/coach/meal-action-card';
 import { Button, Chip, IconButton, Pressy, Row, Txt, webInput, webSingleRow } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { MicButton } from '@/components/ui/mic-button';
+import { InlineProse, Prose } from '@/components/ui/prose';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
+import { useKeyboardLift } from '@/lib/keyboard';
 import { markMorningSeen, useMorningDraft, useProactive } from '@/lib/proactive';
 import { useApi } from '@/lib/session';
 import { Radius, Space, useTheme } from '@/theme';
@@ -23,22 +25,12 @@ const SUGGESTIONS: TranslationKey[] = ['coach.s1', 'coach.s2', 'coach.s3', 'coac
 
 /** The exchange being streamed: the question and the reply as it is written. */
 interface Live {
+  /** Its bubbles' keys, which the saved messages keep: nothing re-enters once the reply is written. */
+  key: string;
   user: CoachMessage;
   reply: string;
-}
-
-/** True while the software keyboard is on screen. */
-function useKeyboardVisible() {
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setVisible(true));
-    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setVisible(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-  return visible;
+  /** Once written: the saved reply's id, until the conversation shows it. */
+  savedId?: string;
 }
 
 export default function Coach() {
@@ -46,12 +38,16 @@ export default function Coach() {
   const { colors, elevation } = useTheme();
   // Inside a native tab, the bottom inset already includes the tab bar.
   const insets = useSafeAreaInsets();
-  const keyboardVisible = useKeyboardVisible();
+  // The composer rests on the tab bar and rides on the keyboard, following it as it is dragged away.
+  const lift = useKeyboardLift(Platform.OS === 'web' ? 88 : insets.bottom, Space.sm);
   const api = useApi();
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
   const dictation = useDictation(text, setText);
   const [live, setLive] = useState<Live | null>(null);
+  // Saved message id → the live bubble's key it took over.
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const exchanges = useRef(0);
   const [error, setError] = useState<unknown>(null);
   const [menu, setMenu] = useState(false);
   const input = useRef<TextInputInstance>(null);
@@ -104,13 +100,17 @@ export default function Coach() {
 
   const submit = async (message: string) => {
     const question = message.trim();
-    if (!question || live) return;
+    if (!question || (live && !live.savedId)) return;
     haptics.tap();
     setText('');
     setError(null);
-    setLive({ user: { id: 'live-user', role: 'user', content: question, suggestion: null, mealActions: [], createdAt: new Date().toISOString() }, reply: '' });
+    exchanges.current += 1;
+    const key = `live-${exchanges.current}`;
+    setLive({ key, user: { id: `${key}-user`, role: 'user', content: question, suggestion: null, mealActions: [], createdAt: new Date().toISOString() }, reply: '' });
     try {
       const saved = await api.streamCoach(question, toLocalDate(), (delta) => setLive((current) => current && { ...current, reply: current.reply + delta }));
+      setKeys((known) => ({ ...known, [saved.user.id]: `${key}-user`, [saved.reply.id]: `${key}-reply` }));
+      setLive((current) => current && { ...current, savedId: saved.reply.id });
       queryClient.setQueryData<CoachMessage[]>(['coach'], (old = []) => [...old, saved.user, saved.reply]);
       // A reply is a conversation, not a milestone.
       haptics.soft();
@@ -118,7 +118,6 @@ export default function Coach() {
       haptics.warning();
       setError(e);
       setText(question); // give the question back so it can be re-sent
-    } finally {
       setLive(null);
     }
   };
@@ -130,8 +129,10 @@ export default function Coach() {
     draft?.date === today && draft.writing && !morningDone
       ? [{ id: 'live-morning', role: 'assistant', content: draft.text, suggestion: null, mealActions: [], kind: 'morning', localDate: today, createdAt: new Date().toISOString(), streaming: true }]
       : [];
+  // The conversation holds the saved exchange: it takes the live one's place, under the same keys.
+  if (live?.savedId && history.some((m) => m.id === live.savedId)) setLive(null);
   const shown: (CoachMessage & { streaming?: boolean })[] = live
-    ? [...history, ...writing, live.user, { id: 'live-reply', role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: true }]
+    ? [...history, ...writing, live.user, { id: `${live.key}-reply`, role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: !live.savedId }]
     : [...history, ...writing];
   // Read here: today's morning notification isn't needed any more.
   const focused = useIsFocused();
@@ -140,10 +141,9 @@ export default function Coach() {
   }, [focused, morningDone, today]);
   const reviewDay = schedule && schedule.settings.weekly && schedule.review.loggedDays >= MIN_REVIEW_DAYS ? schedule.review.monday : null;
   const empty = shown.length === 0;
-  const composerBottom = Platform.OS === 'web' ? 96 : keyboardVisible ? Space.sm : insets.bottom + Space.sm;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Row style={{ justifyContent: 'space-between', paddingTop: insets.top + Space.md, paddingHorizontal: Space.xl, paddingBottom: Space.sm }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Txt variant="title">{t('coach.title')}</Txt>
@@ -190,7 +190,7 @@ export default function Coach() {
         <FlatList
           data={[...shown].reverse()}
           inverted
-          keyExtractor={(m) => m.id}
+          keyExtractor={(m) => keys[m.id] ?? m.id}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: Space.lg, gap: Space.md }}
@@ -205,7 +205,7 @@ export default function Coach() {
         />
       )}
 
-      <View style={{ paddingHorizontal: Space.lg, paddingTop: Space.sm, paddingBottom: composerBottom }}>
+      <Animated.View style={[{ paddingHorizontal: Space.lg, paddingTop: Space.sm }, lift]}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm, backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, padding: 6, paddingLeft: Space.lg }}>
           <TextInput
             ref={input}
@@ -221,12 +221,12 @@ export default function Coach() {
           <MicButton dictation={dictation} size={44} />
           <IconButton label={t('coach.send')} variant="inverted" icon={<ArrowUp size={20} color={colors.onInverted} />} onPress={() => void submit(text)} />
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </View>
   );
 }
 
-/** A soft blinking caret at the end of a reply being written. */
+/** A soft blinking caret after the last word of a reply being written. */
 function Caret() {
   const { colors } = useTheme();
   const opacity = useSharedValue(1);
@@ -234,7 +234,7 @@ function Caret() {
     opacity.set(withRepeat(withTiming(0.15, { duration: 500 }), -1, true));
   }, [opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return <Animated.View style={[{ width: 8, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginLeft: 2, marginBottom: 3 }, style]} />;
+  return <Animated.View style={[{ width: 7, height: 15, borderRadius: 2, backgroundColor: colors.accent, marginLeft: 3 }, style]} />;
 }
 
 function MenuItem({ icon, label, onPress, danger }: { icon: ReactNode; label: string; onPress: () => void; danger?: boolean }) {
@@ -297,10 +297,13 @@ function Bubble({ message, streaming, review }: { message: CoachMessage; streami
           borderWidth: mine ? 0 : 1,
           borderColor: colors.border,
         }}>
-        <Txt color={mine ? colors.onInverted : colors.text} style={{ lineHeight: 23 }} selectable={!streaming}>
-          {message.content}
-        </Txt>
-        {streaming ? <Caret /> : null}
+        {mine ? (
+          <Txt color={colors.onInverted} style={{ lineHeight: 23 }} selectable>
+            {message.content}
+          </Txt>
+        ) : (
+          <Prose text={message.content} streaming={streaming} trailing={streaming ? <Caret /> : null} selectable={!streaming} />
+        )}
       </View>
       {message.suggestion ? (
         <View style={{ maxWidth: '86%', backgroundColor: colors.accentSoft, borderRadius: Radius.lg, padding: Space.lg, gap: Space.sm }}>
@@ -311,7 +314,7 @@ function Bubble({ message, streaming, review }: { message: CoachMessage; streami
             </Txt>
           </Row>
           <Txt variant="caption" tone="secondary">
-            {message.suggestion.rationale}
+            <InlineProse text={message.suggestion.rationale} />
           </Txt>
           <Button title={t('coach.apply')} size="md" variant="accent" onPress={() => router.push({ pathname: '/goals', params: { intentions: message.suggestion!.intentions } })} />
         </View>

@@ -923,7 +923,7 @@ Ajoute un yaourt à 16 h",
   - It is an estimate, never a fact: "environ", "semble"; at \`confidence\` low, only a first hint. Bring it up when they ask about calories, their budget, a plateau or their weight, or when weight is a goal and it explains something.
   - A gap with the formula usually means the formula misjudges their activity, or that some meals go unnoted. Never blame or shame their logging.
   - \`autoAdjust\` true: their budget already follows it, by at most 100 kcal a week (\`appliedKcal\` so far). With no estimate yet, \`missing\` says what would unlock it (more days, well-logged days, weigh-ins).
-- Keep replies short (under ~120 words) unless they ask for detail. Plain text, short paragraphs or a short list; no headings.
+- Keep replies short (under ~120 words) unless they ask for detail. Short paragraphs or a short list. The app renders light Markdown: **bold** for the word or number that matters, \`- \` or \`1.\` lists, a blank line between paragraphs; no headings, tables or links.
 - Suggest concrete next actions (what to eat tonight, a swap, a timing change), adapted to what they have left in their day.
 - Respect the plan's coachTone: gentle, direct or scientific.
 - You are not a doctor. For medical symptoms, conditions or medication, recommend a professional.
@@ -1069,7 +1069,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "d590d1ee4c120f7c77f8cb8249c11aeb9767bbe0963521332ee204162db15092",
+    "sha256": "0edb27bd9bf75c9e93d0606961b116f2a741a424c7ff075888ceeb85ff2a403d",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {

@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ToastHost } from '@/components/ui/toast';
@@ -23,13 +24,16 @@ const queryClient = new QueryClient({
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <SessionProvider>
-            <AppNavigator />
-          </SessionProvider>
-        </QueryClientProvider>
-      </SafeAreaProvider>
+      {/* The keyboard's position, frame by frame, for the screens with a composer. No preloading: Today has no field. */}
+      <KeyboardProvider preload={false}>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <SessionProvider>
+              <AppNavigator />
+            </SessionProvider>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

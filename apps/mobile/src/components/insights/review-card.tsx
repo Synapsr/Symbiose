@@ -7,11 +7,13 @@ import { ActivityIndicator, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Card, Pressy, Row, Skeleton, Txt } from '@/components/ui';
+import { InlineProse } from '@/components/ui/prose';
 import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
+import { plainText } from '@/lib/markdown';
 import { useApi } from '@/lib/session';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
@@ -93,20 +95,22 @@ export function ReviewCard({ today, hideCalories }: { today: string; hideCalorie
         <Animated.View key={review.headline} entering={FadeIn.duration(320)}>
           <View style={{ gap: Space.md, opacity: refreshing ? 0.55 : 1 }}>
             <Txt variant="accent" style={{ fontSize: 22, lineHeight: 28 }}>
-              {review.headline}
+              {plainText(review.headline)}
             </Txt>
             {bullets.map((bullet) =>
               bullet.text ? (
                 <Row key={bullet.key} gap={Space.md} style={{ alignItems: 'flex-start' }}>
                   <View style={{ marginTop: 2 }}>{bullet.icon}</View>
-                  <Txt style={{ flex: 1, fontSize: 15, lineHeight: 21 }}>{bullet.text}</Txt>
+                  <Txt style={{ flex: 1, fontSize: 15, lineHeight: 21 }}>
+                    <InlineProse text={bullet.text} />
+                  </Txt>
                 </Row>
               ) : null,
             )}
           </View>
         </Animated.View>
         <Pressy
-          onPress={() => router.push({ pathname: '/coach', params: { prompt: t('review.prompt', { headline: review.headline }) } })}
+          onPress={() => router.push({ pathname: '/coach', params: { prompt: t('review.prompt', { headline: plainText(review.headline) }) } })}
           accessibilityRole="button"
           style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, paddingHorizontal: 14, borderRadius: Radius.pill, backgroundColor: colors.surface2 }}>
           <Txt variant="label">{t('review.askCoach')}</Txt>

@@ -62,6 +62,13 @@ describe('notification plan', () => {
     expect(plan(written, { morningSeen: today })[0]).toMatchObject({ kind: 'cravings', date: today });
   });
 
+  it('shows the words of the check-in and of the nudges, never their Markdown', () => {
+    const written = schedule({ enabled: true }, { today: { messageId: 'm1', content: '**Nuit de 6 h 10**, une de moins.\nHier : 30 g.' } });
+    expect(plan(written)[0]).toMatchObject({ body: 'Nuit de 6 h 10, une de moins.' });
+    const nudged = plan(schedule({ enabled: true, morning: false, weekly: false, cravings: true }), { nudges: ['Un *en-cas* prêt ?'] });
+    expect(nudged[0]).toMatchObject({ kind: 'cravings', body: 'Un en-cas prêt ?' });
+  });
+
   it('folds the Monday review into the morning check-in, or sends it alone when mornings are off', () => {
     const monday = plan(schedule({ enabled: true })).find((n) => n.date === '2026-11-02')!;
     expect(monday).toMatchObject({ kind: 'morning', body: `${copy.morningBody} ${copy.morningReview}`, data: { review: true } });

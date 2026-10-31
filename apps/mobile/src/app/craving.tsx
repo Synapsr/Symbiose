@@ -11,6 +11,7 @@ import { PillPicker } from '@/components/journal/pickers';
 import { Button, Card, Chip, Field, Row, Skeleton, Txt } from '@/components/ui';
 import { Celebration } from '@/components/ui/celebration';
 import { MicButton } from '@/components/ui/mic-button';
+import { InlineProse } from '@/components/ui/prose';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
 import { feedback } from '@/lib/feedback';
@@ -197,7 +198,9 @@ export default function CravingSheet() {
         </Row>
         <View style={{ minHeight: 75 }}>
           {tip ? (
-            <Txt style={{ fontSize: 18, lineHeight: 25 }}>{tip}</Txt>
+            <Txt style={{ fontSize: 18, lineHeight: 25 }}>
+              <InlineProse text={tip} streaming={!shown?.done} />
+            </Txt>
           ) : (
             <View style={{ gap: 10, paddingTop: 6 }}>
               <Skeleton width="94%" height={14} />
@@ -211,7 +214,7 @@ export default function CravingSheet() {
               <Row gap={Space.sm} style={{ alignItems: 'flex-start' }}>
                 <Lightbulb size={16} color={colors.warning} style={{ marginTop: 2 }} />
                 <Txt tone="secondary" style={{ flex: 1, fontSize: 15, lineHeight: 21 }}>
-                  {alternative}
+                  <InlineProse text={alternative} streaming={!shown?.done} />
                 </Txt>
               </Row>
             </Animated.View>

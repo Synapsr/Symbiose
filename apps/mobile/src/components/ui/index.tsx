@@ -60,8 +60,17 @@ const FRAUNCES: ReadonlySet<Variant> = new Set(['display', 'number', 'title', 'a
  * French typography, for every text in the app (copy, AI and the person's own words): a no-break
  * space before « ? ! : ; » and inside guillemets, so a mark never ends up alone at the start of a line.
  */
+const french = (text: string, space: string) => text.replace(/ ([?!:;»])/g, `${space}$1`).replace(/« /g, `«${space}`);
+
 function frenchSpacing(children: ReactNode, space: string): ReactNode {
-  return Children.map(children, (child) => (typeof child === 'string' ? child.replace(/ ([?!:;»])/g, `${space}$1`).replace(/« /g, `«${space}`) : child));
+  return Children.map(children, (child) => (typeof child === 'string' ? french(child, space) : child));
+}
+
+/** The same typography for text drawn in pieces (AI prose split into bold and plain runs): apply it to the whole text first. */
+export function useFrenchSpacing(variant: Variant = 'body'): (text: string) => string {
+  const locale = useContext(LocaleContext);
+  const space = FRAUNCES.has(variant) ? '\u00A0' : '\u202F';
+  return (text) => (locale === 'fr' ? french(text, space) : text);
 }
 
 export function Txt({

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ItemRow } from '@/components/meal/item-row';
 import { Bar, Card, Chip, Dot, IconButton, Pressy, Row, SectionTitle, SwapIcon, Txt, webInput, webSingleRow } from '@/components/ui';
 import { MicButton } from '@/components/ui/mic-button';
+import { InlineProse } from '@/components/ui/prose';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
@@ -138,12 +139,13 @@ function MealEditor({ meal }: { meal: Meal }) {
                   <Dot color={verdictColor(insight.verdict, colors)} size={10} />
                 </View>
                 <Txt variant="label" style={{ flex: 1, fontSize: 16, lineHeight: 22 }}>
-                  {insight.headline}
+                  <InlineProse text={insight.headline} />
                 </Txt>
               </Row>
               {insight.tips.map((tip) => (
                 <Txt key={tip} tone="secondary" style={{ marginLeft: 18 }}>
-                  → {tip}
+                  {'→ '}
+                  <InlineProse text={tip} />
                 </Txt>
               ))}
             </Card>
