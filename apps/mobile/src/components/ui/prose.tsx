@@ -44,18 +44,15 @@ function Runs({ runs }: { runs: Run[] }) {
  * hanging indents, a modest heading. While it is being written (`streaming`), a half-typed marker
  * never shows, and `trailing` (the caret) sits at the end of the last line.
  */
-export function Prose({ text, streaming = false, color, trailing, selectable }: { text: string; streaming?: boolean; color?: string; trailing?: ReactNode; selectable?: boolean }) {
-  const { colors } = useTheme();
+export function Prose({ text, streaming = false, trailing, selectable }: { text: string; streaming?: boolean; trailing?: ReactNode; selectable?: boolean }) {
   const typography = useFrenchSpacing();
   const blocks = parseMarkdown(typography(text), { streaming });
-  const ink = color ?? colors.text;
   const last = blocks.at(-1);
-  const props = { color: ink, selectable };
 
   return (
     <View style={{ gap: 10 }}>
       {blocks.map((block, index) => (
-        <ProseBlock key={index} block={block} trailing={block === last ? trailing : null} {...props} />
+        <ProseBlock key={index} block={block} trailing={block === last ? trailing : null} selectable={selectable} />
       ))}
       {/* Nothing to draw yet, or a rule last: the caret on its own. */}
       {trailing && (!last || last.type === 'rule') ? <View style={{ flexDirection: 'row' }}>{trailing}</View> : null}
@@ -63,19 +60,19 @@ export function Prose({ text, streaming = false, color, trailing, selectable }: 
   );
 }
 
-function ProseBlock({ block, trailing, color, selectable }: { block: Block; trailing: ReactNode; color: string; selectable?: boolean }) {
+function ProseBlock({ block, trailing, selectable }: { block: Block; trailing: ReactNode; selectable?: boolean }) {
   const { colors } = useTheme();
   switch (block.type) {
     case 'paragraph':
       return (
-        <Txt color={color} style={BODY} selectable={selectable}>
+        <Txt style={BODY} selectable={selectable}>
           <Runs runs={block.runs} />
           {trailing}
         </Txt>
       );
     case 'heading':
       return (
-        <Txt color={color} style={[BODY, { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 }]} selectable={selectable} accessibilityRole="header">
+        <Txt style={[BODY, { fontSize: 17, fontWeight: '700', letterSpacing: -0.2 }]} selectable={selectable} accessibilityRole="header">
           <Runs runs={block.runs} />
           {trailing}
         </Txt>
@@ -83,7 +80,7 @@ function ProseBlock({ block, trailing, color, selectable }: { block: Block; trai
     case 'quote':
       return (
         <View style={{ borderLeftWidth: 3, borderLeftColor: colors.border, paddingLeft: Space.md }}>
-          <Txt color={colors.text2} style={BODY} selectable={selectable}>
+          <Txt tone="secondary" style={BODY} selectable={selectable}>
             <Runs runs={block.runs} />
             {trailing}
           </Txt>
@@ -98,7 +95,7 @@ function ProseBlock({ block, trailing, color, selectable }: { block: Block; trai
       return (
         <View style={{ gap: 6 }}>
           {block.items.map((item, index) => (
-            <Item key={index} item={item} markerWidth={item.number === null ? BULLET_WIDTH : markerWidth} trailing={index === block.items.length - 1 ? trailing : null} color={color} selectable={selectable} />
+            <Item key={index} item={item} markerWidth={item.number === null ? BULLET_WIDTH : markerWidth} trailing={index === block.items.length - 1 ? trailing : null} selectable={selectable} />
           ))}
         </View>
       );
@@ -107,12 +104,12 @@ function ProseBlock({ block, trailing, color, selectable }: { block: Block; trai
 }
 
 /** One list item: its marker hangs in its own column, so wrapped lines align with the first. */
-function Item({ item, markerWidth, trailing, color, selectable }: { item: ListItem; markerWidth: number; trailing: ReactNode; color: string; selectable?: boolean }) {
+function Item({ item, markerWidth, trailing, selectable }: { item: ListItem; markerWidth: number; trailing: ReactNode; selectable?: boolean }) {
   const { colors } = useTheme();
   const nested = item.depth > 0;
   return (
     <View style={{ flexDirection: 'row', paddingLeft: item.depth * NEST }}>
-      <View style={{ width: markerWidth, height: BODY.lineHeight, justifyContent: 'center' }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      <View style={{ width: markerWidth, height: BODY.lineHeight, justifyContent: 'center' }}>
         {item.number === null ? (
           <View style={{ width: nested ? 4 : 5, height: nested ? 4 : 5, borderRadius: 3, marginLeft: 3, backgroundColor: nested ? colors.text3 : colors.accent }} />
         ) : (
@@ -121,7 +118,7 @@ function Item({ item, markerWidth, trailing, color, selectable }: { item: ListIt
           </Txt>
         )}
       </View>
-      <Txt color={color} style={[BODY, { flexShrink: 1 }]} selectable={selectable}>
+      <Txt style={[BODY, { flexShrink: 1 }]} selectable={selectable}>
         <Runs runs={item.runs} />
         {trailing}
       </Txt>
