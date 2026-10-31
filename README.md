@@ -44,7 +44,7 @@ Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Sc
 | `PORT` | `3000` | |
 | `AI_MOCK` | `false` | **Development only**: canned AI answers so you can work on the UI without a key. |
 
-Updating is `docker pull` + restart: migrations run automatically at start-up.
+Updating is `docker pull` + restart: migrations run automatically at start-up. Before applying new migrations, the server copies the database to `DATA_DIR/backups/` (the last three copies are kept), so an update can always be rolled back.
 
 ## The mobile app
 
