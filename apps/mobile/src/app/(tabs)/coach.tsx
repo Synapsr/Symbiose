@@ -11,6 +11,7 @@ import { MealActionCard } from '@/components/coach/meal-action-card';
 import { Button, Chip, IconButton, Pressy, Row, Txt, webInput, webSingleRow } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { MicButton } from '@/components/ui/mic-button';
+import { InlineProse, Prose } from '@/components/ui/prose';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
 import { haptics } from '@/lib/haptics';
@@ -213,7 +214,7 @@ export default function Coach() {
   );
 }
 
-/** A soft blinking caret at the end of a reply being written. */
+/** A soft blinking caret after the last word of a reply being written. */
 function Caret() {
   const { colors } = useTheme();
   const opacity = useSharedValue(1);
@@ -221,7 +222,7 @@ function Caret() {
     opacity.set(withRepeat(withTiming(0.15, { duration: 500 }), -1, true));
   }, [opacity]);
   const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-  return <Animated.View style={[{ width: 8, height: 16, borderRadius: 2, backgroundColor: colors.accent, marginLeft: 2, marginBottom: 3 }, style]} />;
+  return <Animated.View style={[{ width: 7, height: 15, borderRadius: 2, backgroundColor: colors.accent, marginLeft: 3 }, style]} />;
 }
 
 function MenuItem({ icon, label, onPress, danger }: { icon: ReactNode; label: string; onPress: () => void; danger?: boolean }) {
@@ -284,10 +285,13 @@ function Bubble({ message, streaming, review }: { message: CoachMessage; streami
           borderWidth: mine ? 0 : 1,
           borderColor: colors.border,
         }}>
-        <Txt color={mine ? colors.onInverted : colors.text} style={{ lineHeight: 23 }} selectable={!streaming}>
-          {message.content}
-        </Txt>
-        {streaming ? <Caret /> : null}
+        {mine ? (
+          <Txt color={colors.onInverted} style={{ lineHeight: 23 }} selectable>
+            {message.content}
+          </Txt>
+        ) : (
+          <Prose text={message.content} streaming={streaming} trailing={streaming ? <Caret /> : null} selectable={!streaming} />
+        )}
       </View>
       {message.suggestion ? (
         <View style={{ maxWidth: '86%', backgroundColor: colors.accentSoft, borderRadius: Radius.lg, padding: Space.lg, gap: Space.sm }}>
@@ -298,7 +302,7 @@ function Bubble({ message, streaming, review }: { message: CoachMessage; streami
             </Txt>
           </Row>
           <Txt variant="caption" tone="secondary">
-            {message.suggestion.rationale}
+            <InlineProse text={message.suggestion.rationale} />
           </Txt>
           <Button title={t('coach.apply')} size="md" variant="accent" onPress={() => router.push({ pathname: '/goals', params: { intentions: message.suggestion!.intentions } })} />
         </View>
