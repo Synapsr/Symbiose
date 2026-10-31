@@ -1,4 +1,5 @@
 import { Fraunces_400Regular_Italic, Fraunces_600SemiBold, Fraunces_700Bold, useFonts } from '@expo-google-fonts/fraunces';
+import type { Locale } from '@symbiose/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,6 +9,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { Arrival } from '@/components/arrival';
 import { ToastHost } from '@/components/ui/toast';
 import { deviceLocale, LocaleContext } from '@/i18n';
 import { useSignedOutSync } from '@/lib/glance';
@@ -42,7 +44,6 @@ function AppNavigator() {
   const { ready, session, user, userLoading } = useSession();
   const settingsLoaded = useSettings((s) => s.loaded);
   const loadSettings = useSettings((s) => s.load);
-  const { scheme, colors } = useTheme();
   const [fontsLoaded, fontError] = useFonts({ Fraunces_400Regular_Italic, Fraunces_600SemiBold, Fraunces_700Bold });
 
   useEffect(() => {
@@ -54,14 +55,22 @@ function AppNavigator() {
     if (!booting) void SplashScreen.hideAsync();
   }, [booting]);
   useSignedOutSync(ready && !session);
-  if (booting) return null;
 
-  const signedIn = Boolean(session && user);
-  const onboarded = Boolean(user?.profile && user?.plan);
+  return (
+    <>
+      {booting ? null : <App signedIn={Boolean(session && user)} onboarded={Boolean(user?.profile && user?.plan)} locale={user?.profile?.locale ?? deviceLocale()} />}
+      {/* Above the app from the first frame: it takes over from the native splash. */}
+      <Arrival ready={!booting} />
+    </>
+  );
+}
+
+function App({ signedIn, onboarded, locale }: { signedIn: boolean; onboarded: boolean; locale: Locale }) {
+  const { scheme, colors } = useTheme();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
   return (
-    <LocaleContext.Provider value={user?.profile?.locale ?? deviceLocale()}>
+    <LocaleContext.Provider value={locale}>
       <ThemeProvider value={{ ...base, colors: { ...base.colors, background: colors.bg, card: colors.surface, text: colors.text, primary: colors.accent } }}>
         <StatusBar style="auto" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
