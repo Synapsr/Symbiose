@@ -10,6 +10,7 @@ import { Pressy, Row, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatClockTime } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { plainText } from '@/lib/markdown';
 import { useToday } from '@/lib/hooks';
 import { markMorningSeen, useAnswerOffer, useProactiveLine } from '@/lib/proactive';
 import type { ProactiveLine } from '@/lib/proactive-plan';
@@ -85,7 +86,7 @@ function Slot({ line, nudge, onDismiss }: { line: ProactiveLine; nudge: string |
   const text = (() => {
     switch (line.kind) {
       case 'morning':
-        return line.text && !line.writing ? morningTip(line.text) : t('proactive.line.writing');
+        return line.text && !line.writing ? morningTip(plainText(line.text)) : t('proactive.line.writing');
       case 'weekly':
         return t('proactive.line.weekly');
       case 'cravings':

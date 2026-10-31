@@ -12,6 +12,8 @@ import {
   type ProactiveSchedule,
 } from '@symbiose/shared';
 
+import { plainText } from './markdown';
+
 /**
  * Which proactive notifications to schedule over the coming days, from the
  * server's schedule. Pure: the phone replaces its pending notifications
@@ -81,10 +83,10 @@ export interface PlanInput {
   horizonDays?: number;
 }
 
-/** The week's nudges take turns, one a day: the same one in the notification and on the coach line. */
+/** The week's nudges take turns, one a day: the same one in the notification and on the coach line, without Markdown. */
 export function nudgeFor(date: string, lines: string[]): string | null {
   if (!lines.length) return null;
-  return lines[((daysBetween('2026-01-05', date) % lines.length) + lines.length) % lines.length]!;
+  return plainText(lines[((daysBetween('2026-01-05', date) % lines.length) + lines.length) % lines.length]!);
 }
 
 /** A craving logged in the hour before the heads-up makes it pointless that day. */
@@ -108,7 +110,7 @@ export function planNotifications(input: PlanInput): PlannedNotification[] {
     const reviewReady = settings.weekly && date === review.monday && review.loggedDays >= MIN_REVIEW_DAYS;
     const seen = isToday && input.morningSeen === today;
     if (settings.morning && ahead(at) && !seen) {
-      const line = isToday && schedule.today ? firstLine(schedule.today.content) : null;
+      const line = isToday && schedule.today ? firstLine(plainText(schedule.today.content)) : null;
       day.push({
         id: `${PROACTIVE_PREFIX}morning.${date}`,
         kind: 'morning',
