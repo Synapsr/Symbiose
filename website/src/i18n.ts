@@ -253,14 +253,14 @@ const fr = {
     title: 'Tes données restent chez toi.',
     body: "Symbiose tourne sur ton serveur : une image Docker, un volume. Pas de compte chez nous. D'ailleurs, il n'y a pas de « chez nous ».",
     steps: [
-      { title: 'Lance le serveur', body: 'Une commande. Ta clé Anthropic active les photos, les plans, le coach et les bilans.' },
+      { title: 'Lance le serveur', body: 'Une commande. Ta clé d’IA (Claude par défaut, ou un autre fournisseur) active les photos, les plans, le coach et les bilans.' },
       { title: 'Ouvre sa page', body: 'http://ton-serveur:3000 affiche un QR code.' },
       { title: 'Scanne-le avec l’app', body: '« Scanner le QR du serveur », puis crée ton compte, le premier du serveur.' },
     ],
     facts: [
       'Une base SQLite et un dossier de photos, dans un seul volume. Sauvegarde-le, c’est tout.',
       'Export de toutes tes données en JSON. Suppression du compte quand tu veux.',
-      "Les photos et descriptions de repas ne partent que chez le fournisseur d'IA (Anthropic, Claude), pour l'analyse. Rien d'autre ne quitte ton serveur.",
+      "Les photos et descriptions de repas ne partent que chez le fournisseur d'IA que tu as choisi, pour l'analyse. Rien d'autre ne quitte ton serveur.",
       'Sans clé API, l’app reste utilisable : codes-barres, saisie manuelle, plan par mots-clés.',
       'Mise à jour : docker pull et redémarrage. Les migrations se font toutes seules.',
     ],
@@ -274,7 +274,7 @@ const fr = {
   open: {
     kicker: 'Open source',
     title: 'Le code est à toi aussi.',
-    body: 'Licence MIT. Pas d’abonnement, pas de pub, pas de paywall : tu paies seulement ce que tu consommes chez Anthropic.',
+    body: 'Licence MIT. Pas d’abonnement, pas de pub, pas de paywall : tu paies seulement ce que tu consommes chez ton fournisseur d’IA, ou rien avec un modèle local.',
     stack: [
       { name: 'Expo · React Native', role: 'L’app iOS et Android' },
       { name: 'Hono · SQLite', role: 'L’API et tes données, en un fichier' },
@@ -340,15 +340,15 @@ const fr = {
     items: [
       {
         q: 'C’est gratuit ?',
-        a: "Oui. Le code est sous licence MIT et tu héberges le serveur. La seule dépense, c'est ton usage de l'API Anthropic pour l'analyse.",
+        a: "Oui. Le code est sous licence MIT et tu héberges le serveur. La seule dépense, c'est ton usage de l'IA pour l'analyse (Claude par défaut, OpenAI, Mistral, Gemini, OpenRouter), ou rien avec un modèle local.",
       },
       {
         q: 'Où télécharger l’app ?',
-        a: "Elle n'est pas encore sur l'App Store ni sur le Play Store. Pour l'instant, on la compile depuis le dépôt avec Expo (build de développement, en local ou sur EAS). Les étapes sont dans le README.",
+        a: "Elle n'est pas encore sur l'App Store ni sur le Play Store. Pour l'instant, on la compile depuis le dépôt avec Expo, sur son Mac ou son PC. Les étapes sont dans le README.",
       },
       {
         q: 'Faut-il une clé API ?',
-        a: "Pour l'IA, oui : une clé Anthropic. Sans elle, Symbiose reste utilisable avec les codes-barres, la saisie manuelle et un plan établi à partir de mots-clés.",
+        a: "Pour l'IA, oui : une clé Claude (par défaut) ou d'un autre fournisseur, ou un modèle local avec Ollama. Sans IA, Symbiose reste utilisable avec les codes-barres, la saisie manuelle et un plan établi à partir de mots-clés.",
       },
       {
         q: 'Qui voit mes photos ?',
@@ -628,14 +628,14 @@ const en: Dict = {
     title: 'Your data stays with you.',
     body: 'Symbiose runs on your server: one Docker image, one volume. No account with us. In fact, there is no “us” to hold it.',
     steps: [
-      { title: 'Start the server', body: 'One command. Your Anthropic key enables photos, plans, the coach and reviews.' },
+      { title: 'Start the server', body: 'One command. Your AI key (Claude by default, or another provider) enables photos, plans, the coach and reviews.' },
       { title: 'Open its page', body: 'http://your-server:3000 shows a QR code.' },
       { title: 'Scan it with the app', body: '“Scan the server QR code”, then create your account, the server’s first.' },
     ],
     facts: [
       'One SQLite database and a photos folder, in a single volume. Back it up and you’re done.',
       'Export all your data as JSON. Delete your account whenever you want.',
-      'Meal photos and descriptions only go to the AI provider (Anthropic, Claude), for analysis. Nothing else leaves your server.',
+      'Meal photos and descriptions only go to the AI provider you chose, for analysis. Nothing else leaves your server.',
       'Without an API key the app still works: barcodes, manual logging, keyword-based plans.',
       'Updating is docker pull and a restart. Migrations run on their own.',
     ],
@@ -649,7 +649,7 @@ const en: Dict = {
   open: {
     kicker: 'Open source',
     title: 'The code is yours too.',
-    body: 'MIT licence. No subscription, no ads, no paywall: you only pay for what you use at Anthropic.',
+    body: 'MIT licence. No subscription, no ads, no paywall: you only pay for what you use at your AI provider, or nothing with a local model.',
     stack: [
       { name: 'Expo · React Native', role: 'The iOS and Android app' },
       { name: 'Hono · SQLite', role: 'The API and your data, in one file' },
@@ -715,15 +715,15 @@ const en: Dict = {
     items: [
       {
         q: 'Is it free?',
-        a: 'Yes. The code is MIT-licensed and you host the server. Your only cost is your Anthropic API usage for analysis.',
+        a: 'Yes. The code is MIT-licensed and you host the server. Your only cost is your AI usage for analysis (Claude by default, OpenAI, Mistral, Gemini, OpenRouter), or nothing with a local model.',
       },
       {
         q: 'Where do I get the app?',
-        a: 'It isn’t on the App Store or Play Store yet. For now you build it from the repository with Expo (a development build, locally or on EAS). The steps are in the README.',
+        a: 'It isn’t on the App Store or Play Store yet. For now you build it from the repository with Expo, on your Mac or PC. The steps are in the README.',
       },
       {
         q: 'Do I need an API key?',
-        a: 'For the AI, yes: an Anthropic key. Without it, Symbiose still works with barcodes, manual logging and a keyword-based plan.',
+        a: 'For the AI, yes: a Claude key (the default) or another provider’s, or a local model with Ollama. Without AI, Symbiose still works with barcodes, manual logging and a keyword-based plan.',
       },
       {
         q: 'Who sees my photos?',
