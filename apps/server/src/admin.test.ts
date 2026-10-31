@@ -3,15 +3,17 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { AdminOverview, AuthResponse, FoodItem, User } from '@symbiose/shared';
+import { toLocalDate, toLocalDateTime, type AdminOverview, type AdminRequest, type AuthResponse, type FoodItem, type Profile, type User } from '@symbiose/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createDisabledAi } from './ai/claude';
+import { createMockAi } from './ai/mock';
 import type { Ai, AiUsage } from './ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
 import { aiUsage, coachMessages, cravings, journalEntries, meals, photos, users, weights } from './db/schema';
+import { databaseBehind } from './db/testing';
 import { loadConfig, VERSION, type Config } from './env';
 import { adminSetupLog } from './services/admin';
 import { costOf, parsePrices, priceOf } from './services/ai-prices';
@@ -309,7 +311,7 @@ describe('admin overview', () => {
 
   it('counts people and what they log, never who', async () => {
     const { body } = await overview(7);
-    expect(body.people).toEqual({ accounts: 4, active: { day: 2, week: 3, month: 3 }, new: { week: 2, month: 3 } });
+    expect(body.people).toEqual({ accounts: 4, pending: 0, active: { day: 2, week: 3, month: 3 }, new: { week: 2, month: 3 } });
     expect(body.usage).toMatchObject({
       meals: 8,
       mealSources: { photo: 1, relog: 2, text: 2, barcode: 1, library: 1, manual: 1 },
@@ -330,7 +332,7 @@ describe('admin overview', () => {
       photosBytes: 200_000,
       backups: { count: 2, lastAt: '2026-10-20T10:00:00.000Z' },
       ai: { enabled: true, provider: 'anthropic', model: 'claude-opus-5-5' },
-      signupOpen: true,
+      signup: 'open',
     });
     expect(system.dbBytes).toBeGreaterThan(0);
     expect(system.uptimeSeconds).toBeGreaterThanOrEqual(0);
@@ -350,5 +352,142 @@ describe('admin overview', () => {
     const line = info.mock.calls.flat().join(' ');
     expect(line).toContain('overview (30 days)');
     expect(line).not.toMatch(/@|claude|tokens/);
+  });
+});
+
+describe('sign-up on request', () => {
+  /** Every AI method counts its calls: a waiting account must never reach one. */
+  const aiCalls: string[] = [];
+  const mock = createMockAi();
+  const spyAi = new Proxy(mock, {
+    get: (target, key) => {
+      const value = target[key as keyof Ai];
+      return typeof value === 'function' ? (...args: unknown[]) => (aiCalls.push(String(key)), (value as (...a: unknown[]) => unknown).apply(target, args)) : value;
+    },
+  });
+  const profile: Profile = { name: 'Inès', sex: 'female', birthYear: 1992, heightCm: 165, weightKg: 60, activityLevel: 'light', locale: 'fr', timezone: 'Europe/Paris' };
+
+  it('reads SIGNUP, and ALLOW_SIGNUP as before', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const read = (env: Record<string, string>) => {
+      const config = loadConfig({ DATA_DIR: mkdtempSync(join(dir, 'env-')), JWT_SECRET: 'x', ...env });
+      return [config.signup, config.allowSignup];
+    };
+    expect(read({})).toEqual(['closed', false]);
+    expect(read({ ALLOW_SIGNUP: 'true' })).toEqual(['open', true]);
+    expect(read({ ALLOW_SIGNUP: 'false' })).toEqual(['closed', false]);
+    expect(read({ SIGNUP: 'request' })).toEqual(['request', true]);
+    expect(read({ SIGNUP: 'Closed', ALLOW_SIGNUP: 'true' })).toEqual(['closed', false]);
+    expect(read({ SIGNUP: 'maybe', ALLOW_SIGNUP: 'true' })).toEqual(['open', true]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('maybe'));
+  });
+
+  it('approves the first account, and keeps the next ones waiting, away from the AI and the data', async () => {
+    const { request, register } = makeApp({ signup: 'request', adminEmails: [BOSS] }, spyAi);
+    const first = await register('first@example.com');
+    expect(first.body.user.pending).toBe(false);
+    const ines = await register('ines@example.com', 'Inès');
+    expect(ines.status).toBe(201);
+    expect(ines.body.user.pending).toBe(true);
+    const token = ines.body.token;
+    expect((await request('GET', '/api/info')).body).toMatchObject({ signupOpen: true, signup: 'request' });
+
+    // Their own account and the onboarding's profile: yes.
+    expect((await request<User>('GET', '/api/me', token)).body.pending).toBe(true);
+    expect((await request<User>('PUT', '/api/me/profile', token, profile)).status).toBe(200);
+    expect((await request('GET', '/api/me/export', token)).status).toBe(200);
+
+    // Everything else, AI first: no.
+    const today = toLocalDate();
+    const blocked: [string, string, unknown?][] = [
+      ['POST', '/api/goals/draft', { intentions: 'Moins de sucre' }],
+      ['PUT', '/api/goals', {}],
+      ['GET', `/api/goals?date=${today}`],
+      ['POST', '/api/meals', { eatenAt: toLocalDateTime(), localDate: today, text: 'une pomme' }],
+      ['POST', '/api/coach/messages', { text: 'Salut', localDate: today }],
+      ['POST', '/api/coach/messages/stream', { text: 'Salut', localDate: today }],
+      ['POST', '/api/cravings', { at: toLocalDateTime(), localDate: today, what: 'chocolat' }],
+      ['POST', '/api/insights/review', { days: 7, to: today }],
+      ['GET', `/api/insights?days=7&to=${today}`],
+      ['GET', `/api/glance?date=${today}`],
+      ['GET', `/api/days/${today}`],
+      ['GET', `/api/proactive?date=${today}`],
+      ['POST', '/api/journal', { at: toLocalDateTime(), localDate: today, kind: 'other', text: 'x' }],
+      ['GET', '/api/foods/library'],
+      ['GET', '/api/admin/overview'],
+    ];
+    for (const [method, path, body] of blocked) {
+      const res = await request<{ error: { code: string } }>(method, path, token, body);
+      expect([path, res.status, res.body.error.code]).toEqual([path, 403, 'account_pending']);
+    }
+    expect(aiCalls).toEqual([]);
+
+    // Leaving is always possible.
+    expect((await request('DELETE', '/api/me', token)).status).toBe(204);
+  });
+
+  it('lets an admin approve or refuse, seeing only the email, the first name and the date', async () => {
+    const { db, request, register } = makeApp({ signup: 'request', adminEmails: [BOSS, 'late-admin@example.com'] }, spyAi);
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const boss = (await register(BOSS)).body;
+    expect(boss.user).toMatchObject({ pending: false, isAdmin: true });
+    const ines = (await register('ines@example.com', 'Inès')).body;
+    const tom = (await register('tom@example.com')).body;
+    await request('PUT', '/api/me/profile', ines.token, profile);
+
+    // A listed email that signs up waits too, and is no admin while it waits: nobody can squat it.
+    const late = (await register('late-admin@example.com')).body;
+    expect(late.user).toMatchObject({ pending: true, isAdmin: false });
+    expect((await request('GET', '/api/admin/requests', late.token)).status).toBe(403);
+    expect((await request('POST', `/api/admin/requests/${tom.user.id}/approve`, ines.token)).status).toBe(403);
+
+    const list = await request<{ requests: AdminRequest[] }>('GET', '/api/admin/requests', boss.token);
+    expect(list.body.requests.map((r) => r.email)).toEqual(['ines@example.com', 'tom@example.com', 'late-admin@example.com']);
+    expect(list.body.requests[0]).toEqual({ id: ines.user.id, email: 'ines@example.com', name: 'Inès', requestedAt: expect.any(String) });
+    // Nothing of the profile: no body data, no goals.
+    expect(list.text).not.toMatch(/165|1992|female|weight|Europe/);
+    expect((await request<AdminOverview>('GET', '/api/admin/overview', boss.token)).body.people.pending).toBe(3);
+
+    // Approved: the account gets everything, the AI included.
+    expect((await request('POST', `/api/admin/requests/${ines.user.id}/approve`, boss.token)).status).toBe(204);
+    expect((await request<User>('GET', '/api/me', ines.token)).body.pending).toBe(false);
+    expect((await request('GET', `/api/goals?date=${toLocalDate()}`, ines.token)).status).toBe(200);
+    expect((await request('POST', `/api/admin/requests/${ines.user.id}/approve`, boss.token)).status).toBe(404);
+
+    // Refused: the account and what it saved are gone; its next request finds no account.
+    expect((await request('DELETE', `/api/admin/requests/${tom.user.id}`, boss.token)).status).toBe(204);
+    expect((await request('GET', '/api/me', tom.token)).status).toBe(404);
+    expect(db.select().from(users).where(eq(users.id, tom.user.id)).get()).toBeUndefined();
+    // An approved account can't be deleted this way.
+    expect((await request('DELETE', `/api/admin/requests/${ines.user.id}`, boss.token)).status).toBe(404);
+    expect(db.select().from(users).where(eq(users.id, ines.user.id)).get()).toBeDefined();
+
+    // Once approved, a listed email is an admin.
+    await request('POST', `/api/admin/requests/${late.user.id}/approve`, boss.token);
+    expect((await request<User>('GET', '/api/me', late.token)).body.isAdmin).toBe(true);
+    expect((await request<{ requests: AdminRequest[] }>('GET', '/api/admin/requests', late.token)).body.requests).toEqual([]);
+  });
+
+  it('warns at startup when nobody can approve requests', async () => {
+    const { db, config, register } = makeApp({ signup: 'request', adminEmails: [BOSS] });
+    await register('first@example.com');
+    expect(adminSetupLog(db, config).warnings).toEqual([expect.stringContaining('no email in ADMIN_EMAILS has an approved account')]);
+    // The squatting warning is for open sign-up only: on request, a listed email just waits.
+    expect(adminSetupLog(db, config).warnings.join()).not.toContain('refuses');
+  });
+
+  it('keeps every account from before the migration approved', () => {
+    const file = join(mkdtempSync(join(dir, 'migrate-')), 'symbiose.db');
+    const old = databaseBehind(file);
+    old.prepare("INSERT INTO users (id, email, password_hash, name, is_admin, created_at) VALUES ('u1', 'old@example.com', 'x', 'Old', 1, '2026-01-01T00:00:00.000Z'), ('u2', 'friend@example.com', 'x', '', 0, '2026-02-01T00:00:00.000Z')").run();
+    old.close();
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const db = openDb(file);
+    expect(db.select({ id: users.id, pending: users.pending }).from(users).all()).toEqual([
+      { id: 'u1', pending: false },
+      { id: 'u2', pending: false },
+    ]);
+    expect(db.select().from(aiUsage).all()).toEqual([]);
   });
 });

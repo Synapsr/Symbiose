@@ -8,6 +8,8 @@ export const users = sqliteTable('users', {
   name: text('name').notNull().default(''),
   /** Legacy, set on the very first account and read nowhere: admins are the emails listed in ADMIN_EMAILS. */
   isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  /** Sign-up on request: waiting for an admin. Accounts from before (and the first one) are approved. */
+  pending: integer('pending', { mode: 'boolean' }).notNull().default(false),
   profile: text('profile', { mode: 'json' }).$type<Profile>(),
   plan: text('plan', { mode: 'json' }).$type<GoalPlan>(),
   createdAt: text('created_at').notNull(),

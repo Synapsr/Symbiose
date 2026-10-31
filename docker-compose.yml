@@ -10,7 +10,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # AI_MODEL: claude-opus-5-5
       # PUBLIC_URL: https://symbiose.example.com
-      # ALLOW_SIGNUP: "true"
+      # SIGNUP: request   # or open; closed by default
       # ADMIN_EMAILS: you@example.com
     volumes:
       - symbiose-data:/data

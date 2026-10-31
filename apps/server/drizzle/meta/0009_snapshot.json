@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ead0f40d-8965-4171-b1cb-d12a817fcbcd",
+  "id": "c5ac870d-1de5-4cc2-bc26-ee0458f97724",
   "prevId": "4e2cc9d8-4ee7-4808-8e07-47458dc7c352",
   "tables": {
     "activity": {
@@ -1043,6 +1043,14 @@
         },
         "is_admin": {
           "name": "is_admin",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "pending": {
+          "name": "pending",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

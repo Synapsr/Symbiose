@@ -2,6 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import type { SignupMode } from '@symbiose/shared';
+
 import { parsePrices, type Rates } from './services/ai-prices';
 
 export const VERSION = '0.1.0';
@@ -11,8 +13,10 @@ export interface Config {
   dataDir: string;
   publicUrl: string | null;
   jwtSecret: string;
-  /** When false, only the very first account can be created. */
+  /** When false, only the very first account can be created. Read through `signupMode`. */
   allowSignup: boolean;
+  /** SIGNUP; wins over `allowSignup` when set. */
+  signup?: SignupMode;
   anthropicApiKey: string | null;
   /** Required by Anthropic keys that are not scoped to a workspace. */
   anthropicWorkspaceId: string | null;
@@ -41,17 +45,34 @@ function loadSecret(dataDir: string): string {
   return secret;
 }
 
+const SIGNUP_MODES: readonly SignupMode[] = ['open', 'request', 'closed'];
+
+/** How accounts after the first one get in. */
+export function signupMode(config: Pick<Config, 'signup' | 'allowSignup'>): SignupMode {
+  return config.signup ?? (config.allowSignup ? 'open' : 'closed');
+}
+
+/** SIGNUP=open|request|closed; before it, ALLOW_SIGNUP=true meant open. Closed by default. */
+function readSignup(env: NodeJS.ProcessEnv): SignupMode {
+  const value = env.SIGNUP?.trim().toLowerCase();
+  if (value && SIGNUP_MODES.includes(value as SignupMode)) return value as SignupMode;
+  if (value) console.warn(`SIGNUP: ignoring "${env.SIGNUP}" (expected open, request or closed)`);
+  return bool(env.ALLOW_SIGNUP, false) ? 'open' : 'closed';
+}
+
 export function loadConfig(env = process.env): Config {
   const dataDir = resolve(env.DATA_DIR ?? './data');
   mkdirSync(join(dataDir, 'photos'), { recursive: true });
   const prices = parsePrices(env.AI_PRICES);
+  const signup = readSignup(env);
   for (const entry of prices.invalid) console.warn(`AI_PRICES: ignoring "${entry}" (expected model=input/output, USD per million tokens)`);
   return {
     port: Number(env.PORT ?? 3000),
     dataDir,
     publicUrl: env.PUBLIC_URL?.replace(/\/$/, '') || null,
     jwtSecret: loadSecret(dataDir),
-    allowSignup: bool(env.ALLOW_SIGNUP, false),
+    allowSignup: signup !== 'closed',
+    signup,
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
     anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID || null,
     aiModel: env.AI_MODEL || 'claude-opus-5-5',

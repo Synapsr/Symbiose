@@ -1,3 +1,5 @@
+import type { SignupMode } from './schemas';
+
 /**
  * The admin's glance at the whole server: what the AI costs, how much the
  * instance is used, and its health. Counts and totals only: never an email,
@@ -19,6 +21,18 @@ export interface AiTotals {
   cacheReadTokens: number;
   cacheWriteTokens: number;
   costUsd: number | null;
+}
+
+/**
+ * Someone waiting to get in (sign-up on request): only what an admin needs to
+ * decide, the one place an admin sees anything about a person.
+ */
+export interface AdminRequest {
+  id: string;
+  email: string;
+  /** The first name they gave, empty when none. */
+  name: string;
+  requestedAt: string;
 }
 
 export interface AdminOverview {
@@ -47,6 +61,8 @@ export interface AdminOverview {
   };
   people: {
     accounts: number;
+    /** Accounts waiting for an admin (sign-up on request), included in `accounts`. */
+    pending: number;
     /** Distinct accounts that recorded anything over the last 24 hours, 7 days and 30 days. */
     active: { day: number; week: number; month: number };
     /** Accounts created over the last 7 and 30 days. */
@@ -70,6 +86,6 @@ export interface AdminOverview {
     photosBytes: number;
     backups: { count: number; lastAt: string | null };
     ai: { enabled: boolean; provider: string | null; model: string | null };
-    signupOpen: boolean;
+    signup: SignupMode;
   };
 }

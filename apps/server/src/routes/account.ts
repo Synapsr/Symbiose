@@ -7,6 +7,7 @@ import { Hono } from 'hono';
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
 import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, vitals, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
+import { signupMode } from '../env';
 import { nowIso, validate, type Deps } from '../http';
 import { isAdminEmail } from '../services/admin';
 import { toReading } from '../services/blood-pressure';
@@ -30,14 +31,16 @@ export function authRoutes({ db, config }: Deps) {
   app.post('/register', limiter, validate('json', CredentialsSchema), async (c) => {
     const { email, password, name } = c.req.valid('json');
     const existingUsers = db.select({ n: count() }).from(users).get()?.n ?? 0;
-    if (existingUsers > 0 && !config.allowSignup) {
+    const mode = signupMode(config);
+    if (existingUsers > 0 && mode === 'closed') {
       throw new HttpError(403, 'signup_closed', 'Sign-ups are closed on this server');
     }
     if (db.select({ id: users.id }).from(users).where(eq(users.email, email)).get()) {
       throw new HttpError(409, 'email_taken', 'An account already exists with this email');
     }
     // No email verification: an admin email can't be claimed through open sign-up, only as the first account.
-    if (existingUsers > 0 && isAdminEmail(config, email)) {
+    // On request, it simply waits for an admin like any other (and is no admin until approved).
+    if (existingUsers > 0 && mode === 'open' && isAdminEmail(config, email)) {
       throw new HttpError(403, 'email_reserved', 'This email is reserved on this server');
     }
     const row = db
@@ -48,6 +51,8 @@ export function authRoutes({ db, config }: Deps) {
         passwordHash: await hashPassword(password),
         name: name ?? '',
         isAdmin: existingUsers === 0,
+        // The very first account is always approved.
+        pending: existingUsers > 0 && mode === 'request',
         createdAt: nowIso(),
       })
       .returning()

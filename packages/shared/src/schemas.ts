@@ -731,6 +731,8 @@ export interface User {
   email: string;
   name: string;
   isAdmin: boolean;
+  /** Sign-up on request: the account waits for an admin, and reaches nothing but itself until then. */
+  pending?: boolean;
   profile: Profile | null;
   plan: GoalPlan | null;
   createdAt: string;
@@ -746,8 +748,13 @@ export interface ServerInfo {
   version: string;
   ai: { enabled: boolean; model: string | null };
   signupOpen: boolean;
+  /** How new accounts get in once the first one exists (older servers don't say). */
+  signup?: SignupMode;
   hasUsers: boolean;
 }
+
+/** `open`: anyone signs up; `request`: new accounts wait for an admin; `closed`: only the first account. */
+export type SignupMode = 'open' | 'request' | 'closed';
 
 export interface GoalsResponse {
   plan: GoalPlan | null;

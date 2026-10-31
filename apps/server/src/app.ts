@@ -5,8 +5,9 @@ import { logger } from 'hono/logger';
 
 import type { ServerInfo } from '@symbiose/shared';
 
+import { blockPending } from './auth';
 import { users } from './db/schema';
-import { VERSION } from './env';
+import { signupMode, VERSION } from './env';
 import { HttpError } from './errors';
 import type { Deps } from './http';
 import { landingPage } from './landing';
@@ -32,6 +33,7 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
 
   if (options.log) app.use(logger());
   app.use('/api/*', cors({ origin: config.corsOrigins.includes('*') ? '*' : config.corsOrigins }));
+  app.use('/api/*', blockPending(db, config.jwtSecret));
 
   app.onError((error, c) => {
     if (error instanceof HttpError) {
@@ -57,7 +59,8 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
       name: 'symbiose',
       version: VERSION,
       ai: { enabled: ai.enabled, model: ai.model },
-      signupOpen: !hasUsers || config.allowSignup,
+      signupOpen: !hasUsers || signupMode(config) !== 'closed',
+      signup: signupMode(config),
       hasUsers,
     });
   });

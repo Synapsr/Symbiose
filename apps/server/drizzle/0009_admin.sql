@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `ai_usage` (
+CREATE TABLE `ai_usage` (
 	`id` integer PRIMARY KEY NOT NULL,
 	`at` text NOT NULL,
 	`feature` text NOT NULL,
@@ -13,4 +13,5 @@ CREATE TABLE IF NOT EXISTS `ai_usage` (
 	`error` text
 );
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS `ai_usage_at` ON `ai_usage` (`at`);
+CREATE INDEX `ai_usage_at` ON `ai_usage` (`at`);--> statement-breakpoint
+ALTER TABLE `users` ADD `pending` integer DEFAULT false NOT NULL;

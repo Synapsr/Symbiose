@@ -1,41 +1,76 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { addDays, MEAL_SOURCES, type AdminOverview, type AdminPeriod, type AiTotals, type MealSource } from '@symbiose/shared';
-import { inArray, sql } from 'drizzle-orm';
+import { addDays, MEAL_SOURCES, type AdminOverview, type AdminPeriod, type AdminRequest, type AiTotals, type MealSource } from '@symbiose/shared';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 
 import type { Ai } from '../ai/types';
 import type { Db } from '../db';
-import { users } from '../db/schema';
-import { VERSION, type Config } from '../env';
+import { photos as photosTable, users } from '../db/schema';
+import { signupMode, VERSION, type Config } from '../env';
 import { costOf, LONG_PROMPT_TOKENS, priceOf } from './ai-prices';
+import type { PhotoStore } from './photos';
 
 // ---------------------------------------------------------------- Who is an admin
 
-/** Admins are the accounts whose email is listed in ADMIN_EMAILS, checked as it is now. */
+/** Whether an email is listed in ADMIN_EMAILS, as it is now. */
 export function isAdminEmail(config: Pick<Config, 'adminEmails'>, email: string): boolean {
   return (config.adminEmails ?? []).includes(email.trim().toLowerCase());
 }
 
+/** Admins are the approved accounts whose email is listed: a pending one waits like anyone else. */
+export function isAdmin(config: Pick<Config, 'adminEmails'>, account: { email: string; pending: boolean }): boolean {
+  return !account.pending && isAdminEmail(config, account.email);
+}
+
 /**
- * The startup log about the admin view. There is no email verification, so a
- * listed email without an account could be claimed by anyone while sign-up is
- * open: sign-up refuses it (unless it is the server's first account), and each
- * one gets a warning saying how to create it.
+ * The startup log about the admin view. There is no email verification, so
+ * anyone could sign up with a listed email before its owner. With sign-up on
+ * request, that account would wait for an admin like any other (and never be
+ * admin while it waits). With open sign-up, a listed email is refused unless it
+ * is the server's first account: each listed email without an account gets a
+ * warning saying how to create it.
  */
 export function adminSetupLog(db: Db, config: Config): { info: string; warnings: string[] } {
   const listed = config.adminEmails ?? [];
-  if (!listed.length) return { info: 'Admin view off: list admin emails in ADMIN_EMAILS to see how the server is used', warnings: [] };
+  const onRequest = signupMode(config) === 'request';
   // Emails are stored lowercased (CredentialsSchema), like the list.
-  const existing = new Set(db.select({ email: users.email }).from(users).where(inArray(users.email, listed)).all().map((row) => row.email));
-  const missing = listed.filter((email) => !existing.has(email));
+  const accounts = listed.length ? db.select({ email: users.email, pending: users.pending }).from(users).where(inArray(users.email, listed)).all() : [];
+  const warnings: string[] = [];
+  if (onRequest && !accounts.some((account) => !account.pending)) {
+    warnings.push("SIGNUP=request, but no email in ADMIN_EMAILS has an approved account yet: requests will wait until one does (the server's first account is always approved).");
+  }
+  if (!onRequest) {
+    const existing = new Set(accounts.map((account) => account.email));
+    for (const email of listed.filter((e) => !existing.has(e))) {
+      warnings.push(`ADMIN_EMAILS lists ${email}, which has no account yet. Sign-up refuses listed emails (anyone could claim one) unless it is the server's first account: create the account first, then list it.`);
+    }
+  }
   return {
-    info: `Admin view on for ${listed.length} ${listed.length === 1 ? 'email' : 'emails'} (ADMIN_EMAILS)`,
-    warnings: missing.map(
-      (email) =>
-        `ADMIN_EMAILS lists ${email}, which has no account yet. Sign-up refuses listed emails (anyone could claim one) unless it is the server's first account: create the account first, then list it.`,
-    ),
+    info: listed.length ? `Admin view on for ${listed.length} ${listed.length === 1 ? 'email' : 'emails'} (ADMIN_EMAILS)` : 'Admin view off: list admin emails in ADMIN_EMAILS to see how the server is used',
+    warnings,
   };
+}
+
+// ---------------------------------------------------------------- Requests (sign-up on request)
+
+/** The accounts waiting for an admin, oldest first: email, first name and date, nothing else. */
+export function pendingRequests(db: Db): AdminRequest[] {
+  return db.select({ id: users.id, email: users.email, name: users.name, requestedAt: users.createdAt }).from(users).where(eq(users.pending, true)).orderBy(users.createdAt).all();
+}
+
+/** Lets a waiting account in; false when there is no such request. */
+export function approveRequest(db: Db, id: string): boolean {
+  return db.update(users).set({ pending: false }).where(and(eq(users.id, id), eq(users.pending, true))).run().changes > 0;
+}
+
+/** Refuses a request: the waiting account and everything it saved go. Never touches an approved account. */
+export async function refuseRequest({ db, photos }: { db: Db; photos: PhotoStore }, id: string): Promise<boolean> {
+  const row = db.select({ id: users.id }).from(users).where(and(eq(users.id, id), eq(users.pending, true))).get();
+  if (!row) return false;
+  for (const photo of db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.userId, id)).all()) await photos.remove(id, photo.id);
+  db.delete(users).where(and(eq(users.id, id), eq(users.pending, true))).run();
+  return true;
 }
 
 // ---------------------------------------------------------------- Overview
@@ -135,8 +170,10 @@ function aiSection(db: Db, config: Config, since: string, dates: string[]): Admi
 function peopleSection(db: Db, now: Date): AdminOverview['people'] {
   const ago = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString();
   const [day, week, month] = [ago(1), ago(7), ago(30)];
-  const accounts = db.get<{ accounts: number; week: number; month: number }>(sql`
-    SELECT count(*) AS accounts, coalesce(sum(created_at >= ${week}), 0) AS week, coalesce(sum(created_at >= ${month}), 0) AS month FROM users`)!;
+  const accounts = db.get<{ accounts: number; pending: number; week: number; month: number }>(sql`
+    SELECT count(*) AS accounts, coalesce(sum(pending), 0) AS pending,
+      coalesce(sum(created_at >= ${week}), 0) AS week, coalesce(sum(created_at >= ${month}), 0) AS month
+    FROM users`)!;
   // Anything an account recorded, or the health store synced from its phone, counts as activity.
   const active = db.get<{ day: number; week: number; month: number }>(sql`
     WITH events(user_id, at) AS (
@@ -158,7 +195,7 @@ function peopleSection(db: Db, now: Date): AdminOverview['people'] {
       count(DISTINCT CASE WHEN at >= ${week} THEN user_id END) AS week,
       count(DISTINCT user_id) AS month
     FROM events WHERE at >= ${month}`)!;
-  return { accounts: accounts.accounts, active, new: { week: accounts.week, month: accounts.month } };
+  return { accounts: accounts.accounts, pending: accounts.pending, active, new: { week: accounts.week, month: accounts.month } };
 }
 
 function usageSection(db: Db, since: string, dates: string[]): AdminOverview['usage'] {
@@ -226,7 +263,7 @@ function aiProvider(config: Config, ai: Ai): string | null {
   return config.anthropicApiKey ? 'anthropic' : null;
 }
 
-function systemSection(db: Db, ai: Ai, config: Config, accounts: number): AdminOverview['system'] {
+function systemSection(db: Db, ai: Ai, config: Config): AdminOverview['system'] {
   const { dbBytes } = db.get<{ dbBytes: number }>(sql`SELECT page_count * page_size AS dbBytes FROM pragma_page_count(), pragma_page_size()`)!;
   const photos = db.get<{ photos: number; photosBytes: number }>(sql`SELECT count(*) AS photos, coalesce(sum(size), 0) AS photosBytes FROM photos`)!;
   return {
@@ -236,7 +273,7 @@ function systemSection(db: Db, ai: Ai, config: Config, accounts: number): AdminO
     ...photos,
     backups: backups(config.dataDir),
     ai: { enabled: ai.enabled, provider: aiProvider(config, ai), model: ai.model },
-    signupOpen: accounts === 0 || config.allowSignup,
+    signup: signupMode(config),
   };
 }
 
@@ -255,6 +292,6 @@ export function adminOverview({ db, ai, config }: { db: Db; ai: Ai; config: Conf
     ai: aiSection(db, config, since, dates),
     people,
     usage: usageSection(db, since, dates),
-    system: systemSection(db, ai, config, people.accounts),
+    system: systemSection(db, ai, config),
   };
 }
