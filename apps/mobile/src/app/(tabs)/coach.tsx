@@ -193,7 +193,8 @@ export default function Coach() {
           data={[...shown].reverse()}
           inverted
           keyExtractor={(m) => keys[m.id] ?? m.id}
-          keyboardDismissMode="interactive"
+          // iOS drags the keyboard away with the finger; Android has no such mode (it would never go): it leaves as the drag begins.
+          keyboardDismissMode={Platform.OS === 'android' ? 'on-drag' : 'interactive'}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: Space.lg, gap: Space.md }}
           ListHeaderComponent={
