@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { ArrowUp, CloudOff, Images, PenLine, Star, X, Zap, ZapOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -132,6 +133,8 @@ export default function Capture() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
+      {/* Always on black: light status bar icons, whatever the app's theme. */}
+      <StatusBar style="light" />
       {cameraNeeded && permission?.granted ? (
         <CameraView
           ref={camera}
