@@ -349,6 +349,20 @@ describe('words about the past', () => {
     expect(res.body.courses![0]!.basedOn).toEqual({ mealId: dinner.id, localDate: yesterday, mealType: dinner.mealType, title: 'Gratin et salade' });
   });
 
+  it('keeps what a course was based on when it is moved out and joined back', async () => {
+    const meals = (await request<Meal[]>('GET', `/api/meals?date=${day}`)).body;
+    const lunch = meals.find((m) => m.title === 'Reste de gratin')!;
+    const dessert = (await request<Meal>('POST', '/api/meals', { eatenAt: at('12:50'), localDate: day, text: 'une tarte', course: 'auto' })).body;
+    expect(dessert.id).toBe(lunch.id);
+    const out = (await request<SeparateCourseResult>('POST', `/api/meals/${lunch.id}/courses/${dessert.courses![1]!.id}/separate`)).body;
+    const back = (await request<Meal>('POST', `/api/meals/${lunch.id}/merge`, { mealId: out.separated.id })).body;
+    expect(back.courses!.map((c) => c.basedOn?.mealId ?? null)).toEqual([dinner.id, null]);
+    // The leftovers moved out keep it too.
+    const moved = (await request<SeparateCourseResult>('POST', `/api/meals/${lunch.id}/courses/${back.courses![0]!.id}/separate`)).body;
+    expect(moved.separated.courses![0]!.basedOn?.mealId).toBe(dinner.id);
+    await request('POST', `/api/meals/${moved.meal.id}/merge`, { mealId: moved.separated.id });
+  });
+
   it('lets a correction refer to the past too, on the course it changes', async () => {
     // Far enough from the leftovers at 12:30 to be a meal of its own.
     const lunch = (await request<Meal>('POST', '/api/meals', { eatenAt: at('15:30'), localDate: day, text: 'une salade', course: 'auto' })).body;

@@ -530,12 +530,16 @@ export async function deleteCourse(deps: MealDeps, userId: string, mealId: strin
   return toMeal(updated);
 }
 
-/** Copies a meal's courses (fresh ids, moved to `start`) with their items: what joins another meal. */
-function copiedCourses(source: MealRow, start: string) {
+/**
+ * A meal's courses with fresh ids (moved to `start`) and their items: what
+ * joins another meal. A copy made later isn't « d'après » anything any more;
+ * a course joined back keeps what it was based on.
+ */
+function copiedCourses(source: MealRow, start: string, { keepBasis = false } = {}) {
   const courses = storedCourses(source);
   const ids = new Map(courses.map((c) => [c.id, shortId()]));
   return {
-    courses: moveCourses(courses, start).map((c) => ({ ...c, id: ids.get(c.id)!, basedOn: null })),
+    courses: moveCourses(courses, start).map((c) => ({ ...c, id: ids.get(c.id)!, basedOn: keepBasis ? c.basedOn : null })),
     items: tagItems(source.items, courses[0]!.id).map((item) => ({ ...item, id: shortId(), courseId: ids.get(item.courseId!)! })),
   };
 }
@@ -547,7 +551,7 @@ export async function mergeMeal(deps: MealDeps, userId: string, intoId: string, 
   const from = getMealRow(db, userId, fromId);
   if (into.id === from.id || into.localDate !== from.localDate) throw new HttpError(409, 'cannot_merge', 'Only two meals of the same day can be joined');
   const courses = storedCourses(into);
-  const joined = copiedCourses(from, storedCourses(from)[0]!.eatenAt);
+  const joined = copiedCourses(from, storedCourses(from)[0]!.eatenAt, { keepBasis: true });
   if (courses.length + joined.courses.length > COURSE_WINDOW.maxCourses) throw new HttpError(409, 'too_many_courses', 'This meal already has many courses');
   const nextCourses = [...courses, ...joined.courses];
   const items = [...tagItems(into.items, courses[0]!.id), ...joined.items];
