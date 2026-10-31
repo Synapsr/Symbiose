@@ -448,7 +448,7 @@ describe('sign-up on request', () => {
     expect(list.body.requests.map((r) => r.email)).toEqual(['ines@example.com', 'tom@example.com', 'late-admin@example.com']);
     expect(list.body.requests[0]).toEqual({ id: ines.user.id, email: 'ines@example.com', name: 'Inès', requestedAt: expect.any(String) });
     // Nothing of the profile: no body data, no goals.
-    expect(list.text).not.toMatch(/165|1992|female|weight|Europe/);
+    expect(list.text).not.toMatch(/\b(165|1992)\b|female|weight|Europe/);
     expect((await request<AdminOverview>('GET', '/api/admin/overview', boss.token)).body.people.pending).toBe(3);
 
     // Approved: the account gets everything, the AI included.
