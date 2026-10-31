@@ -25,8 +25,12 @@ const SUGGESTIONS: TranslationKey[] = ['coach.s1', 'coach.s2', 'coach.s3', 'coac
 
 /** The exchange being streamed: the question and the reply as it is written. */
 interface Live {
+  /** Its bubbles' keys, which the saved messages keep: nothing re-enters once the reply is written. */
+  key: string;
   user: CoachMessage;
   reply: string;
+  /** Once written: the saved reply's id, until the conversation shows it. */
+  savedId?: string;
 }
 
 export default function Coach() {
@@ -41,6 +45,9 @@ export default function Coach() {
   const [text, setText] = useState('');
   const dictation = useDictation(text, setText);
   const [live, setLive] = useState<Live | null>(null);
+  // Saved message id → the live bubble's key it took over.
+  const [keys, setKeys] = useState<Record<string, string>>({});
+  const exchanges = useRef(0);
   const [error, setError] = useState<unknown>(null);
   const [menu, setMenu] = useState(false);
   const input = useRef<TextInputInstance>(null);
@@ -93,13 +100,17 @@ export default function Coach() {
 
   const submit = async (message: string) => {
     const question = message.trim();
-    if (!question || live) return;
+    if (!question || (live && !live.savedId)) return;
     haptics.tap();
     setText('');
     setError(null);
-    setLive({ user: { id: 'live-user', role: 'user', content: question, suggestion: null, mealActions: [], createdAt: new Date().toISOString() }, reply: '' });
+    exchanges.current += 1;
+    const key = `live-${exchanges.current}`;
+    setLive({ key, user: { id: `${key}-user`, role: 'user', content: question, suggestion: null, mealActions: [], createdAt: new Date().toISOString() }, reply: '' });
     try {
       const saved = await api.streamCoach(question, toLocalDate(), (delta) => setLive((current) => current && { ...current, reply: current.reply + delta }));
+      setKeys((known) => ({ ...known, [saved.user.id]: `${key}-user`, [saved.reply.id]: `${key}-reply` }));
+      setLive((current) => current && { ...current, savedId: saved.reply.id });
       queryClient.setQueryData<CoachMessage[]>(['coach'], (old = []) => [...old, saved.user, saved.reply]);
       // A reply is a conversation, not a milestone.
       haptics.soft();
@@ -107,7 +118,6 @@ export default function Coach() {
       haptics.warning();
       setError(e);
       setText(question); // give the question back so it can be re-sent
-    } finally {
       setLive(null);
     }
   };
@@ -119,8 +129,10 @@ export default function Coach() {
     draft?.date === today && draft.writing && !morningDone
       ? [{ id: 'live-morning', role: 'assistant', content: draft.text, suggestion: null, mealActions: [], kind: 'morning', localDate: today, createdAt: new Date().toISOString(), streaming: true }]
       : [];
+  // The conversation holds the saved exchange: it takes the live one's place, under the same keys.
+  if (live?.savedId && history.some((m) => m.id === live.savedId)) setLive(null);
   const shown: (CoachMessage & { streaming?: boolean })[] = live
-    ? [...history, ...writing, live.user, { id: 'live-reply', role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: true }]
+    ? [...history, ...writing, live.user, { id: `${live.key}-reply`, role: 'assistant', content: live.reply, suggestion: null, mealActions: [], createdAt: '', streaming: !live.savedId }]
     : [...history, ...writing];
   // Read here: today's morning notification isn't needed any more.
   const focused = useIsFocused();
@@ -178,7 +190,7 @@ export default function Coach() {
         <FlatList
           data={[...shown].reverse()}
           inverted
-          keyExtractor={(m) => m.id}
+          keyExtractor={(m) => keys[m.id] ?? m.id}
           keyboardDismissMode="interactive"
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: Space.lg, gap: Space.md }}
