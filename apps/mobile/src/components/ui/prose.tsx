@@ -20,7 +20,7 @@ function runStyle(run: Run, colors: Palette): TextStyle | null {
     ...(run.italic ? { fontStyle: 'italic' } : null),
     ...(run.strike ? { textDecorationLine: 'line-through' } : null),
     ...(run.code ? { fontFamily: MONO, fontSize: 14, backgroundColor: colors.surface2 } : null),
-    ...(run.href ? { color: colors.accent } : null),
+    ...(run.href ? { color: colors.accentText } : null),
   };
 }
 
@@ -116,7 +116,7 @@ function Item({ item, markerWidth, trailing, color, selectable }: { item: ListIt
         {item.number === null ? (
           <View style={{ width: nested ? 4 : 5, height: nested ? 4 : 5, borderRadius: 3, marginLeft: 3, backgroundColor: nested ? colors.text3 : colors.accent }} />
         ) : (
-          <Txt color={nested ? colors.text2 : colors.accent} style={[BODY, { fontWeight: '600', fontVariant: ['tabular-nums'] }]}>
+          <Txt color={nested ? colors.text2 : colors.accentText} style={[BODY, { fontWeight: '600', fontVariant: ['tabular-nums'] }]}>
             {`${item.number}.`}
           </Txt>
         )}
