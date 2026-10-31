@@ -1,0 +1,99 @@
+name: Bug report
+description: Something in Symbiose doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please search the [existing issues](https://github.com/Synapsr/Symbiose/issues) first.
+        **Security problem?** Don't post it here: report it privately (see [SECURITY.md](https://github.com/Synapsr/Symbiose/blob/main/SECURITY.md)).
+        **Never paste an API key, a token, or health data you wouldn't want public.**
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        I photographed a plate of pasta. The meal appeared, but the analysis never finished and the card kept spinning.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Tap …
+        3. …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where does it happen?
+      multiple: true
+      options:
+        - iPhone app
+        - Android app
+        - Apple Watch app
+        - Widgets or Live Activity
+        - App in a browser
+        - Server (API, QR page, admin view)
+        - Website
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and system
+      placeholder: "iPhone 16, iOS 26.1 · Pixel 9, Android 16 · Apple Watch Series 10, watchOS 26"
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App build
+      description: The TestFlight build number, or the commit you built from.
+      placeholder: "Build 14, or a1b2c3d"
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Server version and setup
+      description: The version shown on the server's home page, and how you run it.
+      placeholder: "0.1.0, ghcr.io/synapsr/symbiose:latest with docker compose"
+
+  - type: dropdown
+    id: ai
+    attributes:
+      label: AI provider
+      options:
+        - Anthropic (default)
+        - OpenAI
+        - Mistral
+        - Google Gemini
+        - OpenRouter
+        - Ollama
+        - Another OpenAI-compatible server
+        - AI disabled
+        - Not relevant
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: |
+        Optional but very helpful: `docker logs symbiose` around the time it happened.
+        Keys are never logged, but check for anything private before pasting.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, a screen recording, or what you already tried.

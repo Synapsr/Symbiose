@@ -2,8 +2,33 @@
   "name": "symbiose",
   "private": true,
   "version": "0.1.0",
-  "description": "Open-source, AI-first life companion. Starts with effortless, goal-aware meal tracking.",
+  "description": "Open-source, self-hosted companion for your health goals. Snap, say or scan a meal: the AI follows the goal you wrote in your own words. iOS, Android and Apple Watch.",
+  "keywords": [
+    "nutrition",
+    "meal-tracking",
+    "food-tracker",
+    "calorie-counter",
+    "health",
+    "ai",
+    "self-hosted",
+    "apple-watch",
+    "healthkit",
+    "health-connect",
+    "expo",
+    "react-native",
+    "hono",
+    "sqlite"
+  ],
+  "homepage": "https://symbiose.synapsr.io",
+  "bugs": {
+    "url": "https://github.com/Synapsr/Symbiose/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Synapsr/Symbiose.git"
+  },
   "license": "MIT",
+  "author": "Synapsr",
   "packageManager": "pnpm@10.27.0",
   "engines": {
     "node": ">=22"

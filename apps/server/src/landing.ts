@@ -36,7 +36,7 @@ export async function landingPage(opts: { url: string; version: string; aiEnable
   <h1>Symbiose</h1>
   <p>Your server is running · v${escape(opts.version)}</p>
   <div class="qr">${qr}</div>
-  <p>Open the Symbiose app, tap <strong>Scan server</strong> and point it at this code, or enter:</p>
+  <p>Open the Symbiose app, tap <strong>Scan the server QR code</strong> and point it at this code, or enter:</p>
   <p><code>${escape(opts.url)}</code></p>
   <span class="pill"><span class="dot"></span>${opts.aiEnabled ? `AI ready · ${escape(opts.model ?? '')}` : 'AI disabled · set ANTHROPIC_API_KEY or AI_PROVIDER'}</span>
   ${isLocal ? '<p class="warn">This address only works on this machine. Open this page through your LAN IP or domain, or set PUBLIC_URL.</p>' : ''}
