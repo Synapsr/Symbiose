@@ -20,7 +20,8 @@ export function ToastHost() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const leftHanded = useSettings((s) => s.leftHanded);
-  const bottom = Math.max(insets.bottom + (Platform.OS === 'web' ? 96 : 72), lift);
+  // Above the tab bar: Android's Material bar is taller than iOS's.
+  const bottom = Math.max(insets.bottom + (Platform.select({ web: 96, android: 100 }) ?? 72), lift);
   const offset = useSharedValue(bottom);
   useEffect(() => {
     offset.set(withTiming(bottom, { duration: 220, easing: Easing.out(Easing.cubic) }));

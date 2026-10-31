@@ -2,11 +2,12 @@ import type { ActivityLevel, Sex } from '@symbiose/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react-native';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActivityPicker, BodyFields, parseBody, SexPicker, type BodyValues } from '@/components/profile-fields';
 import { Button, Field, IconButton, Row, Txt } from '@/components/ui';
+import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { useI18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -45,7 +46,7 @@ export default function ProfileScreen() {
   });
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoiding style={{ flex: 1, backgroundColor: colors.bg }}>
       <Row style={{ justifyContent: 'space-between', padding: Space.lg, paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.lg }}>
         <Txt variant="heading">{t('me.editProfile')}</Txt>
         <Row gap={Space.sm}>
@@ -65,6 +66,6 @@ export default function ProfileScreen() {
         <SexPicker value={sex} onChange={setSex} />
         <ActivityPicker value={activity} onChange={setActivity} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoiding>
   );
 }

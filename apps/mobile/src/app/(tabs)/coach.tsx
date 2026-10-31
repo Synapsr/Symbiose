@@ -16,7 +16,7 @@ import { useI18n, type TranslationKey } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
-import { useKeyboardLift } from '@/lib/keyboard';
+import { useBottomOverlap, useKeyboardLift } from '@/lib/keyboard';
 import { markMorningSeen, useMorningDraft, useProactive } from '@/lib/proactive';
 import { useApi } from '@/lib/session';
 import { Radius, Space, useTheme } from '@/theme';
@@ -39,7 +39,9 @@ export default function Coach() {
   // Inside a native tab, the bottom inset already includes the tab bar.
   const insets = useSafeAreaInsets();
   // The composer rests on the tab bar and rides on the keyboard, following it as it is dragged away.
-  const lift = useKeyboardLift(Platform.OS === 'web' ? 88 : insets.bottom, Space.sm);
+  // On Android the screen ends at the tab bar: the keyboard and insets are that much shorter for it.
+  const { overlap, onLayout } = useBottomOverlap();
+  const lift = useKeyboardLift(Platform.OS === 'web' ? 88 : insets.bottom, Space.sm, overlap);
   const api = useApi();
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
@@ -143,7 +145,7 @@ export default function Coach() {
   const empty = shown.length === 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }} onLayout={onLayout}>
       <Row style={{ justifyContent: 'space-between', paddingTop: insets.top + Space.md, paddingHorizontal: Space.xl, paddingBottom: Space.sm }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Txt variant="title">{t('coach.title')}</Txt>
@@ -191,7 +193,8 @@ export default function Coach() {
           data={[...shown].reverse()}
           inverted
           keyExtractor={(m) => keys[m.id] ?? m.id}
-          keyboardDismissMode="interactive"
+          // iOS drags the keyboard away with the finger; Android has no such mode (it would never go): it leaves as the drag begins.
+          keyboardDismissMode={Platform.OS === 'android' ? 'on-drag' : 'interactive'}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: Space.lg, gap: Space.md }}
           ListHeaderComponent={

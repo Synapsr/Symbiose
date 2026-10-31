@@ -2,7 +2,7 @@ import type { ActivityLevel, GoalsResponse, Profile, Sex } from '@symbiose/share
 import { useMutation } from '@tanstack/react-query';
 import { ChevronLeft, Flame, HeartPulse, Ruler, Sparkles, Watch } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import { PendingPanel } from '@/components/pending-panel';
 import { PlanPreview } from '@/components/plan-preview';
 import { ActivityPicker, BodyFields, parseBody, SexPicker, type BodyValues } from '@/components/profile-fields';
 import { Button, Field, IconButton, Reveal, Row, Txt } from '@/components/ui';
+import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { Logo } from '@/components/ui/logo';
 import { deviceLocale, useI18n } from '@/i18n';
 import { feedback } from '@/lib/feedback';
@@ -196,7 +197,7 @@ export default function Onboarding() {
   if (step === 'waiting' && pending) return <PendingPanel />;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoiding style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ paddingTop: insets.top + Space.sm, paddingHorizontal: Space.xl, gap: Space.md, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
         <Row style={{ height: 44 }}>
           {back ? <IconButton label={t('common.back')} icon={<ChevronLeft size={22} color={colors.text} />} onPress={back} /> : <View style={{ width: 44 }} />}
@@ -306,7 +307,7 @@ export default function Onboarding() {
         {step === 'plan' ? <Button title={t('onb.plan.adjust')} variant="ghost" onPress={() => go('goals')} /> : null}
         {step === 'health' ? <Button title={t('common.later')} variant="ghost" onPress={() => go(sexFromHealth ? 'body' : 'sex')} disabled={connectHealth.isPending} /> : null}
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAvoiding>
   );
 }
 

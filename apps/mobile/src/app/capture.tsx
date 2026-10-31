@@ -3,15 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { ArrowUp, CloudOff, Images, PenLine, Star, X, Zap, ZapOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseChip } from '@/components/meal/course-chip';
 import { PortionStepper } from '@/components/meal/portion-stepper';
 import { Button, IconButton, Pressy, Row, Txt, webInput } from '@/components/ui';
+import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { MicButton } from '@/components/ui/mic-button';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
@@ -152,6 +154,8 @@ export default function Capture() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
+      {/* Always on black: light status bar icons, whatever the app's theme. */}
+      <StatusBar style="light" />
       {cameraNeeded && permission?.granted ? (
         <CameraView
           ref={camera}
@@ -359,7 +363,7 @@ function TextMode({ date, destination, onDone }: { date: string; destination: De
   };
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: '#0A0A0B', paddingTop: insets.top + 72, paddingBottom: insets.bottom + 72 }}>
+    <KeyboardAvoiding style={{ flex: 1, backgroundColor: '#0A0A0B', paddingTop: insets.top + 72, paddingBottom: insets.bottom + 72 }}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: Space.xl, gap: Space.xl }}>
         <View style={{ backgroundColor: '#161618', borderRadius: Radius.xl, padding: Space.lg, gap: Space.md }}>
           <TextInput
@@ -426,6 +430,6 @@ function TextMode({ date, destination, onDone }: { date: string; destination: De
           </View>
         ) : null}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoiding>
   );
 }

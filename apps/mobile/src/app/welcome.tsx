@@ -2,10 +2,11 @@ import type { ServerInfo } from '@symbiose/shared';
 import { router } from 'expo-router';
 import { QrCode } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Dot, Field, IconButton, Pressy, Reveal, Row, Txt } from '@/components/ui';
+import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { Logo } from '@/components/ui/logo';
 import { Wordmark } from '@/components/ui/wordmark';
 import { useI18n } from '@/i18n';
@@ -106,7 +107,7 @@ export default function Welcome() {
   const canSubmit = ok && email.includes('@') && password.length >= 8;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoiding style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: insets.top + Space.xxxl, paddingBottom: insets.bottom + Space.xxl, paddingHorizontal: Space.xxl, gap: Space.xxl, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
@@ -203,6 +204,6 @@ export default function Welcome() {
           </Reveal>
         ) : null}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoiding>
   );
 }
