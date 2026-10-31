@@ -25,19 +25,17 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-height: 44px;
   margin-right: auto;
   text-decoration: none;
   border-radius: 12px;
 }
 
+/* The wordmark ships as outlines (Fraunces SuperSoft, not in the web font). */
 .brand-name {
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  font-size: 21px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  flex: none;
+  display: block;
 }
 
 .nav {

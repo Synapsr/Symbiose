@@ -63,7 +63,7 @@ export function Hero() {
             <Phone screen="today" theme="light" alt={h.altLight} eager width="100%" />
           </div>
           <div className="hero-chip hero-chip--analyzing" aria-hidden="true">
-            <Logo size={22} className="logo--breathe" />
+            <Logo size={22} breathe />
             {h.chipAnalyzing}
           </div>
           <div className="hero-chip hero-chip--rule" aria-hidden="true">

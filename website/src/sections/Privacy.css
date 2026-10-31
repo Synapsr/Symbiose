@@ -7,8 +7,12 @@
   --text: #f5f5f3;
   --text-2: #a3a3a9;
   --hairline: rgba(255, 255, 255, 0.09);
-  --accent: #3dd68c;
-  --accent-ink: #3dd68c;
+  --accent: #2ee68a;
+  --accent-ink: #2ee68a;
+  --logo-0: #00b85c;
+  --logo-1: #1fe584;
+  --logo-2: #8dff62;
+  --logo-3: #e2ff4d;
   --inverted: #f5f5f3;
   --on-inverted: #0a0a0b;
   --shadow-border: 0 0 0 1px rgba(255, 255, 255, 0.09);
