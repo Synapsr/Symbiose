@@ -21,6 +21,6 @@ module.exports = (config) => ({
   // Glance.swift, in sRGB like the app. Note: the plugin reads `light`/`dark`,
   // not the `color`/`darkColor` its README shows (that left $accent empty).
   colors: {
-    $accent: { light: '#1F8A5B', dark: '#3DD68C' },
+    $accent: { light: '#00803F', dark: '#2EE68A' },
   },
 });

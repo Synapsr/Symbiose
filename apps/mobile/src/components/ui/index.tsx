@@ -3,11 +3,13 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  Switch,
   Text as RNText,
   TextInput,
   View,
   type PressableProps,
   type StyleProp,
+  type SwitchProps,
   type TextInputProps,
   type TextProps,
   type TextStyle,
@@ -44,7 +46,7 @@ function toneColor(tone: Tone, colors: Palette): string {
     primary: colors.text,
     secondary: colors.text2,
     tertiary: colors.text3,
-    accent: colors.accent,
+    accent: colors.accentText,
     warning: colors.warning,
     danger: colors.danger,
     inverted: colors.onInverted,
@@ -381,6 +383,16 @@ export function Field({ label, style, onFocus, onBlur, accessory, highlighted, .
   );
 }
 
+/** A switch in the brand's emerald rather than the system green, with a white thumb everywhere. */
+const WEB_THUMB = Platform.OS === 'web' ? { activeThumbColor: '#FFFFFF' } : null;
+
+export function Toggle(props: SwitchProps) {
+  const { colors } = useTheme();
+  // iOS keeps its own off track; Android and the web need one.
+  const off = Platform.OS === 'ios' ? undefined : colors.text3;
+  return <Switch trackColor={{ false: off, true: colors.accent }} thumbColor={Platform.OS === 'ios' ? undefined : '#FFFFFF'} {...WEB_THUMB} {...props} />;
+}
+
 // ---------------------------------------------------------------- Progress
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -433,7 +445,7 @@ export function Bar({ progress, color, height = 8 }: { progress: number; color: 
 
 /** Soft colored light behind hero content. */
 export function Glow({ color, size = 260, opacity = 0.28, style }: { color: string; size?: number; opacity?: number; style?: StyleProp<ViewStyle> }) {
-  const id = `glow-${color.replace('#', '')}`;
+  const id = `glow-${color.replace('#', '')}-${Math.round(opacity * 100)}`;
   return (
     <View pointerEvents="none" style={[{ position: 'absolute', width: size, height: size }, style]}>
       <Svg width={size} height={size}>

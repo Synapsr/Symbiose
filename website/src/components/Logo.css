@@ -3,61 +3,46 @@
   overflow: visible;
 }
 
-.logo circle {
-  transform-box: fill-box;
-  transform-origin: center;
+/* Emerald in the cell to acid lime in the bud; the stops follow the theme (base.css). */
+.logo-s0 {
+  stop-color: var(--logo-0);
 }
 
-.logo-a {
-  fill: var(--accent);
+.logo-s1 {
+  stop-color: var(--logo-1);
 }
 
-.logo-b {
-  fill: var(--text);
-  fill-opacity: 0.88;
+.logo-s2 {
+  stop-color: var(--logo-2);
 }
 
-.logo-core {
-  fill: var(--logo-core, var(--bg));
+.logo-s3 {
+  stop-color: var(--logo-3);
 }
 
-.logo--animate .logo-a {
-  animation: logo-glide-left 1100ms var(--ease-out) 150ms both;
+/* A moving mark draws its living path (SMIL, so it plays before JavaScript);
+   the still one only stands in under reduced motion. */
+.logo-still {
+  display: none;
 }
 
-.logo--animate .logo-b {
-  animation: logo-glide-right 1100ms var(--ease-out) 150ms both;
-}
+@media (prefers-reduced-motion: reduce) {
+  .logo-live {
+    display: none;
+  }
 
-.logo--animate .logo-core {
-  animation: logo-core 620ms var(--ease-out) 650ms both;
-}
+  .logo-still {
+    display: inline;
+  }
 
-@keyframes logo-glide-left {
-  from {
-    translate: -32% 0;
+  /* No breath, a soft pulse instead (base.css shortens every animation: this one is the exception). */
+  .logo--breathe .logo-still {
+    animation: logo-pulse 1600ms ease-in-out infinite alternate !important;
   }
 }
 
-@keyframes logo-glide-right {
-  from {
-    translate: 32% 0;
-  }
-}
-
-@keyframes logo-core {
-  from {
-    scale: 0;
-  }
-}
-
-/* "Thinking": the core breathes, as in the app while a meal is analysed. */
-.logo--breathe .logo-core {
-  animation: logo-breathe 1400ms ease-in-out infinite;
-}
-
-@keyframes logo-breathe {
-  50% {
-    scale: 0.6;
+@keyframes logo-pulse {
+  to {
+    opacity: 0.75;
   }
 }

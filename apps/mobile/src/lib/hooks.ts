@@ -8,6 +8,8 @@ import { useI18n } from '@/i18n';
 
 import { ApiError } from './api';
 import { withoutMeal } from './day-logic';
+import { claimReward, feedback } from './feedback';
+import { mealMilestone } from './feedback-logic';
 import { haptics } from './haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, inferWalkIntensity } from './health';
 import { dropEntry, isNetworkError, kickOutbox, openOutbox, releaseCapture, stashCapture, useOutbox, type OutboxEntry } from './outbox';
@@ -114,6 +116,8 @@ export function useMealLogger() {
   const { session, user } = useSession();
   const serverUrl = session?.serverUrl;
   const userId = user?.id;
+  // The local day the account was made: its first meal is a milestone.
+  const joined = user ? toLocalDate(new Date(user.createdAt)) : '';
 
   // Kept on the phone before the first request, in this account's queue: closing the app mid-way can't lose it.
   const keep = useCallback(
@@ -144,14 +148,19 @@ export function useMealLogger() {
       upsert({ ...entry, status: 'analyzing', error: null });
       try {
         const meal = await api.createMeal(entry.input);
+        // Today as it stood before this meal: the one that opens a day can mark a milestone.
+        const milestone = mealMilestone(queryClient.getQueryData<DaySummary>(['day', meal.localDate]), toLocalDate(), joined);
+        const celebrated = milestone && claimReward(meal.localDate, milestone) ? milestone : null;
         void dropEntry(entry.id);
         remove(entry.id);
         refresh(meal);
         // A milestone: the meal is analysed.
-        haptics.success();
+        feedback.mealLogged(meal, Boolean(celebrated));
         showToast({
           // The AI has a question: the toast says so, and a tap opens it.
-          message: meal.insight?.clarification ? `${t('today.mealLogged')} · ${t('today.question')} ›` : `${t('today.mealLogged')} · ${meal.title}`,
+          message: meal.insight?.clarification
+            ? `${t('today.mealLogged')} · ${t('today.question')} ›`
+            : `${celebrated ? t(`reward.${celebrated}`) : t('today.mealLogged')} · ${meal.title}`,
           onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
           action: {
             label: t('today.undo'),
@@ -169,7 +178,7 @@ export function useMealLogger() {
         return null;
       }
     },
-    [api, healthEnabled, keep, park, refresh, remove, showToast, t, upsert],
+    [api, healthEnabled, joined, keep, park, queryClient, refresh, remove, showToast, t, upsert],
   );
 
   const log = useCallback(
@@ -206,7 +215,7 @@ export function useMealLogger() {
       try {
         const copy = await api.duplicateMeal(source.id, { eatenAt: entry.eatenAt, localDate: entry.localDate });
         void dropEntry(entry.id);
-        haptics.soft();
+        feedback.mealRelogged(copy);
         refresh(copy);
         showToast({ message: `${t('detail.relogged')} · ${copy.title}` });
         return copy;

@@ -1,4 +1,4 @@
-import { toLocalDateTime, type DayHydration, type DaySummary, type WaterEntry } from '@symbiose/shared';
+import { toLocalDate, toLocalDateTime, type DayHydration, type DaySummary, type WaterEntry } from '@symbiose/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import Animated, { useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
@@ -6,6 +6,7 @@ import Svg, { ClipPath, Defs, Path, Rect } from 'react-native-svg';
 
 import { useI18n } from '@/i18n';
 import { momentOn } from '@/lib/day-logic';
+import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { health } from '@/lib/health';
 import { useApi } from '@/lib/session';
@@ -58,8 +59,8 @@ export function Glass({ progress, totalMl, height = 42 }: { progress: number; to
 /**
  * Pours a glass on a day. Optimistic: the glass fills on tap, the server
  * catches up. Every glass can be undone from the toast; with Health on, it
- * lands there too (and leaves with the undo). Reaching the goal is the one
- * moment worth a success haptic.
+ * lands there too (and leaves with the undo). Reaching today's goal is
+ * celebrated on Today (`useGoalRewards`); a past day's gets a success haptic.
  */
 export function useWater(date: string) {
   const api = useApi();
@@ -95,10 +96,12 @@ export function useWater(date: string) {
 
   return async (ml: number, hydration: DayHydration | null | undefined) => {
     haptics.soft();
+    feedback.acted();
     await bump(ml);
     try {
       const entry = await api.addWater({ externalId: null, at: toLocalDateTime(momentOn(date)), localDate: date, ml });
-      if (hydration && hydration.totalMl < hydration.goalMl && hydration.totalMl + ml >= hydration.goalMl) haptics.success();
+      const past = date < toLocalDate();
+      if (past && hydration && hydration.totalMl < hydration.goalMl && hydration.totalMl + ml >= hydration.goalMl) haptics.success();
       const written = healthEnabled && health.source ? health.writeWater({ id: entry.id, at: new Date(entry.at), ml }).catch(() => undefined) : null;
       showToast({ message: t('water.added', { ml }), action: { label: t('today.undo'), onPress: () => void remove(entry, written) } });
     } catch {

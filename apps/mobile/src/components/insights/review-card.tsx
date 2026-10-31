@@ -75,7 +75,7 @@ export function ReviewCard({ today, hideCalories }: { today: string; hideCalorie
       <Card style={{ gap: Space.lg }}>
         <Row style={{ justifyContent: 'space-between' }}>
           <Row gap={6} style={{ flexShrink: 1 }}>
-            <Sparkles size={14} color={colors.accent} />
+            <Sparkles size={14} color={colors.accentText} />
             <Txt variant="label" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
               {t('insights.review')}
               {range ? ` · ${range}` : ''}
@@ -157,7 +157,7 @@ export function ReviewCard({ today, hideCalories }: { today: string; hideCalorie
           <Txt variant="label" tone="accent">
             {t('review.generate')}
           </Txt>
-          <ChevronRight size={15} color={colors.accent} />
+          <ChevronRight size={15} color={colors.accentText} />
         </Pressy>
       ) : null}
     </View>

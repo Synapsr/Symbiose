@@ -13,6 +13,7 @@ import { ActivityPicker, BodyFields, parseBody, SexPicker, type BodyValues } fro
 import { Button, Field, IconButton, Reveal, Row, Txt } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { deviceLocale, useI18n } from '@/i18n';
+import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { health, HEALTH_SCOPES, type HealthProfile } from '@/lib/health';
 import { errorMessage } from '@/lib/hooks';
@@ -139,7 +140,8 @@ export default function Onboarding() {
       return api.me();
     },
     onSuccess: (saved) => {
-      haptics.success();
+      // The plan is made: the first milestone.
+      feedback.milestone();
       setSettings({ waitingIntentions: '' });
       setUser(saved);
     },
@@ -258,7 +260,7 @@ export default function Onboarding() {
                 <Txt variant="title">{t('onb.body.title')}</Txt>
                 {bodyFromHealth ? (
                   <Row gap={6}>
-                    <HeartPulse size={14} color={colors.accent} />
+                    <HeartPulse size={14} color={colors.accentText} />
                     <Txt variant="caption" tone="accent">
                       {t('onb.body.fromHealth', { store: health.storeName[locale] })}
                     </Txt>

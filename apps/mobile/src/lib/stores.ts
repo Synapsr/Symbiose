@@ -2,6 +2,7 @@ import { DEFAULT_GLASS_ML, type CreateMealInput } from '@symbiose/shared';
 import { AppState } from 'react-native';
 import { create } from 'zustand';
 
+import type { RewardLog } from './feedback-logic';
 import { storage } from './storage';
 
 // ---------------------------------------------------------------- Settings (per device)
@@ -38,6 +39,9 @@ interface SettingsState {
   nudges: { week: string; lines: string[] } | null;
   /** Sign-up on request: the goals written while the account waits, drafted into a plan once approved. */
   waitingIntentions: string;
+  /** Feedback: the reward sounds (the silent switch still mutes them), and the rewards already given today (`rewardsDue`). */
+  sounds: boolean;
+  rewards: RewardLog;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -66,6 +70,8 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   lineDismissed: { date: '', kinds: [] },
   nudges: null,
   waitingIntentions: '',
+  sounds: true,
+  rewards: { date: '', keys: [] },
   set: (patch) => {
     set(patch);
     const s = get();
@@ -89,6 +95,8 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       lineDismissed: s.lineDismissed,
       nudges: s.nudges,
       waitingIntentions: s.waitingIntentions,
+      sounds: s.sounds,
+      rewards: s.rewards,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

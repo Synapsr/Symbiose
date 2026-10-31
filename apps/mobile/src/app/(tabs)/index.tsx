@@ -24,6 +24,7 @@ import { errorMessage, useDay, useHealthSync, useMealLogger, useToday } from '@/
 import { useJournal } from '@/lib/journal';
 import { dropEntry, isNetworkError, retryEntry, useOutbox, type OutboxEntry } from '@/lib/outbox';
 import { timeline, type TimelineRow } from '@/lib/outbox-logic';
+import { useGoalRewards, useGoodDay } from '@/lib/rewards';
 import { useUser } from '@/lib/session';
 import { usePending, useSettings, useToast } from '@/lib/stores';
 import { useHiddenIds } from '@/lib/undo';
@@ -69,6 +70,8 @@ export default function Today() {
   const leftHanded = useSettings((s) => s.leftHanded);
   const showToast = useToast((s) => s.show);
   const setLift = useToast((s) => s.setLift);
+  // Today's goals, celebrated as they are reached: the hero card glows with them.
+  const glow = useGoalRewards(today);
   const [animate] = useState(() => !entrancePlayed);
   useEffect(() => {
     entrancePlayed = true;
@@ -120,6 +123,8 @@ export default function Today() {
   ].sort((a, b) => b.at - a.at);
   const streak = data?.streak ?? 0;
   const streakLabel = plural('today.streakLabel', streak);
+  // A new day, nothing logged yet: yesterday, when it went well, is said first.
+  const good = useGoodDay(today, isToday && empty, user.plan, hideCalories);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -165,9 +170,13 @@ export default function Today() {
           <Reveal index={1} instant={!animate} style={{ gap: Space.md }}>
             {data ? (
               <>
-                <CoachLine date={date} fallback={dayVoice(data, hero, t, nutrient, locale, !isToday)} />
+                <CoachLine
+                  date={date}
+                  fallback={good ? t(`reward.goodDay.${good.kind}`, { nutrient: nutrient(good.nutrient).toLowerCase() }) : dayVoice(data, hero, t, nutrient, locale, !isToday)}
+                  celebrate={Boolean(good)}
+                />
                 <View>
-                  <EnergyCard day={data} plan={user.plan} hero={hero} hideCalories={hideCalories} />
+                  <EnergyCard day={data} plan={user.plan} hero={hero} hideCalories={hideCalories} glow={isToday ? glow : undefined} />
                   {queued.length ? <WaitingNote count={queued.length} /> : null}
                 </View>
                 {/* Day 1, or a new morning: the invitation comes right under the hero. */}

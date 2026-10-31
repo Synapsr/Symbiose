@@ -296,7 +296,7 @@ function Bubble({ message, streaming, review }: { message: CoachMessage; streami
       {message.suggestion ? (
         <View style={{ maxWidth: '86%', backgroundColor: colors.accentSoft, borderRadius: Radius.lg, padding: Space.lg, gap: Space.sm }}>
           <Row gap={Space.sm}>
-            <Sparkles size={16} color={colors.accent} />
+            <Sparkles size={16} color={colors.accentText} />
             <Txt variant="label" tone="accent">
               {t('coach.suggestion')}
             </Txt>

@@ -1,4 +1,11 @@
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg" />
+    <img src="docs/brand/lockup.svg" width="300" alt="Symbiose" />
+  </picture>
+</p>
+
+<p align="center">
   <img src="docs/screenshots/today.png" width="240" alt="Today screen" />
   <img src="docs/screenshots/meal.png" width="240" alt="Meal detail" />
   <img src="docs/screenshots/insights-dark.png" width="240" alt="Trends, dark mode" />

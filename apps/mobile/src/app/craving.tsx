@@ -14,6 +14,7 @@ import { MicButton } from '@/components/ui/mic-button';
 import { InlineProse } from '@/components/ui/prose';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
+import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
 import { endCravingActivity, startCravingActivity } from '@/lib/live-activity';
@@ -129,7 +130,6 @@ export default function CravingSheet() {
       void queryClient.invalidateQueries({ queryKey: ['day', today] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       if (outcome === 'resisted') {
-        haptics.success();
         setCelebrating(true);
         setTimeout(() => dismiss(), 1900);
       } else {
@@ -138,6 +138,11 @@ export default function CravingSheet() {
     },
     onError: () => haptics.warning(),
   });
+
+  // Once the sheet (and any dictation in it) has let go: the crescendo, with the celebration.
+  useEffect(() => {
+    if (celebrating) feedback.resisted();
+  }, [celebrating]);
 
   if (celebrating) return <Celebration emoji="💪" title={t('craving.celebrate')} subtitle={t('craving.celebrateBody')} />;
 
@@ -186,7 +191,7 @@ export default function CravingSheet() {
       {/* Room for the tip from the start: it streams in without moving the buttons. */}
       <Card style={{ gap: Space.sm, backgroundColor: colors.accentSoft, borderColor: 'transparent' }} accessibilityLiveRegion="polite">
         <Row gap={Space.sm}>
-          <Sparkles size={18} color={colors.accent} />
+          <Sparkles size={18} color={colors.accentText} />
           <Txt variant="overline" tone="accent">
             {t('craving.tip')}
           </Txt>
