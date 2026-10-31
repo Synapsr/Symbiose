@@ -98,6 +98,8 @@ function MealEditor({ meal }: { meal: Meal }) {
   // Courses: one moved out as a meal of its own, or deleted with « Annuler » (the meal is judged again on the server).
   const courses = mealCourses(meal);
   const separate = useSeparateCourse();
+  // The page's spinner turns while the server moves the course out and judges both meals.
+  const split = useMutation({ mutationFn: (course: MealCourse) => separate(meal, course) });
   const removeLater = useUndoableDelete();
   const deleteCourse = (course: MealCourse, name: string) => {
     queryClient.setQueryData(['meal', meal.id], withoutCourse(meal, course.id));
@@ -164,7 +166,7 @@ function MealEditor({ meal }: { meal: Meal }) {
                 label={`${t(`meal.${meal.mealType}`)} · ${localTime(meal.eatenAt)}`}
                 onPress={() => update.mutate({ mealType: MEAL_TYPES[(MEAL_TYPES.indexOf(meal.mealType) + 1) % MEAL_TYPES.length]! })}
               />
-              {busy || update.isPending ? <ActivityIndicator /> : null}
+              {busy || update.isPending || split.isPending ? <ActivityIndicator /> : null}
             </Row>
             {courses.length === 1 && courses[0]!.basedOn ? <BasedOn basedOn={courses[0]!.basedOn} mealDate={meal.localDate} /> : null}
           </View>
@@ -289,7 +291,7 @@ function MealEditor({ meal }: { meal: Meal }) {
                     course={course}
                     name={courseName(t, course, index)}
                     mealDate={meal.localDate}
-                    onSeparate={() => void separate(meal, course)}
+                    onSeparate={() => split.mutate(course)}
                     onDelete={() => deleteCourse(course, courseName(t, course, index))}>
                     {courseItems({ ...meal, items }, course.id).map(itemRow)}
                   </CourseBlock>
