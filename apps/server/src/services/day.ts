@@ -3,12 +3,15 @@ import {
   addDays,
   computeProgress,
   computeTargets,
+  courseItems,
   dateRange,
   focusNutrients,
   foodKey,
   goalNutrient,
   itemNutrients,
   localHour,
+  mealCourses,
+  mealTotals,
   NUTRIENT_KEYS,
   roundNutrients,
   sumNutrients,
@@ -240,7 +243,10 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
   // When during the day the headline nutrient is eaten.
   const primary = hero;
   const hours = Array.from({ length: 24 }, () => 0);
-  for (const meal of rangeMeals) hours[localHour(meal.eatenAt)]! += meal.totals[primary];
+  // Each course at its own hour: dessert at 21:00 counts at 21:00, not when dinner started.
+  for (const meal of rangeMeals) {
+    for (const course of mealCourses(meal)) hours[localHour(course.eatenAt)]! += mealTotals(courseItems(meal, course.id))[primary];
+  }
 
   const whatCounts = new Map<string, { label: string; count: number }>();
   for (const c of rangeCravings) {

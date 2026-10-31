@@ -45,6 +45,7 @@ const parseItems = (line: string) =>
     .map((part) => /^(.*) (\d+) g$/.exec(part))
     .flatMap((m) => (m ? [{ name: m[1]!, grams: Number(m[2]) }] : []));
 
+const DRINK = /caf[ée]|coca|th[ée] |tisane|soda/i;
 const IGNORED = ['reste', 'restes', 'hier', 'comme', 'meme', 'chose', 'soir', 'midi'];
 
 /** The past meal the words point to: one sharing a word with them, else yesterday's latest, else the latest. */
@@ -162,7 +163,7 @@ export function createMockAi(): Ai {
         // A correction of a meal in courses: every course comes back, the one it names changed.
         const last = input.previous.courses.length;
         items = input.previous.courses.flatMap((c) => c.items.map(({ name, emoji, portion, grams, confidence, per100g }) => ({ name, emoji, portion, grams, confidence: confidence ?? 0.7, per100g, course: c.course })));
-        if (/dessert/i.test(text) && /demi|moiti|half/i.test(text)) items = items.map((i) => (i.course === last ? { ...i, grams: Math.round(i.grams / 2), portion: '½ part' } : i));
+        if (/dessert/i.test(text) && /demi|moiti|half/i.test(text)) items = items.map((i) => (i.course === last && !/caf[ée]|th[ée]|coffee|tea/i.test(i.name) ? { ...i, grams: Math.round(i.grams / 2), portion: '½ part' } : i));
       } else {
         items = FOODS.filter((f) => f.match.test(text)).map((f) => f.item);
         if (!items.length && input.previous) items = input.previous.items.map(({ name, emoji, portion, grams, confidence, per100g }) => ({ name, emoji, portion, grams, confidence: confidence ?? 0.7, per100g }));
@@ -184,9 +185,9 @@ export function createMockAi(): Ai {
         : corrected.map((c) => ({ label: c.label || courseName(c.items.map((i) => i.name).join(' ')), addedSugar: addedSugarOf(items.filter((i) => i.course === c.course)) }));
       const whole = courses.length > 1 ? wholeMealWords(courses) : null;
       const title = input.meal
-        ? mealTitle([...earlier.map((c) => firstName(c.items)), items[0]!.name])
+        ? mealTitle([...earlier.map((c) => firstName(c.items)), (items.find((i) => !DRINK.test(i.name)) ?? items[0]!).name])
         : corrected.length
-          ? mealTitle(corrected.map((c) => c.items[0]?.name ?? ''))
+          ? mealTitle(corrected.map((c) => (c.items.find((i) => !DRINK.test(i.name)) ?? c.items[0])?.name ?? ''))
           : items.length === 1
             ? items[0]!.name
             : items.slice(0, 2).map((i) => i.name).join(' & ');

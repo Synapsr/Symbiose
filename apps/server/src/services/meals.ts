@@ -476,7 +476,9 @@ export async function separateCourse(deps: MealDeps, userId: string, mealId: str
   const resolved = resolveUser(db, userId, row.localDate);
   const moved = ownItems(items, [course], courseId).map(({ courseId: _course, ...item }) => item);
   const alone: MealCourseRow = { ...course, id: FIRST_COURSE_ID, label: '' };
-  const mealType = mealTypeForHour(localHour(course.eatenAt));
+  // Moved out of a lunch, a course isn't that lunch again: by the clock, else a snack.
+  const clock = mealTypeForHour(localHour(course.eatenAt));
+  const mealType = clock === row.mealType ? 'snack' : clock;
   const fallbackTitle = moved.map((i) => i.name).join(', ').slice(0, 120) || row.title;
   const [left, separated] = await Promise.all([
     judge(deps, userId, resolved, { id: row.id, localDate: row.localDate, mealType: row.mealType, title: row.title, courses: rest, items: kept }),

@@ -147,6 +147,8 @@ describe('meals in courses', () => {
     expect(summary.totals.kcal).toBe(306 + 180 + 323 + 306);
     const glance = (await request<Glance>('GET', `/api/glance?date=${day}&hideCalories=0`)).body;
     expect(glance.meals).toBe(2);
+    // The watch says when the last course was eaten, not when lunch started.
+    expect(glance.lastMealAt).toBe(at('12:45'));
   });
 
   it('leaves older apps’ captures alone, and starts a new meal past the window', async () => {
@@ -235,6 +237,8 @@ describe('meals in courses', () => {
       [true, 2],
       [true, 1],
     ]);
+    // Moved out of lunch at lunchtime, it is a snack.
+    expect(inputs.at(-1)!.mealTypeHint).toBe('snack');
     expect((await mealsOn()).length).toBe(3);
 
     const merged = await request<Meal>('POST', `/api/meals/${lunch.id}/merge`, { mealId: res.body.separated.id });
@@ -273,6 +277,15 @@ describe('meals in courses', () => {
     // Deleting the copy keeps the photo the lunch still shows.
     await request('DELETE', `/api/meals/${copy.body.id}`);
     expect((await photo(lunch.photoId)).status).toBe(200);
+  });
+
+  it('counts each course at its own hour in Trends', async () => {
+    const dinner = await log({ eatenAt: at('19:40', '2026-10-29'), localDate: '2026-10-29', text: 'un poulet' });
+    const dessert = await log({ eatenAt: at('20:05', '2026-10-29'), localDate: '2026-10-29', text: 'une tarte', course: 'auto' });
+    expect(dessert.body.id).toBe(dinner.body.id);
+    const { byHour } = (await request<{ byHour: { nutrient: string; hours: number[] } }>('GET', '/api/insights?from=2026-10-29&to=2026-10-29')).body;
+    expect(byHour.hours[19]).toBeGreaterThan(0);
+    expect(byHour.hours[20]).toBeGreaterThan(0);
   });
 
   it('reads meals from before courses as one course, and joins them without rewriting them', async () => {
