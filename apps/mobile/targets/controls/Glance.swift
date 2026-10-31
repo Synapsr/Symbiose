@@ -221,13 +221,25 @@ enum Nutrient {
 
 /// src/theme in Swift, in sRGB like the app (asset catalog colours would be read as Display P3).
 enum Palette {
-  static let accent = Color(light: 0x1F8A5B, dark: 0x3DD68C)
-  static let accentSoft = Color(light: 0xE1F0E7, dark: 0x12301F)
+  static let accent = Color(light: 0x00803F, dark: 0x2EE68A)
+  static let accentSoft = Color(light: 0xE2F9EA, dark: 0x0D3320)
   /// Text and icons on the accent.
   static let onAccent = Color(light: 0xFFFFFF, dark: 0x0A0A0B)
   static let surface = Color(light: 0xFFFFFF, dark: 0x161618)
   static let track = Color(light: 0xEDECE7, dark: 0x2A2A2E)
   static let warning = Color(light: 0xE8890C, dark: 0xFFB224)
+
+  /// The logo's fill, emerald in the cell to acid lime in the bud, for a square `LogoMark`.
+  static let bourgeon = LinearGradient(
+    stops: [
+      .init(color: Color(light: 0x00934A, dark: 0x00B85C), location: 0),
+      .init(color: Color(light: 0x0DC466, dark: 0x1FE584), location: 0.48),
+      .init(color: Color(light: 0x5BE65E, dark: 0x8DFF62), location: 0.76),
+      .init(color: Color(light: 0xC2FF2E, dark: 0xE2FF4D), location: 1),
+    ],
+    startPoint: UnitPoint(x: 0.153, y: 0.934),
+    endPoint: UnitPoint(x: 0.898, y: 0.073)
+  )
 }
 
 extension Color {

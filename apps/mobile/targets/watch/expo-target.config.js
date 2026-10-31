@@ -11,10 +11,11 @@ module.exports = {
   displayName: 'Symbiose',
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  icon: '../../assets/images/icon-dark.png',
+  // Its own icon: the mark is centred for the watch's circle mask.
+  icon: '../../assets/images/watch-icon.png',
   frameworks: ['SwiftUI', 'WatchKit', 'WatchConnectivity', 'WidgetKit'],
   colors: {
-    $accent: { light: '#3DD68C', dark: '#3DD68C' },
+    $accent: { light: '#2EE68A', dark: '#2EE68A' },
   },
   entitlements: {
     'com.apple.security.application-groups': ['group.io.synapsr.symbiose'],

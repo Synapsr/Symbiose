@@ -25,7 +25,7 @@ struct HeroCircular: View {
     } else {
       ZStack {
         AccessoryWidgetBackground()
-        LogoMark().frame(width: 28, height: 20)
+        LogoMark().fill(Palette.accent).frame(width: 24, height: 24).widgetAccentable()
       }
     }
   }
@@ -59,7 +59,7 @@ struct HeroCorner: View {
         .tint(Palette.hero(metric))
       }
     } else {
-      LogoMark().frame(width: 24, height: 17).widgetLabel { Text(copy.appName) }
+      LogoMark().fill(Palette.accent).frame(width: 20, height: 20).widgetAccentable().widgetLabel { Text(copy.appName) }
     }
   }
 }
@@ -111,7 +111,7 @@ struct HeroRectangular: View {
       .frame(maxWidth: .infinity, alignment: .leading)
     } else {
       HStack(spacing: 8) {
-        LogoMark().frame(width: 28, height: 20)
+        LogoMark().fill(Palette.accent).frame(width: 22, height: 22).widgetAccentable()
         VStack(alignment: .leading, spacing: 0) {
           Text(copy.appName).font(.rounded(15, .semibold))
           Text(copy.connectTitle).font(.rounded(12, .medium)).foregroundStyle(Palette.text2)
@@ -163,18 +163,29 @@ struct ProgressBar: View {
   }
 }
 
-/// The two overlapping circles of the app icon.
-struct LogoMark: View {
-  var body: some View {
-    GeometryReader { proxy in
-      let d = proxy.size.height
-      let shift = proxy.size.width - d
-      ZStack(alignment: .leading) {
-        Circle().fill(Palette.accent).frame(width: d, height: d).widgetAccentable()
-        Circle().fill(Color(hex: 0xE2E2E0)).frame(width: d, height: d).offset(x: shift).opacity(0.9)
-        Circle().fill(Color(hex: 0x0A0A0B)).frame(width: d * 0.47, height: d * 0.47).offset(x: shift / 2 + d * 0.265)
-      }
-    }
+/// The Symbiose mark (« Bourgeon »): a cell and its bud, one single-colour path (68.5-unit box),
+/// so it works in every widget rendering mode. The same outline as the app's Logo.
+struct LogoMark: Shape {
+  func path(in rect: CGRect) -> Path {
+    let s = min(rect.width, rect.height) / 68.5
+    let ox = rect.midX - 34.25 * s
+    let oy = rect.midY - 34.25 * s
+    func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+    var p = Path()
+    p.move(to: pt(49.20, 37.23))
+    p.addCurve(to: pt(50.01, 33.01), control1: pt(48.82, 35.77), control2: pt(49.12, 34.23))
+    p.addCurve(to: pt(53.79, 30.98), control1: pt(50.90, 31.80), control2: pt(52.29, 31.06))
+    p.addCurve(to: pt(68.50, 15.24), control1: pt(62.13, 30.56), control2: pt(68.64, 23.59))
+    p.addCurve(to: pt(53.26, 0.00), control1: pt(68.36, 6.88), control2: pt(61.62, 0.14))
+    p.addCurve(to: pt(37.52, 14.71), control1: pt(44.91, -0.14), control2: pt(37.94, 6.37))
+    p.addCurve(to: pt(35.49, 18.49), control1: pt(37.44, 16.21), control2: pt(36.70, 17.60))
+    p.addCurve(to: pt(31.27, 19.30), control1: pt(34.27, 19.38), control2: pt(32.73, 19.68))
+    p.addCurve(to: pt(3.30, 31.09), control1: pt(20.36, 16.47), control2: pt(8.90, 21.30))
+    p.addCurve(to: pt(7.32, 61.18), control1: pt(-2.30, 40.88), control2: pt(-0.65, 53.20))
+    p.addCurve(to: pt(37.41, 65.20), control1: pt(15.30, 69.15), control2: pt(27.62, 70.80))
+    p.addCurve(to: pt(49.20, 37.23), control1: pt(47.20, 59.60), control2: pt(52.03, 48.14))
+    p.closeSubpath()
+    return p
   }
 }
 
