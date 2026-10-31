@@ -2,7 +2,7 @@ import { useId } from 'react';
 
 import './Logo.css';
 
-// « Bourgeon »: the same geometry and motion as the app's Logo (apps/mobile/src/components/ui/logo.tsx).
+// « Bourgeon » Graphite: the same geometry, rendering and motion as the app's Logo (apps/mobile/src/components/ui/logo.tsx).
 const C1X = 41.5;
 const C1Y = 59.5;
 const R1 = 25;
@@ -83,16 +83,33 @@ const MOUNT = Array.from({ length: MOUNT_FRAMES + 1 }, (_, i) => {
 const BREATH = [REST, shape(1, 1, 1), REST].join(';');
 const SINE = '0.37 0 0.63 1;0.37 0 0.63 1';
 
+/** The bud's light sits exactly on the bud of the path, with the same numbers. */
+type Bud = { cx: number; cy: number; r: number };
+function budAt(bud: number, breath: number): Bud {
+  return {
+    cx: C1X + (C2X - C1X) * bud + U * 0.9 * breath,
+    cy: C1Y + (C2Y - C1Y) * bud - U * 0.9 * breath,
+    r: R2 * (0.45 + 0.55 * Math.min(bud, 1.08)) + 1.5 * breath,
+  };
+}
+const BUD_REST = budAt(1, 0);
+const BUD_MOUNT = Array.from({ length: MOUNT_FRAMES + 1 }, (_, i) => (i === MOUNT_FRAMES ? BUD_REST : budAt(spring((i / MOUNT_FRAMES) * MOUNT_SECONDS - 0.16, 10, 0.6), 0)));
+const BUD_BREATH = [BUD_REST, budAt(1, 1), BUD_REST];
+const KEYS = ['cx', 'cy', 'r'] as const;
+const track = (key: keyof Bud, frames: Bud[]) => frames.map((frame) => frame[key].toFixed(2)).join(';');
+
 /**
- * The Symbiose mark, « Bourgeon »: a cell and the bud that grows out of it.
- * `animate`: the bud pushes out on load, like the app's welcome. `breathe`: it
- * breathes, as in the app while a meal is analysed. Reduced motion: drawn at
- * rest, and a breathing mark only pulses its opacity.
+ * The Symbiose mark, « Bourgeon » Graphite: a cell in ink and the bud of light
+ * that grows out of it. `animate`: the light pushes out on load, like the
+ * app's welcome. `breathe`: it breathes, as in the app while a meal is
+ * analysed. Reduced motion: drawn at rest, and a breathing mark only pulses its opacity.
  */
 export function Logo({ size = 28, animate = false, breathe = false, className = '' }: { size?: number; animate?: boolean; breathe?: boolean; className?: string }) {
-  const id = `bourgeon${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
-  const fill = `url(#${id})`;
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const ink = `logo-ink${id}`;
+  const light = `logo-bud${id}`;
   const moving = animate || breathe;
+  const start = animate ? BUD_MOUNT[0]! : BUD_REST;
   return (
     <svg
       className={['logo', breathe && 'logo--breathe', className].filter(Boolean).join(' ')}
@@ -102,20 +119,32 @@ export function Logo({ size = 28, animate = false, breathe = false, className = 
       aria-hidden="true"
       focusable="false">
       <defs>
-        <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="27" y1="80" x2="78" y2="21">
-          <stop offset="0" className="logo-s0" />
-          <stop offset="0.48" className="logo-s1" />
-          <stop offset="0.76" className="logo-s2" />
-          <stop offset="1" className="logo-s3" />
+        <linearGradient id={ink} gradientUnits="userSpaceOnUse" x1="27" y1="80" x2="78" y2="21">
+          <stop offset="0" className="logo-k0" />
+          <stop offset="1" className="logo-k1" />
         </linearGradient>
+        <radialGradient id={light} cx="0.38" cy="0.34" r="0.72">
+          <stop offset="0" className="logo-b0" />
+          <stop offset="0.55" className="logo-b1" />
+          <stop offset="1" className="logo-b2" />
+        </radialGradient>
       </defs>
       {moving ? (
-        <path className="logo-live" d={animate ? MOUNT[0] : REST} fill={fill}>
-          {animate ? <animate attributeName="d" values={MOUNT.join(';')} dur={`${MOUNT_SECONDS}s`} begin="0.15s" fill="freeze" /> : null}
-          {breathe ? <animate attributeName="d" values={BREATH} dur="3.2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines={SINE} /> : null}
-        </path>
+        <>
+          <path className="logo-live" d={animate ? MOUNT[0] : REST} fill={`url(#${ink})`}>
+            {animate ? <animate attributeName="d" values={MOUNT.join(';')} dur={`${MOUNT_SECONDS}s`} begin="0.15s" fill="freeze" /> : null}
+            {breathe ? <animate attributeName="d" values={BREATH} dur="3.2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines={SINE} /> : null}
+          </path>
+          <circle className="logo-live" cx={start.cx} cy={start.cy} r={start.r} fill={`url(#${light})`}>
+            {animate ? KEYS.map((key) => <animate key={key} attributeName={key} values={track(key, BUD_MOUNT)} dur={`${MOUNT_SECONDS}s`} begin="0.15s" fill="freeze" />) : null}
+            {breathe
+              ? KEYS.map((key) => <animate key={`b${key}`} attributeName={key} values={track(key, BUD_BREATH)} dur="3.2s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines={SINE} />)
+              : null}
+          </circle>
+        </>
       ) : null}
-      <path className={moving ? 'logo-still' : undefined} d={REST} fill={fill} />
+      <path className={moving ? 'logo-still' : undefined} d={REST} fill={`url(#${ink})`} />
+      <circle className={moving ? 'logo-still' : undefined} cx={BUD_REST.cx} cy={BUD_REST.cy} r={BUD_REST.r} fill={`url(#${light})`} />
     </svg>
   );
 }

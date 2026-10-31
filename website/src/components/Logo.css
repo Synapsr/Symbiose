@@ -3,21 +3,25 @@
   overflow: visible;
 }
 
-/* Emerald in the cell to acid lime in the bud; the stops follow the theme (base.css). */
-.logo-s0 {
-  stop-color: var(--logo-0);
+/* The body in ink, the bud as the only light; the stops follow the theme (base.css). */
+.logo-k0 {
+  stop-color: var(--logo-k0);
 }
 
-.logo-s1 {
-  stop-color: var(--logo-1);
+.logo-k1 {
+  stop-color: var(--logo-k1);
 }
 
-.logo-s2 {
-  stop-color: var(--logo-2);
+.logo-b0 {
+  stop-color: var(--logo-b0);
 }
 
-.logo-s3 {
-  stop-color: var(--logo-3);
+.logo-b1 {
+  stop-color: var(--logo-b1);
+}
+
+.logo-b2 {
+  stop-color: var(--logo-b2);
 }
 
 /* A moving mark draws its living path (SMIL, so it plays before JavaScript);

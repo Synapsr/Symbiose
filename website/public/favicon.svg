@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="10.59 7.31 83.1 83.1">
   <style>
-    .a{stop-color:#00934A}.b{stop-color:#0DC466}.c{stop-color:#5BE65E}.d{stop-color:#C2FF2E}
-    @media (prefers-color-scheme: dark){.a{stop-color:#00B85C}.b{stop-color:#1FE584}.c{stop-color:#8DFF62}.d{stop-color:#E2FF4D}}
+    .k0{stop-color:#0E1012}.k1{stop-color:#3A4048}.b0{stop-color:#D9FFEE}.b1{stop-color:#4BE0A6}.b2{stop-color:#12A27A}
+    @media (prefers-color-scheme: dark){.k0{stop-color:#B9BEC4}.k1{stop-color:#F5F5F3}.b0{stop-color:#F0FFF7}.b1{stop-color:#6FF2BE}.b2{stop-color:#1DBF8A}}
   </style>
-  <defs><linearGradient id="g" gradientUnits="userSpaceOnUse" x1="27" y1="80" x2="78" y2="21"><stop offset="0" class="a"/><stop offset=".48" class="b"/><stop offset=".76" class="c"/><stop offset="1" class="d"/></linearGradient></defs>
-  <path d="M65.7 53.23 A5 5 0 0 1 70.29 46.98 A15.5 15.5 0 1 0 54.02 30.71 A5 5 0 0 1 47.77 35.3 A25 25 0 1 0 65.7 53.23 Z" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="k" gradientUnits="userSpaceOnUse" x1="27" y1="80" x2="78" y2="21"><stop offset="0" class="k0"/><stop offset="1" class="k1"/></linearGradient>
+    <radialGradient id="b" cx="0.38" cy="0.34" r="0.72"><stop offset="0" class="b0"/><stop offset="0.55" class="b1"/><stop offset="1" class="b2"/></radialGradient>
+  </defs>
+  <path d="M65.7 53.23 A5 5 0 0 1 70.29 46.98 A15.5 15.5 0 1 0 54.02 30.71 A5 5 0 0 1 47.77 35.3 A25 25 0 1 0 65.7 53.23 Z" fill="url(#k)"/>
+  <circle cx="69.5" cy="31.5" r="15.5" fill="url(#b)"/>
 </svg>
