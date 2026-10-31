@@ -307,7 +307,7 @@ export default function Me() {
           title={t('me.sounds')}
           subtitle={t('me.soundsHint')}
           right={
-            <Switch
+            <Toggle
               value={settings.sounds}
               onValueChange={(on) => {
                 settings.set({ sounds: on });
