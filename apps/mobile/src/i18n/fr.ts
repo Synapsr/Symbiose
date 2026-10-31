@@ -760,7 +760,7 @@ export const fr = {
 
   // Feedback: sounds and rewards at the right moments
   'me.sounds': 'Sons',
-  'me.soundsHint': 'Quelques notes douces aux bons moments. Le mode silencieux les coupe.',
+  'me.soundsHint': 'Quelques notes douces aux bons moments, jamais en silencieux.',
   'reward.firstMeal': 'Premier repas noté, bienvenue',
   'reward.week': '7 jours notés, bravo',
   'reward.month': '30 jours notés, bravo',

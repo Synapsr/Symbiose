@@ -747,7 +747,7 @@ export const en: Record<TranslationKey, string> = {
 
   // Feedback: sounds and rewards at the right moments
   'me.sounds': 'Sounds',
-  'me.soundsHint': 'A few soft notes at the right moments. Silent mode mutes them.',
+  'me.soundsHint': 'A few soft notes at the right moments, never in silent mode.',
   'reward.firstMeal': 'First meal logged, welcome',
   'reward.week': '7 days logged, well done',
   'reward.month': '30 days logged, well done',

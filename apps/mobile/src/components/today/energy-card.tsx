@@ -121,7 +121,7 @@ const HALO = 300;
 
 /** The ring with its reward: a halo of the accent blooms behind it and the ring swells a hair, then both settle. */
 function RingSwell({ glow, children }: { glow?: SharedValue<number>; children: ReactNode }) {
-  const { colors } = useTheme();
+  const { colors, scheme } = useTheme();
   const halo = useAnimatedStyle(() => {
     const g = glow?.value ?? 0;
     return { opacity: g, transform: [{ scale: 0.55 + 0.45 * g }] };
@@ -131,7 +131,8 @@ function RingSwell({ glow, children }: { glow?: SharedValue<number>; children: R
   return (
     <View style={{ width: RING, height: RING }}>
       <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: (RING - HALO) / 2, top: (RING - HALO) / 2, width: HALO, height: HALO }, halo]}>
-        <Glow color={colors.accent} size={HALO} opacity={0.55} />
+        {/* The dark accent is brighter: a lighter touch there. */}
+        <Glow color={colors.accent} size={HALO} opacity={scheme === 'dark' ? 0.36 : 0.55} />
       </Animated.View>
       <Animated.View style={swell}>{children}</Animated.View>
     </View>
