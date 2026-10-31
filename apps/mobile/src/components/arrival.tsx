@@ -38,15 +38,26 @@ function budRadius(b: number) {
 let played = false;
 
 /**
- * The arrival, on a cold start (iOS). The native splash shows a seed: the ink cell with
+ * Android fades its splash out over this overlay instead of dropping it: the same picture
+ * underneath, so the fade can't be seen, but the light waits for it to be gone before moving.
+ */
+const ANDROID_FADE_MS = 180;
+let splashHiddenAt = 0;
+
+/**
+ * The arrival, on a cold start. The native splash shows a seed: the ink cell with
  * its mint light glowing inside. This overlay takes over with the very same picture, then
  * the light travels out as the neck stretches, settles into the bud with a soft glow, and
  * the overlay fades away over the app. About 1.2 s; a tap skips it. Reduced motion: no
  * overlay, the native splash simply fades.
+ *
+ * Android 12+ draws the splash image (a 120 dp box on a 288 dp canvas, see expo-splash-screen)
+ * in the middle of the window, masked to a 192 dp circle the box fits in: the same seed, at the
+ * same size and place as iOS's, which this overlay redraws.
  */
 export function Arrival({ ready }: { ready: boolean }) {
   const reduced = useReducedMotion();
-  const [active] = useState(() => !played && Platform.OS === 'ios' && !reduced);
+  const [active] = useState(() => !played && Platform.OS !== 'web' && !reduced);
   const [gone, setGone] = useState(false);
   if (!active) return <SplashFade />;
   if (gone) return null;
@@ -61,7 +72,7 @@ export function Arrival({ ready }: { ready: boolean }) {
   );
 }
 
-/** Without the overlay, the splash fades out (iOS) when the app is ready. */
+/** Without the overlay, the splash fades out when the app is ready. */
 function SplashFade() {
   useEffect(() => {
     SplashScreen.setOptions({ fade: true, duration: 300 });
@@ -72,7 +83,11 @@ function SplashFade() {
 function Birth({ ready, onDone }: { ready: boolean; onDone: () => void }) {
   const { scheme, colors } = useTheme();
   const tone = scheme === 'dark' ? 'dark' : 'light';
-  const { width, height } = useWindowDimensions();
+  // Centred on the overlay's own frame, the whole window, as the splash is: Android's window
+  // metrics can leave the system bars out, which would set the seed off by half their height.
+  const window = useWindowDimensions();
+  const [frame, setFrame] = useState<{ width: number; height: number } | null>(null);
+  const { width, height } = frame ?? window;
   // The seed: the light already leans towards where the bud will be born.
   const bud = useSharedValue<number>(SPLASH.seed);
   const glow = useSharedValue(0);
@@ -83,12 +98,14 @@ function Birth({ ready, onDone }: { ready: boolean; onDone: () => void }) {
     // Once: later renders of the app underneath must not restart it.
     if (!ready || started.get()) return;
     started.set(true);
+    // Android: once its splash has faded away (not hidden yet: the whole fade, and a frame or two).
+    const wait = Platform.OS === 'android' ? Math.max(0, splashHiddenAt ? ANDROID_FADE_MS - (Date.now() - splashHiddenAt) : ANDROID_FADE_MS + 40) : 0;
     // The light travels out (critically damped, barely any overshoot)…
-    bud.set(withDelay(80, withSpring(1, { stiffness: 121, damping: 18, mass: 1 })));
+    bud.set(withDelay(wait + 80, withSpring(1, { stiffness: 121, damping: 18, mass: 1 })));
     // …settles into the bud with one soft pulse of glow…
-    glow.set(withDelay(560, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })));
+    glow.set(withDelay(wait + 560, withTiming(1, { duration: 520, easing: Easing.out(Easing.cubic) })));
     // …then the overlay fades over the app, the mark lifting a little as it goes.
-    leave.set(withDelay(820, withTiming(1, { duration: 420, easing: Easing.inOut(Easing.quad) }, (finished) => finished && scheduleOnRN(onDone))));
+    leave.set(withDelay(wait + 820, withTiming(1, { duration: 420, easing: Easing.inOut(Easing.quad) }, (finished) => finished && scheduleOnRN(onDone))));
   }, [ready, started, bud, glow, leave, onDone]);
 
   const skip = () => {
@@ -125,7 +142,14 @@ function Birth({ ready, onDone }: { ready: boolean; onDone: () => void }) {
       onPress={skip}
       accessible={false}
       // The native splash goes as soon as the same picture is on screen underneath it.
-      onLayout={() => requestAnimationFrame(() => SplashScreen.hide())}
+      onLayout={(e) => {
+        setFrame(e.nativeEvent.layout);
+        if (Platform.OS === 'android') SplashScreen.setOptions({ fade: true, duration: ANDROID_FADE_MS });
+        requestAnimationFrame(() => {
+          splashHiddenAt = Date.now();
+          SplashScreen.hide();
+        });
+      }}
       style={StyleSheet.absoluteFill}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }, backdrop]} />
       <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: (width - SIZE) / 2, top: (height - SIZE) / 2, width: SIZE, height: SIZE }, mark]}>
