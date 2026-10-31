@@ -1,8 +1,11 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
+import { eq } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { sign, verify } from 'hono/jwt';
 
+import type { Db } from './db';
+import { users } from './db/schema';
 import { HttpError } from './errors';
 
 function scrypt(password: string, salt: Buffer, keylen: number, options: ScryptOptions): Promise<Buffer> {
@@ -40,17 +43,45 @@ export function issueToken(userId: string, secret: string): Promise<string> {
 
 export type AuthEnv = { Variables: { userId: string } };
 
+function bearer(header: string | undefined, query: string | undefined): string | undefined {
+  return header?.startsWith('Bearer ') ? header.slice(7) : query;
+}
+
+/** The account a token stands for, or null when it isn't valid. */
+async function tokenSubject(token: string, secret: string): Promise<string | null> {
+  try {
+    const payload = await verify(token, secret, 'HS256');
+    return typeof payload.sub === 'string' ? payload.sub : null;
+  } catch {
+    return null;
+  }
+}
+
 export function requireAuth(secret: string): MiddlewareHandler<AuthEnv> {
   return async (c, next) => {
-    const header = c.req.header('authorization') ?? '';
-    const token = header.startsWith('Bearer ') ? header.slice(7) : c.req.query('token');
+    const token = bearer(c.req.header('authorization'), c.req.query('token'));
     if (!token) throw new HttpError(401, 'unauthorized', 'Missing token');
-    try {
-      const payload = await verify(token, secret, 'HS256');
-      if (typeof payload.sub !== 'string') throw new Error('bad subject');
-      c.set('userId', payload.sub);
-    } catch {
-      throw new HttpError(401, 'unauthorized', 'Invalid or expired token');
+    const userId = await tokenSubject(token, secret);
+    if (!userId) throw new HttpError(401, 'unauthorized', 'Invalid or expired token');
+    c.set('userId', userId);
+    await next();
+  };
+}
+
+/** What a waiting account may reach: its own account (read, profile, export, delete) and nothing else. */
+const PENDING_ALLOWED = /^\/api\/(auth|info|me)(\/|$)/;
+
+/**
+ * Sign-up on request: until an admin approves it, an account reaches nothing
+ * but itself, so it can never start an AI call or store data. One check for
+ * every route, in front of them all.
+ */
+export function blockPending(db: Db, secret: string): MiddlewareHandler {
+  return async (c, next) => {
+    const token = PENDING_ALLOWED.test(c.req.path) ? undefined : bearer(c.req.header('authorization'), c.req.query('token'));
+    const userId = token ? await tokenSubject(token, secret) : null;
+    if (userId && db.select({ pending: users.pending }).from(users).where(eq(users.id, userId)).get()?.pending) {
+      throw new HttpError(403, 'account_pending', 'This account is waiting for an admin to approve it');
     }
     await next();
   };

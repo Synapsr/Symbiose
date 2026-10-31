@@ -213,7 +213,8 @@ describe('Symbiose API', () => {
   beforeAll(async () => {
     const res = await request<AuthResponse>('POST', '/api/auth/register', { email: 'Loan@Example.com', password: 'correct horse', name: 'Loan' }, false);
     expect(res.status).toBe(201);
-    expect(res.body.user.isAdmin).toBe(true);
+    // Admins come from ADMIN_EMAILS, not from being first.
+    expect(res.body.user.isAdmin).toBe(false);
     token = res.body.token;
   });
 

@@ -7,7 +7,9 @@ import { Hono } from 'hono';
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
 import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, vitals, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
+import { signupMode } from '../env';
 import { nowIso, validate, type Deps } from '../http';
+import { isAdminEmail } from '../services/admin';
 import { toReading } from '../services/blood-pressure';
 import { toActivity, toCraving } from '../services/day';
 import { toWaterEntry } from '../services/hydration';
@@ -29,11 +31,17 @@ export function authRoutes({ db, config }: Deps) {
   app.post('/register', limiter, validate('json', CredentialsSchema), async (c) => {
     const { email, password, name } = c.req.valid('json');
     const existingUsers = db.select({ n: count() }).from(users).get()?.n ?? 0;
-    if (existingUsers > 0 && !config.allowSignup) {
+    const mode = signupMode(config);
+    if (existingUsers > 0 && mode === 'closed') {
       throw new HttpError(403, 'signup_closed', 'Sign-ups are closed on this server');
     }
     if (db.select({ id: users.id }).from(users).where(eq(users.email, email)).get()) {
       throw new HttpError(409, 'email_taken', 'An account already exists with this email');
+    }
+    // No email verification: an admin email can't be claimed through open sign-up, only as the first account.
+    // On request, it simply waits for an admin like any other (and is no admin until approved).
+    if (existingUsers > 0 && mode === 'open' && isAdminEmail(config, email)) {
+      throw new HttpError(403, 'email_reserved', 'This email is reserved on this server');
     }
     const row = db
       .insert(users)
@@ -43,11 +51,13 @@ export function authRoutes({ db, config }: Deps) {
         passwordHash: await hashPassword(password),
         name: name ?? '',
         isAdmin: existingUsers === 0,
+        // The very first account is always approved.
+        pending: existingUsers > 0 && mode === 'request',
         createdAt: nowIso(),
       })
       .returning()
       .get();
-    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row) }, 201);
+    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row, config) }, 201);
   });
 
   app.post('/login', limiter, validate('json', CredentialsSchema.pick({ email: true, password: true })), async (c) => {
@@ -56,7 +66,7 @@ export function authRoutes({ db, config }: Deps) {
     if (!row || !(await verifyPassword(password, row.passwordHash))) {
       throw new HttpError(401, 'invalid_credentials', 'Wrong email or password');
     }
-    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row) });
+    return c.json<AuthResponse>({ token: await issueToken(row.id, config.jwtSecret), user: toUser(row, config) });
   });
 
   return app;
@@ -66,7 +76,7 @@ export function meRoutes({ db, config, photos }: Deps) {
   const app = new Hono<AuthEnv>();
   app.use(requireAuth(config.jwtSecret));
 
-  app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')))));
+  app.get('/', (c) => c.json(toUser(getUserRow(db, c.get('userId')), config)));
 
   app.put('/profile', validate('json', ProfileSchema), (c) => {
     const profile = { ...c.req.valid('json') };
@@ -82,13 +92,13 @@ export function meRoutes({ db, config, photos }: Deps) {
       .where(eq(users.id, c.get('userId')))
       .returning()
       .get();
-    return c.json(toUser(row));
+    return c.json(toUser(row, config));
   });
 
   /** Everything we store about the user, as JSON. */
   app.get('/export', (c) => {
     const userId = c.get('userId');
-    const user = toUser(getUserRow(db, userId));
+    const user = toUser(getUserRow(db, userId), config);
     const payload = {
       exportedAt: nowIso(),
       user,

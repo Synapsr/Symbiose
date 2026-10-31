@@ -13,7 +13,8 @@ services:
       # AI_PROVIDER: openai
       # AI_API_KEY: ${AI_API_KEY:-}
       # PUBLIC_URL: https://symbiose.example.com
-      # ALLOW_SIGNUP: "true"
+      # SIGNUP: request   # or open; closed by default
+      # ADMIN_EMAILS: you@example.com
     volumes:
       - symbiose-data:/data
 

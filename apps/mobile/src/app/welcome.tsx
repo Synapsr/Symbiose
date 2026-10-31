@@ -83,6 +83,7 @@ export default function Welcome() {
     } catch (e) {
       haptics.warning();
       if (e instanceof ApiError && e.code === 'signup_closed') setError(t('welcome.signupClosed'));
+      else if (e instanceof ApiError && e.code === 'email_reserved') setError(t('admin.emailReserved'));
       else setError(e instanceof ApiError ? (e.status === 0 ? t('common.offline') : e.message) : t('common.error'));
     } finally {
       setBusy(false);
@@ -182,6 +183,11 @@ export default function Welcome() {
               textContentType={mode === 'register' ? 'newPassword' : 'password'}
               onSubmitEditing={() => canSubmit && void submit()}
             />
+            {mode === 'register' && serverState.info.signup === 'request' && serverState.info.hasUsers ? (
+              <Txt variant="caption" tone="secondary" style={{ marginLeft: 4 }}>
+                {t('admin.signupOnRequest')}
+              </Txt>
+            ) : null}
             {error ? (
               <Txt variant="caption" tone="warning" style={{ marginLeft: 4 }}>
                 {error}

@@ -36,6 +36,8 @@ interface SettingsState {
   lineDismissed: { date: string; kinds: string[] };
   /** The week's craving nudges, kept for the notifications scheduled ahead. */
   nudges: { week: string; lines: string[] } | null;
+  /** Sign-up on request: the goals written while the account waits, drafted into a plan once approved. */
+  waitingIntentions: string;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -63,6 +65,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   morningSeen: '',
   lineDismissed: { date: '', kinds: [] },
   nudges: null,
+  waitingIntentions: '',
   set: (patch) => {
     set(patch);
     const s = get();
@@ -85,6 +88,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       morningSeen: s.morningSeen,
       lineDismissed: s.lineDismissed,
       nudges: s.nudges,
+      waitingIntentions: s.waitingIntentions,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

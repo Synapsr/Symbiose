@@ -19,6 +19,7 @@ import {
   Moon,
   Plus,
   Server,
+  ShieldCheck,
   Trash2,
   Watch,
   Activity,
@@ -32,6 +33,7 @@ import { signed } from '@/components/insights/adaptive-energy-card';
 import { CoachSettings } from '@/components/settings/coach-settings';
 import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
+import { ApiError } from '@/lib/api';
 import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules } from '@/lib/health';
@@ -54,7 +56,7 @@ const RESYNC = { hydration: { lastWaterSync: 0 }, sleep: { lastSleepSync: 0 }, b
 
 /** Me is settings only: who I am, my goals, what I track, the coach, devices, preferences, account. */
 export default function Me() {
-  const { t, locale, nutrient } = useI18n();
+  const { t, plural, locale, nutrient } = useI18n();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const user = useUser();
@@ -182,6 +184,12 @@ export default function Me() {
   };
 
   const pendingLocale = saveProfile.isPending ? saveProfile.variables.locale : undefined;
+
+  // Admins see how many people wait to get in (sign-up on request), right on the row.
+  const requests = useQuery({ queryKey: ['admin-requests'], queryFn: () => api.adminRequests(), enabled: user.isAdmin });
+  const waitingRequests = requests.data?.requests.length ?? 0;
+  // A server from before the admin view flags its first account as admin: no row there.
+  const showAdmin = user.isAdmin && !(requests.error instanceof ApiError && requests.error.status === 404);
 
   return (
     <ScrollView
@@ -311,6 +319,20 @@ export default function Me() {
       <SectionTitle>{t('me.account')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>
         <Item icon={<Server size={20} color={colors.text} />} title={api.baseUrl.replace(/^https?:\/\//, '')} subtitle={user.email} />
+        {/* Only for the emails listed in ADMIN_EMAILS on the server. */}
+        {showAdmin ? (
+          <>
+            <Divider />
+            <Item
+              icon={<ShieldCheck size={20} color={colors.text} />}
+              title={t('admin.title')}
+              subtitle={t('admin.row')}
+              onPress={() => router.push('/admin')}
+              right={waitingRequests ? <CountBadge count={waitingRequests} label={plural('admin.waiting', waitingRequests)} /> : null}
+              chevron
+            />
+          </>
+        ) : null}
         <Divider />
         <Item
           icon={<Download size={20} color={colors.text} />}
@@ -493,6 +515,17 @@ function Item({
     </Row>
   );
   return onPress ? <Pressy onPress={onPress}>{content}</Pressy> : content;
+}
+
+function CountBadge({ count, label }: { count: number; label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View accessible accessibilityLabel={label} style={{ minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' }}>
+      <Txt variant="caption" color={colors.onAccent} style={{ fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+        {count}
+      </Txt>
+    </View>
+  );
 }
 
 function Divider() {

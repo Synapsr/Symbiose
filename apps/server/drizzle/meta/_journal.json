@@ -64,6 +64,13 @@
       "when": 1793404384608,
       "tag": "0008_craving_optional_intensity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793433345696,
+      "tag": "0009_admin",
+      "breakpoints": true
     }
   ]
 }

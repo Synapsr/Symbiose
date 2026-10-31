@@ -6,7 +6,10 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   name: text('name').notNull().default(''),
+  /** Legacy, set on the very first account and read nowhere: admins are the emails listed in ADMIN_EMAILS. */
   isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  /** Sign-up on request: waiting for an admin. Accounts from before (and the first one) are approved. */
+  pending: integer('pending', { mode: 'boolean' }).notNull().default(false),
   profile: text('profile', { mode: 'json' }).$type<Profile>(),
   plan: text('plan', { mode: 'json' }).$type<GoalPlan>(),
   createdAt: text('created_at').notNull(),
@@ -283,6 +286,30 @@ export const aiCache = sqliteTable('ai_cache', {
   value: text('value', { mode: 'json' }).notNull(),
   createdAt: text('created_at').notNull(),
 });
+
+/**
+ * One row per call to the AI provider, for the admin's global view: what it
+ * cost and how it went. Never who asked or what was said. Kept 13 months.
+ */
+export const aiUsage = sqliteTable(
+  'ai_usage',
+  {
+    id: integer('id').primaryKey(),
+    at: text('at').notNull(),
+    feature: text('feature').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    inputTokens: integer('input_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    cacheReadTokens: integer('cache_read_tokens').notNull(),
+    cacheWriteTokens: integer('cache_write_tokens').notNull(),
+    durationMs: integer('duration_ms').notNull(),
+    ok: integer('ok', { mode: 'boolean' }).notNull(),
+    /** The failure's code (`ai_rate_limited`…), never its message. */
+    error: text('error'),
+  },
+  (t) => [index('ai_usage_at').on(t.at)],
+);
 
 export type UserRow = typeof users.$inferSelect;
 export type MealRow = typeof meals.$inferSelect;

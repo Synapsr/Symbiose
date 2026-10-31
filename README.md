@@ -30,7 +30,7 @@ docker run -d --name symbiose -p 3000:3000 \
 
 Or with Compose: `docker compose up -d` (see [docker-compose.yml](docker-compose.yml)).
 
-Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Scan the server QR code** and create your account. The first account is the admin; sign-ups then close unless `ALLOW_SIGNUP=true`.
+Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Scan the server QR code** and create your account. Sign-ups then close, unless `SIGNUP` says otherwise.
 
 | Variable | Default | |
 | --- | --- | --- |
@@ -42,11 +42,17 @@ Open `http://<your-server>:3000`: the page shows a QR code. In the app, tap **Sc
 | `AI_BASE_URL` | per provider | Where an OpenAI-compatible server listens (Ollama, LM Studio, vLLM…). |
 | `AI_VISION` | `true` | `false` for a model that can't read photos: photo meals then ask for a description, text meals work. |
 | `PUBLIC_URL` | derived from the request | URL encoded in the QR code (set it behind a reverse proxy). |
-| `ALLOW_SIGNUP` | `false` | Allow more accounts after the first one (family server). |
+| `SIGNUP` | `closed` | Who gets an account after the first one: `closed` (nobody), `request` (anyone can ask; an admin accepts or refuses in the app, and until then the account reaches neither the AI nor any data) or `open` (anyone, for a family server). The older `ALLOW_SIGNUP=true` still means `open`. |
 | `DATA_DIR` | `/data` | SQLite database, photos and generated JWT secret. Back up this folder. |
 | `JWT_SECRET` | generated once | Override the token signing secret. |
 | `PORT` | `3000` | |
+| `ADMIN_EMAILS` | — | Comma-separated emails of the accounts that get the admin view (see below). |
+| `AI_PRICES` | — | Prices for the admin view's cost estimate, for models other than Claude: `model=input/output[/cacheRead[/cacheWrite]]` in USD per million tokens, comma-separated (`my-model=1.25/10/0.125,gemma4=0/0`). Claude's prices are built in; a dated id (`-2026-09-01`) takes its alias's price. |
 | `AI_MOCK` | `false` | **Development only**: canned AI answers so you can work on the UI without a key. |
+
+**Admin view.** List your email in `ADMIN_EMAILS` and an « Admin » row shows up in « Moi »: a glance at the whole server, with the AI's calls, tokens and estimated cost, how much the app is used, and the server's health. Counts and totals only: never anyone's email, name, meals or notes, and no per-person figure. Each AI call is kept as numbers alone (feature, model, tokens, duration, error code; no account, no content) for 13 months. With `SIGNUP=request`, it also lists the requests to accept or refuse, with only the email, first name and date (refusing deletes the account).
+
+Accounts aren't verified by email, so someone could sign up with a listed email before its owner. On request, that account waits like any other and is no admin until approved. With open sign-up, a listed email is refused unless it is the server's first account: create the account, then list it (the server warns at start-up about listed emails without one).
 
 ### Other AI providers
 

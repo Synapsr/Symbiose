@@ -6,6 +6,7 @@ import Database from 'better-sqlite3';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { openDb } from './index';
+import { databaseBehind } from './testing';
 
 const dir = mkdtempSync(join(tmpdir(), 'symbiose-backup-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -21,10 +22,8 @@ describe('database backups before migrations', () => {
 
   it('copies an existing database before applying a pending migration, and keeps the last three', () => {
     for (let i = 0; i < 4; i++) {
-      // Pretend the latest migration has not run yet.
-      const raw = new Database(file);
-      raw.prepare('DELETE FROM __drizzle_migrations WHERE created_at = (SELECT max(created_at) FROM __drizzle_migrations)').run();
-      raw.close();
+      // A database from before the latest migration.
+      databaseBehind(file).close();
       openDb(file);
     }
     const copies = readdirSync(backups);
