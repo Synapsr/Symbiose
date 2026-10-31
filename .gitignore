@@ -1,8 +1,28 @@
 node_modules/
 dist/
 data/
-.env
-.env*.local
+coverage/
 *.log
-.DS_Store
 *.tsbuildinfo
+
+# Secrets and local environments (the example stays)
+.env
+.env.*
+!.env.example
+
+# Signing material, builds and databases
+*.p8
+*.p12
+*.pem
+*.key
+*.mobileprovision
+*.ipa
+*.xcarchive
+*.db
+*.sqlite*
+
+# Editors and tools
+.DS_Store
+.idea/
+.vscode/
+.claude/

@@ -5,6 +5,9 @@
 apps/mobile/ios
 apps/mobile/android
 .git
+.claude
+website
+docs
 *.log
 .env
 **/.env
