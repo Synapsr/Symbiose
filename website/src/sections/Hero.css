@@ -175,62 +175,10 @@
 }
 
 .hero-orbs {
+  --D: calc(var(--pw) * 1.75);
   position: absolute;
   inset: 0;
   z-index: -1;
-  display: grid;
-  place-items: center;
-}
-
-.hero-orb {
-  --D: calc(var(--pw) * 1.75);
-  grid-area: 1 / 1;
-  width: var(--D);
-  aspect-ratio: 1;
-  border-radius: 50%;
-}
-
-/* The mark, blown up behind the phones: the cell, and its bud pushing out on the diagonal. */
-.hero-orb--a {
-  translate: calc(var(--D) * -0.2) calc(var(--D) * 0.12);
-  background: var(--accent);
-  opacity: 0.2;
-  animation: orb-cell 1200ms var(--ease-out) 150ms both;
-}
-
-.hero-orb--b {
-  width: calc(var(--D) * 0.62);
-  translate: calc(var(--D) * 0.36) calc(var(--D) * -0.44);
-  background: var(--logo-3);
-  opacity: 0.32;
-  animation: orb-bud 1100ms cubic-bezier(0.34, 1.36, 0.64, 1) 420ms both;
-}
-
-:root[data-theme='dark'] .hero-orb--b {
-  background: var(--logo-2);
-  opacity: 0.14;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .hero-orb--b {
-    background: var(--logo-2);
-    opacity: 0.14;
-  }
-}
-
-@keyframes orb-cell {
-  from {
-    scale: 0.62;
-    opacity: 0;
-  }
-}
-
-@keyframes orb-bud {
-  from {
-    translate: calc(var(--D) * -0.2) calc(var(--D) * 0.12);
-    scale: 0.45;
-    opacity: 0;
-  }
 }
 
 .hero-phone {

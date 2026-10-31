@@ -1,17 +1,55 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 
+import { HeroMark } from '../components/HeroMark';
 import { ArrowRight, GitHub } from '../components/Icons';
 import { Logo } from '../components/Logo';
 import { Phone } from '../components/Phone';
+import { prefersReducedMotion } from '../hooks';
 import { REPO } from '../i18n';
 import { useLang } from '../lang';
 import './Hero.css';
 
 const d = (step: number) => ({ '--d': step }) as CSSProperties;
 
+/** On desktop, a soft light follows the pointer around the hero's mark (one rAF per move, CSS variables only). */
+function usePointerLight() {
+  const orbs = useRef<HTMLDivElement>(null);
+  const glow = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const area = orbs.current;
+    const light = glow.current;
+    if (!area || !light || prefersReducedMotion() || !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    const hero = area.closest('section');
+    if (!hero) return;
+    let frame = 0;
+    const move = (event: PointerEvent) => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const box = light.getBoundingClientRect();
+        light.style.setProperty('--mx', `${event.clientX - box.left}px`);
+        light.style.setProperty('--my', `${event.clientY - box.top}px`);
+        light.dataset.on = '';
+      });
+    };
+    const leave = () => {
+      cancelAnimationFrame(frame);
+      delete light.dataset.on;
+    };
+    hero.addEventListener('pointermove', move, { passive: true });
+    hero.addEventListener('pointerleave', leave);
+    return () => {
+      cancelAnimationFrame(frame);
+      hero.removeEventListener('pointermove', move);
+      hero.removeEventListener('pointerleave', leave);
+    };
+  }, []);
+  return { orbs, glow };
+}
+
 export function Hero() {
   const { t } = useLang();
   const h = t.hero;
+  const { orbs, glow } = usePointerLight();
   return (
     <section className="hero" id="top">
       <div className="wrap hero-grid">
@@ -52,9 +90,9 @@ export function Hero() {
         </div>
 
         <div className="hero-visual">
-          <div className="hero-orbs" aria-hidden="true">
-            <span className="hero-orb hero-orb--a" />
-            <span className="hero-orb hero-orb--b" />
+          <div className="hero-orbs" ref={orbs} aria-hidden="true">
+            <span className="hero-glow" ref={glow} />
+            <HeroMark />
           </div>
           <div className="hero-phone hero-phone--back">
             <Phone screen="insights-sources" theme="dark" alt={h.altDark} eager width="100%" />

@@ -189,8 +189,8 @@ function Actions({ primary, secondary }: { primary: Action; secondary: Action })
   const pill = { height: 36, paddingHorizontal: Space.lg, borderRadius: Radius.pill, justifyContent: 'center' } as const;
   return (
     <Row gap={Space.sm} style={{ paddingLeft: 23 }}>
-      <Pressy onPress={primary.onPress} accessibilityRole="button" style={[pill, { backgroundColor: colors.accent }]}>
-        <Txt variant="label" color={colors.onAccent}>
+      <Pressy onPress={primary.onPress} accessibilityRole="button" style={[pill, { backgroundColor: colors.inverted }]}>
+        <Txt variant="label" color={colors.onInverted}>
           {primary.label}
         </Txt>
       </Pressy>

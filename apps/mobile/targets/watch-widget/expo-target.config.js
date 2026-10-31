@@ -13,7 +13,7 @@ module.exports = {
   deploymentTarget: '10.0',
   frameworks: ['SwiftUI', 'WidgetKit'],
   colors: {
-    $accent: { light: '#2EE68A', dark: '#2EE68A' },
+    $accent: { light: '#5FD6B4', dark: '#5FD6B4' },
     $widgetBackground: { light: '#0A0A0B', dark: '#0A0A0B' },
   },
   entitlements: {

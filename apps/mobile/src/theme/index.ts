@@ -9,11 +9,11 @@ const light = {
   text2: '#6E6E73',
   text3: '#A1A1A6',
   border: 'rgba(0,0,0,0.07)',
-  /** Fills: buttons, rings, active states. */
-  accent: '#00803F',
-  /** Accent-coloured text and small glyphs: a shade deeper so it reads on every surface. */
-  accentText: '#00753B',
-  accentSoft: '#E2F9EA',
+  /** What is alive: progress, rings, focus, success. Plain actions use the ink (`inverted`). */
+  accent: '#0F7663',
+  /** Accent-coloured text and small glyphs. The same value as `accent`, which passes AA on every surface. */
+  accentText: '#0F7663',
+  accentSoft: '#E6F2EE',
   /** Text and icons on an accent background. */
   onAccent: '#FFFFFF',
   warning: '#E8890C',
@@ -32,9 +32,9 @@ const dark: typeof light = {
   text2: '#9A9AA0',
   text3: '#5F5F66',
   border: 'rgba(255,255,255,0.08)',
-  accent: '#2EE68A',
-  accentText: '#2EE68A',
-  accentSoft: '#0D3320',
+  accent: '#5FD6B4',
+  accentText: '#5FD6B4',
+  accentSoft: '#122C27',
   onAccent: '#0A0A0B',
   warning: '#FFB224',
   warningSoft: '#3A2A0E',
@@ -46,9 +46,12 @@ const dark: typeof light = {
 
 export type Palette = typeof light;
 
+/** The night palette whatever the scheme, for surfaces that are always dark (the camera). */
+export const NIGHT: Palette = dark;
+
 /** One color per nutrient, used consistently in rings, bars and chips. */
 export const NUTRIENT_COLORS: Record<NutrientKey, string> = {
-  kcal: '#009A4E',
+  kcal: '#139478',
   protein: '#FF7A59',
   carbs: '#F2B23A',
   fat: '#4F8EF7',

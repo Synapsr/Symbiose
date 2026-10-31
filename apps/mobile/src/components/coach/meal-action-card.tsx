@@ -95,7 +95,7 @@ export function MealActionCard({ messageId, index, action }: { messageId: string
                 <Button
                   title={action.action === 'delete' ? t('common.delete') : t('coach.mealConfirm')}
                   size="md"
-                  variant={action.action === 'delete' ? 'danger' : 'accent'}
+                  variant={action.action === 'delete' ? 'danger' : 'primary'}
                   loading={apply.isPending}
                   onPress={() => apply.mutate()}
                   style={{ flex: 1 }}

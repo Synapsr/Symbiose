@@ -215,6 +215,7 @@ export function Button({
   loading,
   disabled,
   size = 'lg',
+  palette,
   style,
 }: {
   title: string;
@@ -224,9 +225,12 @@ export function Button({
   loading?: boolean;
   disabled?: boolean;
   size?: 'md' | 'lg';
+  /** Another palette than the scheme's, e.g. `NIGHT` on the always-dark camera. */
+  palette?: Palette;
   style?: StyleProp<ViewStyle>;
 }) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const colors = palette ?? theme.colors;
   const inactive = disabled && !loading;
   const bg = inactive ? colors.surface2 : { primary: colors.inverted, secondary: colors.surface2, ghost: 'transparent', accent: colors.accent, danger: colors.surface2 }[variant];
   const fg = inactive ? colors.text3 : { primary: colors.onInverted, secondary: colors.text, ghost: colors.text2, accent: colors.onAccent, danger: colors.danger }[variant];

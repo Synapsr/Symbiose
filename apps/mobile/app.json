@@ -30,7 +30,7 @@
     "android": {
       "package": "io.synapsr.symbiose",
       "adaptiveIcon": {
-        "backgroundColor": "#00B458",
+        "backgroundColor": "#2C3036",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -99,7 +99,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/android-icon-monochrome.png",
-          "color": "#00803F",
+          "color": "#0F7663",
           "enableRemoteNotifications": false
         }
       ],

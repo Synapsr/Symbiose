@@ -56,7 +56,7 @@ export function HowItWorks() {
         </span>
       </div>
       <p className="how-status">
-        <Logo size={22} breathe />
+        <Logo size={22} animate="inview" breathe />
         {x.status}
       </p>
     </div>,

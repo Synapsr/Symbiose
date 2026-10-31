@@ -23,7 +23,7 @@ import { preparePhoto } from '@/lib/image';
 import { isNetworkError } from '@/lib/outbox';
 import { useApi } from '@/lib/session';
 import { useSettings, useToast } from '@/lib/stores';
-import { Radius, Space, useTheme } from '@/theme';
+import { NIGHT, Radius, Space, useTheme } from '@/theme';
 
 type Mode = 'photo' | 'barcode' | 'text';
 const BARCODES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e'];
@@ -145,7 +145,7 @@ export default function Capture() {
       {cameraNeeded && permission && !permission.granted ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: Space.xl, padding: Space.xxl }}>
           <Txt style={{ color: WHITE, textAlign: 'center' }}>{t('capture.permission')}</Txt>
-          <Button title={t('capture.allow')} variant="accent" onPress={requestPermission} />
+          <Button title={t('capture.allow')} variant="accent" palette={NIGHT} onPress={requestPermission} />
         </View>
       ) : null}
 
@@ -259,7 +259,7 @@ export default function Capture() {
                   {busy ? <ActivityIndicator color="#000" /> : null}
                 </View>
               </Pressy>
-              <IconButton label={t('capture.note')} variant="glass" size={52} icon={<PenLine size={22} color={note ? '#2EE68A' : WHITE} />} onPress={() => setNoteOpen(!noteOpen)} />
+              <IconButton label={t('capture.note')} variant="glass" size={52} icon={<PenLine size={22} color={note ? '#5FD6B4' : WHITE} />} onPress={() => setNoteOpen(!noteOpen)} />
             </Row>
           ) : null}
 

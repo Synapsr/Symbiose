@@ -15,7 +15,7 @@ struct ConnectView: View {
   private func content(_ copy: Copy) -> some View {
     ScrollView {
       VStack(spacing: 10) {
-        LogoMark().fill(Palette.bourgeon).frame(width: 44, height: 44).padding(.top, 8)
+        SymbioseMark(size: 44).padding(.top, 8)
         Text(copy.connectTitle)
           .font(.rounded(18, .bold))
           .multilineTextAlignment(.center)

@@ -18,7 +18,7 @@ export function Footer() {
     <footer className="footer">
       <div className="wrap">
         <div className="footer-cta" data-reveal>
-          <Logo size={64} />
+          <Logo size={64} animate="inview" breathe />
           <p className="footer-title">
             <span>{f.title1}</span> <span className="accent-italic">{f.title2}</span>
           </p>
