@@ -1,4 +1,4 @@
-import { toLocalDate, WATER_SIZES, type JournalKind } from '@symbiose/shared';
+import { JOURNAL_KINDS, toLocalDate, WATER_SIZES } from '@symbiose/shared';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, ChevronRight, HeartPulse, PenLine, Scale, ScanBarcode, Sparkles, SportShoe, type LucideIcon } from 'lucide-react-native';
 import { useState, type ReactNode } from 'react';
@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BloodPressureForm } from '@/components/forms/blood-pressure-form';
 import { WeightForm } from '@/components/forms/weight-form';
 import { KIND_META, kindLabel } from '@/components/journal/meta';
-import { MoodFaces, useMood } from '@/components/today/mood-row';
+import { MoodPanel } from '@/components/today/mood-row';
 import { WaterSizeChip } from '@/components/today/status-row';
 import { Glass, lastGlass, useRemoveGlass, useWater } from '@/components/today/water';
 import { Card, IconButton, Pressy, Row, Txt } from '@/components/ui';
@@ -21,15 +21,13 @@ import { useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
-/** The owner asked for feelings first; transit comes further down. */
-const NOTE_KINDS: JournalKind[] = ['feeling', 'symptom', 'medication', 'transit', 'other'];
-
 type Pane = 'menu' | 'weight' | 'bp';
 
 /**
  * « + »: the single home for every log that isn't a photo. One tap for a
  * glass or a mood, two for the rest. Tiles for modules that are off are not
- * there at all. Works the same for a past day (the date comes from Today).
+ * there at all; the mood's faces always are (Humeur's switch only adds its
+ * pill on Today). Works the same for a past day (the date comes from Today).
  */
 export default function LogSheet() {
   const params = useLocalSearchParams<{ date?: string }>();
@@ -80,7 +78,6 @@ function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpe
   const setSettings = useSettings((s) => s.set);
   const pour = useWater(date);
   const removeGlass = useRemoveGlass(date);
-  const { pick } = useMood(date);
 
   const rules = user.plan?.rules ?? [];
   // Cravings are about the plan's limits; when sugar is one of them, the craving comes first.
@@ -88,7 +85,6 @@ function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpe
   const sugarFirst = craving && rules.some((r) => r.kind === 'max' && (r.nutrient === 'addedSugar' || r.nutrient === 'sugar'));
   // A past day loads its own summary: the quick row waits for it rather than guess.
   const hydration = day?.date === date ? (day.hydration ?? null) : null;
-  const trackMood = user.profile?.trackMood === true;
   const trackBp = user.profile?.trackBloodPressure === true;
   const mood = day?.date === date ? (day.mood ?? null) : null;
   // A glass too many: the last one logged here can be taken back.
@@ -126,70 +122,57 @@ function Menu({ date, isToday, onOpen }: { date: string; isToday: boolean; onOpe
         <Tile icon={ScanBarcode} label={t('capture.barcode')} onPress={() => go('/capture', { mode: 'barcode' })} />
       </Tiles>
 
-      {hydration || trackMood ? (
-        <Card style={{ gap: Space.lg, padding: Space.lg }}>
-          {hydration ? (
-            <View style={{ gap: Space.sm }}>
-              <Row gap={Space.sm}>
-                <Glass progress={hydration.totalMl / Math.max(1, hydration.goalMl)} totalMl={hydration.totalMl} height={18} />
-                <Txt variant="label">{t('water.short')}</Txt>
-                <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1, fontVariant: ['tabular-nums'] }}>
-                  {t('water.today', { total: formatLiters(hydration.totalMl, locale), goal: formatLiters(hydration.goalMl, locale) })}
-                </Txt>
-                {last ? (
-                  <Pressy
-                    onPress={() => {
-                      removeGlass(last);
-                      dismiss();
-                    }}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('water.removeLast', { ml: last.ml })}>
-                    <Txt variant="label" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
-                      − {last.ml} ml
-                    </Txt>
-                  </Pressy>
-                ) : null}
-              </Row>
-              <Row gap={Space.sm}>
-                {WATER_SIZES.map((ml) => (
-                  <WaterSizeChip
-                    key={ml}
-                    ml={ml}
-                    selected={ml === glassMl}
-                    onPress={() => {
-                      setSettings({ glassMl: ml });
-                      void pour(ml, hydration);
-                      dismiss();
-                    }}
-                  />
-                ))}
-              </Row>
-            </View>
-          ) : null}
-          {hydration && trackMood ? <View style={{ height: 1, backgroundColor: colors.border }} /> : null}
-          {trackMood ? (
-            <View style={{ gap: Space.sm }}>
-              <Txt variant="label">{t('mood.title')}</Txt>
-              <MoodFaces
-                mood={mood?.mood ?? null}
-                size={36}
-                onPick={(level) => {
-                  pick(level);
-                  dismiss();
-                }}
-              />
-            </View>
-          ) : null}
-        </Card>
-      ) : null}
+      <Card style={{ gap: Space.lg, padding: Space.lg }}>
+        {hydration ? (
+          <View style={{ gap: Space.sm }}>
+            <Row gap={Space.sm}>
+              <Glass progress={hydration.totalMl / Math.max(1, hydration.goalMl)} totalMl={hydration.totalMl} height={18} />
+              <Txt variant="label">{t('water.short')}</Txt>
+              <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1, fontVariant: ['tabular-nums'] }}>
+                {t('water.today', { total: formatLiters(hydration.totalMl, locale), goal: formatLiters(hydration.goalMl, locale) })}
+              </Txt>
+              {last ? (
+                <Pressy
+                  onPress={() => {
+                    removeGlass(last);
+                    dismiss();
+                  }}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('water.removeLast', { ml: last.ml })}>
+                  <Txt variant="label" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+                    − {last.ml} ml
+                  </Txt>
+                </Pressy>
+              ) : null}
+            </Row>
+            <Row gap={Space.sm}>
+              {WATER_SIZES.map((ml) => (
+                <WaterSizeChip
+                  key={ml}
+                  ml={ml}
+                  selected={ml === glassMl}
+                  onPress={() => {
+                    setSettings({ glassMl: ml });
+                    void pour(ml, hydration);
+                    dismiss();
+                  }}
+                />
+              ))}
+            </Row>
+          </View>
+        ) : null}
+        {hydration ? <View style={{ height: 1, backgroundColor: colors.border }} /> : null}
+        {/* « Humeur »: the one mood, with its word. The day's first face closes the sheet. */}
+        <MoodPanel date={date} mood={mood} title={t('mood.title')} size={36} onPicked={dismiss} />
+      </Card>
 
       {/* The body, then the journal's kinds: one even grid, so every tile is where the eye expects it. */}
       <Tiles>
         <Tile icon={SportShoe} tint={colors.accent} label={t('today.move')} onPress={() => go('/workout')} />
         <Tile icon={Scale} label={t('weight.title')} onPress={() => onOpen('weight')} />
         {trackBp ? <Tile icon={HeartPulse} tint="#D98166" label={t('bp.title')} onPress={() => onOpen('bp')} /> : null}
-        {NOTE_KINDS.map((kind) => (
+        {JOURNAL_KINDS.map((kind) => (
           <Tile
             key={kind}
             icon={KIND_META[kind].icon}

@@ -21,7 +21,7 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { headline } from '@/components/journal/meta';
-import { FeelingPicker, KindChips, PillPicker } from '@/components/journal/pickers';
+import { KindChips, PillPicker } from '@/components/journal/pickers';
 import { Button, Chip, IconButton, Row, Txt, webInput } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { formatDay } from '@/lib/format';
@@ -87,7 +87,8 @@ export default function NoteSheet() {
       </View>
     );
   }
-  const kind = JournalKindSchema.safeParse(params.kind);
+  // A new note never starts as a mood: those are logged with the faces in « + ».
+  const kind = JournalKindSchema.exclude(['feeling']).safeParse(params.kind);
   return <NoteForm key={entry?.id ?? 'new'} entry={entry} date={date} initialKind={kind.success ? kind.data : 'other'} fromJournal={params.from === 'journal'} />;
 }
 
@@ -106,7 +107,8 @@ function NoteForm({ entry, date, initialKind, fromJournal }: { entry: JournalEnt
   const [text, setText] = useState(entry?.text ?? '');
   const [bristol, setBristol] = useState(entry?.data.bristol);
   const [ease, setEase] = useState(entry?.data.ease);
-  const [feeling, setFeeling] = useState(entry?.data.feeling);
+  // An older « Ressenti » note keeps its face as it was: moods are logged with the faces in « + » now.
+  const feeling = entry?.data.feeling;
   const [when, setWhen] = useState(() => {
     if (entry) return new Date(entry.at);
     if (date === toLocalDate(now)) return now;
@@ -146,7 +148,7 @@ function NoteForm({ entry, date, initialKind, fromJournal }: { entry: JournalEnt
   const pickKind = (next: JournalKind) => {
     setKind(next);
     // The pickers need the room and the words are optional there; elsewhere, words are the note.
-    if (next !== 'transit' && next !== 'feeling') input.current?.focus();
+    if (next !== 'transit') input.current?.focus();
     else if (!text.trim()) Keyboard.dismiss();
   };
   const nudge = (delta: number) => {
@@ -186,10 +188,6 @@ function NoteForm({ entry, date, initialKind, fromJournal }: { entry: JournalEnt
             onChange={(value) => setBristol(value ? CONSISTENCY_BRISTOL[value] : undefined)}
           />
           <PillPicker<TransitEase> label={t('journal.ease')} options={TRANSIT_EASES.map((value) => ({ value, label: t(`journal.ease.${value}`) }))} value={ease} onChange={setEase} />
-        </Animated.View>
-      ) : kind === 'feeling' ? (
-        <Animated.View key="feeling" entering={FadeInDown.duration(240)}>
-          <FeelingPicker value={feeling} onChange={setFeeling} />
         </Animated.View>
       ) : null}
 

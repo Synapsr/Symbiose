@@ -1,7 +1,6 @@
-import type { AdaptiveEnergy, BloodPressureReading, BloodPressureTrend, GoalPlan, WeightTrend } from '@symbiose/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { AdaptiveEnergy, BloodPressureTrend, GoalPlan, WeightTrend } from '@symbiose/shared';
 import { HeartPulse, Scale } from 'lucide-react-native';
-import { Alert, Platform, View } from 'react-native';
+import { View } from 'react-native';
 
 import { AdaptiveEnergyRow } from '@/components/insights/adaptive-energy-card';
 import { BpChart, categoryColor, DIASTOLIC, LatestReading, needsDoctor } from '@/components/insights/blood-pressure-card';
@@ -11,8 +10,6 @@ import { WeightChart } from '@/components/insights/weight-card';
 import { Dot, Row, Txt } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { formatNumber } from '@/lib/format';
-import { haptics } from '@/lib/haptics';
-import { useApi } from '@/lib/session';
 import { Space, useTheme } from '@/theme';
 
 /** Where a day sits in the period, for the mini charts. */
@@ -91,29 +88,6 @@ function WeightRow({ weight, plan, from, to }: { weight: WeightTrend; plan: Goal
 function BloodPressureRow({ trend, from, to, first }: { trend: BloodPressureTrend | null; from: string; to: string; first: boolean }) {
   const { t } = useI18n();
   const { colors } = useTheme();
-  const api = useApi();
-  const queryClient = useQueryClient();
-  const remove = useMutation({
-    mutationFn: (id: string) => api.deleteBloodPressure(id),
-    onSuccess: () => {
-      haptics.success();
-      void queryClient.invalidateQueries({ queryKey: ['insights'] });
-    },
-  });
-  // Readings typed in the app can be removed here for now, after a confirmation (as before).
-  const confirmDelete = (reading: BloodPressureReading) => {
-    haptics.impact();
-    const label = `${reading.systolic}/${reading.diastolic}`;
-    if (Platform.OS === 'web') {
-      if (globalThis.confirm?.(`${t('bp.delete')}\n${label}`)) remove.mutate(reading.id);
-      return;
-    }
-    Alert.alert(t('bp.delete'), label, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: () => remove.mutate(reading.id) },
-    ]);
-  };
-
   const points = trend?.points.filter((p) => p.date >= from) ?? [];
   const shown = trend?.average7 ?? (trend?.latest ? { systolic: trend.latest.systolic, diastolic: trend.latest.diastolic } : null);
   const category = trend?.category ?? null;
@@ -150,7 +124,7 @@ function BloodPressureRow({ trend, from, to, first }: { trend: BloodPressureTren
               </Row>
             </>
           ) : null}
-          {trend?.latest ? <LatestReading reading={trend.latest} onDelete={confirmDelete} /> : null}
+          {trend?.latest ? <LatestReading reading={trend.latest} /> : null}
         </View>
       ) : null}
     </ExpandRow>

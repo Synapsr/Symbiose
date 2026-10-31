@@ -1,4 +1,4 @@
-import { addDays, type Craving, type JournalEntry, type Meal, type Workout } from '@symbiose/shared';
+import { addDays, type Craving, type JournalEntry, type Meal, type MoodCheckIn, type Workout } from '@symbiose/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { Camera, ChevronRight, CloudOff, Flame } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -11,6 +11,7 @@ import { JournalRow } from '@/components/journal/journal-row';
 import { CravingRow, WorkoutRow } from '@/components/today/day-rows';
 import { EnergyCard, heroNutrient } from '@/components/today/energy-card';
 import { MealCard, PendingMealCard } from '@/components/today/meal-card';
+import { MoodEntry } from '@/components/today/mood-row';
 import { QueuedMealCard } from '@/components/today/queued-meal-card';
 import { StatusRow } from '@/components/today/status-row';
 import { CAPTURE_SIZE, ThumbZone } from '@/components/today/thumb-zone';
@@ -36,7 +37,8 @@ type DayRow =
   | TimelineRow<Meal, OutboxEntry>
   | { type: 'note'; at: number; note: JournalEntry }
   | { type: 'workout'; at: number; workout: Workout }
-  | { type: 'craving'; at: number; craving: Craving };
+  | { type: 'craving'; at: number; craving: Craving }
+  | { type: 'mood'; at: number; mood: MoodCheckIn };
 
 /**
  * Today: the status (coach line, hero, one row of modules), then the day's
@@ -106,12 +108,15 @@ export default function Today() {
   const meals = (data?.meals ?? []).filter((m) => !hidden[m.id]);
   const empty = Boolean(data && meals.length === 0 && pending.length === 0 && queued.length === 0);
   const offline = isNetworkError(day.error);
-  // Meals, captures waiting for the network, notes, sessions and cravings on one timeline, newest first.
+  // The mood shows once: in its pill when Humeur is on, otherwise here, in the day's story.
+  const moodRow = user.profile?.trackMood === true ? null : (data?.mood ?? null);
+  // Meals, captures waiting for the network, notes, sessions, cravings and the mood on one timeline, newest first.
   const rows: DayRow[] = [
     ...timeline(meals, queued),
     ...notes.filter((note) => !hidden[note.id]).map((note) => ({ type: 'note' as const, at: Date.parse(note.at), note })),
     ...(data?.workouts ?? []).filter((w) => !hidden[w.id]).map((workout) => ({ type: 'workout' as const, at: Date.parse(workout.startedAt), workout })),
     ...(data?.cravings.items ?? []).map((craving) => ({ type: 'craving' as const, at: Date.parse(craving.at), craving })),
+    ...(moodRow ? [{ type: 'mood' as const, at: Date.parse(moodRow.at), mood: moodRow }] : []),
   ].sort((a, b) => b.at - a.at);
   const streak = data?.streak ?? 0;
   const streakLabel = plural('today.streakLabel', streak);
@@ -225,6 +230,8 @@ export default function Today() {
                     <WorkoutRow key={row.workout.id} workout={row.workout} hideCalories={hideCalories} />
                   ) : row.type === 'craving' ? (
                     <CravingRow key={row.craving.id} craving={row.craving} />
+                  ) : row.type === 'mood' ? (
+                    <MoodEntry key={`mood-${row.mood.localDate}`} mood={row.mood} variant="row" />
                   ) : (
                     <QueuedMealCard
                       key={row.entry.id}
