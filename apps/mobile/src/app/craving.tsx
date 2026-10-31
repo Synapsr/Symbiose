@@ -10,7 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PillPicker } from '@/components/journal/pickers';
 import { Button, Card, Chip, Field, Row, Skeleton, Txt } from '@/components/ui';
 import { Celebration } from '@/components/ui/celebration';
+import { MicButton } from '@/components/ui/mic-button';
 import { useI18n, type TranslationKey } from '@/i18n';
+import { useDictation } from '@/lib/dictation';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
 import { endCravingActivity, startCravingActivity } from '@/lib/live-activity';
@@ -175,7 +177,7 @@ export default function CravingSheet() {
         </View>
         {typing ? (
           <Animated.View entering={FadeIn.duration(160)}>
-            <Field value={draft} onChangeText={setDraft} placeholder={t('craving.otherPlaceholder')} autoFocus maxLength={80} returnKeyType="done" onSubmitEditing={submitDraft} onBlur={submitDraft} />
+            <OtherField value={draft} onChange={setDraft} onSubmit={submitDraft} />
           </Animated.View>
         ) : null}
       </View>
@@ -236,5 +238,25 @@ export default function CravingSheet() {
         }}
       />
     </ScrollView>
+  );
+}
+
+/** « Autre » in its own words, typed or dictated; closing it ends the dictation. */
+function OtherField({ value, onChange, onSubmit }: { value: string; onChange: (text: string) => void; onSubmit: () => void }) {
+  const { t } = useI18n();
+  const dictation = useDictation(value, onChange);
+  return (
+    <Field
+      value={value}
+      onChangeText={onChange}
+      placeholder={dictation.listening ? t('dictation.listening') : t('craving.otherPlaceholder')}
+      autoFocus
+      maxLength={80}
+      returnKeyType="done"
+      onSubmitEditing={onSubmit}
+      onBlur={onSubmit}
+      accessory={<MicButton dictation={dictation} />}
+      highlighted={dictation.listening}
+    />
   );
 }

@@ -178,7 +178,7 @@ export const en: Record<TranslationKey, string> = {
 
   'detail.items': 'Foods',
   'detail.fix': 'Fix with AI',
-  'detail.fixPlaceholder': 'E.g. no sugar in the coffee, half the fries',
+  'detail.fixPlaceholder': 'Fix: no sugar in the coffee…',
   'detail.fixing': 'Fixing…',
   'detail.favorite': 'Favorite',
   'detail.relog': 'Eat again',
@@ -654,4 +654,10 @@ export const en: Record<TranslationKey, string> = {
   'coach.settings': 'Coach settings',
   'coach.clearConfirm': 'The whole conversation will be erased, morning check-ins included.',
   'coach.clearAction': 'Erase',
+  'dictation.start': 'Dictate',
+  'dictation.stop': 'Stop dictation',
+  'dictation.listening': 'Listening…',
+  'dictation.denied': 'Allow the microphone to dictate',
+  'dictation.settings': 'Settings',
+  'dictation.unavailable': 'Dictation isn’t available right now',
 };

@@ -309,6 +309,7 @@ const fr = {
           'Dépense énergétique réelle, mesurée à partir de la tendance du poids',
           'Modules optionnels : sommeil, hydratation, humeur',
           'Carnet de santé : humeur, symptômes, digestion, lus par ton coach',
+          'Dictée vocale partout où tu écris',
         ],
       },
       {
@@ -679,6 +680,7 @@ const en: Dict = {
           'Real energy expenditure, measured from your weight trend',
           'Optional modules: sleep, hydration, mood',
           'Health journal: mood, symptoms, digestion, read by your coach',
+          'Voice dictation wherever you type',
         ],
       },
       {

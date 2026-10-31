@@ -11,9 +11,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PortionStepper } from '@/components/meal/portion-stepper';
 import { Button, IconButton, Pressy, Row, Txt, webInput } from '@/components/ui';
+import { MicButton } from '@/components/ui/mic-button';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
+import { useDictation } from '@/lib/dictation';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage, useMealLogger } from '@/lib/hooks';
@@ -50,6 +52,7 @@ export default function Capture() {
   const [torch, setTorch] = useState(false);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
+  const noteDictation = useDictation(note, setNote);
   const [busy, setBusy] = useState(false);
   const leftHanded = useSettings((s) => s.leftHanded);
   // A quick white flash confirms the shot, like a real shutter.
@@ -228,14 +231,17 @@ export default function Capture() {
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom + Space.lg, gap: Space.xl, alignItems: 'center' }}>
           {mode === 'photo' && noteOpen ? (
             <Animated.View entering={FadeIn} style={{ width: '100%', paddingHorizontal: Space.lg }}>
-              <TextInput
-                value={note}
-                onChangeText={setNote}
-                placeholder={t('capture.note')}
-                placeholderTextColor={DIM}
-                autoFocus
-                style={[{ height: 48, borderRadius: Radius.pill, backgroundColor: 'rgba(0,0,0,0.55)', color: WHITE, paddingHorizontal: Space.xl, fontSize: 16 }, webInput]}
-              />
+              <Row gap={0} style={{ height: 48, borderRadius: Radius.pill, backgroundColor: 'rgba(0,0,0,0.55)', paddingRight: 4 }}>
+                <TextInput
+                  value={note}
+                  onChangeText={setNote}
+                  placeholder={noteDictation.listening ? t('dictation.listening') : t('capture.note')}
+                  placeholderTextColor={DIM}
+                  autoFocus
+                  style={[{ flex: 1, height: 48, color: WHITE, paddingHorizontal: Space.xl, fontSize: 16 }, webInput]}
+                />
+                <MicButton dictation={noteDictation} tint={DIM} />
+              </Row>
             </Animated.View>
           ) : null}
 
@@ -299,6 +305,7 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
   const { log, relog } = useMealLogger();
   const showToast = useToast((s) => s.show);
   const [text, setText] = useState('');
+  const dictation = useDictation(text, setText);
   const library = useQuery({ queryKey: ['library', date], queryFn: () => api.library(toLocalDate()) });
 
   const send = () => {
@@ -328,13 +335,14 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
           <TextInput
             value={text}
             onChangeText={setText}
-            placeholder={t('capture.textPlaceholder')}
+            placeholder={dictation.listening ? t('dictation.listening') : t('capture.textPlaceholder')}
             placeholderTextColor="rgba(255,255,255,0.35)"
             multiline
             autoFocus
             style={[{ minHeight: 110, color: WHITE, fontSize: 20, lineHeight: 27, textAlignVertical: 'top' }, webInput]}
           />
           <Row style={{ justifyContent: 'flex-end' }}>
+            <MicButton dictation={dictation} size={42} tint={DIM} style={{ marginLeft: -6, marginRight: 'auto' }} />
             <Pressy
               onPress={send}
               disabled={!text.trim()}

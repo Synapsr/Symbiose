@@ -23,7 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { headline } from '@/components/journal/meta';
 import { KindChips, PillPicker } from '@/components/journal/pickers';
 import { Button, Chip, IconButton, Row, Txt, webInput } from '@/components/ui';
+import { MicButton } from '@/components/ui/mic-button';
 import { useI18n, type TranslationKey } from '@/i18n';
+import { useDictation } from '@/lib/dictation';
 import { formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
@@ -105,6 +107,7 @@ function NoteForm({ entry, date, initialKind, fromJournal }: { entry: JournalEnt
   const [now] = useState(() => new Date());
   const [kind, setKind] = useState<JournalKind>(entry?.kind ?? initialKind);
   const [text, setText] = useState(entry?.text ?? '');
+  const dictation = useDictation(text, setText);
   const [bristol, setBristol] = useState(entry?.data.bristol);
   const [ease, setEase] = useState(entry?.data.ease);
   // An older « Ressenti » note keeps its face as it was: moods are logged with the faces in « + » now.
@@ -191,35 +194,40 @@ function NoteForm({ entry, date, initialKind, fromJournal }: { entry: JournalEnt
         </Animated.View>
       ) : null}
 
-      <TextInput
-        ref={input}
-        value={text}
-        onChangeText={setText}
-        placeholder={t(`journal.placeholder.${kind}`)}
-        placeholderTextColor={colors.text3}
-        multiline
-        maxLength={2000}
-        autoFocus={!entry && initialKind === 'other'}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={[
-          {
-            minHeight: 128,
-            borderRadius: Radius.lg,
-            borderCurve: 'continuous',
-            backgroundColor: colors.surface,
-            borderWidth: 1.5,
-            borderColor: focused ? colors.text : colors.border,
-            padding: Space.lg,
-            paddingTop: Space.lg,
-            fontSize: 18,
-            lineHeight: 25,
-            color: colors.text,
-            textAlignVertical: 'top',
-          },
-          webInput,
-        ]}
-      />
+      <View>
+        <TextInput
+          ref={input}
+          value={text}
+          onChangeText={setText}
+          placeholder={dictation.listening ? t('dictation.listening') : t(`journal.placeholder.${kind}`)}
+          placeholderTextColor={colors.text3}
+          multiline
+          maxLength={2000}
+          autoFocus={!entry && initialKind === 'other'}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={[
+            {
+              minHeight: 128,
+              borderRadius: Radius.lg,
+              borderCurve: 'continuous',
+              backgroundColor: colors.surface,
+              borderWidth: 1.5,
+              borderColor: dictation.listening ? colors.accent : focused ? colors.text : colors.border,
+              padding: Space.lg,
+              paddingTop: Space.lg,
+              // The mic sits in the bottom corner: the text stays above it.
+              paddingBottom: dictation.available ? 56 : Space.lg,
+              fontSize: 18,
+              lineHeight: 25,
+              color: colors.text,
+              textAlignVertical: 'top',
+            },
+            webInput,
+          ]}
+        />
+        <MicButton dictation={dictation} style={{ position: 'absolute', right: 8, bottom: 8 }} />
+      </View>
 
       <View style={{ gap: Space.sm }}>
         <Row style={{ justifyContent: 'space-between', marginLeft: 4 }}>
