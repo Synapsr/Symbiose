@@ -146,7 +146,7 @@ export function buildMorningInput(db: Db, userId: string, date: string, hideCalo
       date: yesterday,
       meals: day.meals.length,
       hero: day.meals.length && progress ? { nutrient: hero, consumed: Math.round(progress.consumed), target: Math.round(progress.target.value), kind: progress.target.kind } : null,
-      cravings: { total: day.cravings.total, resisted: day.cravings.resisted, what: [...new Set(day.cravings.items.map((c) => c.what))].slice(0, 3) },
+      cravings: { total: day.cravings.total, resisted: day.cravings.resisted, what: [...new Set(day.cravings.items.flatMap((c) => (c.what ? [c.what] : [])))].slice(0, 3) },
     },
     cravingWindow: window ? { start: window.start, end: window.end } : null,
   };
@@ -169,7 +169,7 @@ export function nudgesInput(db: Db, userId: string, date: string, window: Cravin
     .where(and(eq(cravings.userId, userId), gte(cravings.localDate, addDays(date, -(CRAVING_WINDOW_DAYS - 1)))))
     .all();
   const counts = new Map<string, number>();
-  for (const { what } of rows) counts.set(what.toLowerCase(), (counts.get(what.toLowerCase()) ?? 0) + 1);
+  for (const { what } of rows) if (what) counts.set(what.toLowerCase(), (counts.get(what.toLowerCase()) ?? 0) + 1);
   return {
     ...resolved.context,
     cravingWindow: { start: window.start, end: window.end, source: window.source },

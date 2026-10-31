@@ -11,7 +11,8 @@ import type {
   CreateMealInput,
   Craving,
   CravingInput,
-  CravingOutcome,
+  CravingPatch,
+  CravingTipRequest,
   DayActivity,
   DaySummary,
   FoodItem,
@@ -105,13 +106,14 @@ async function request<T>(baseUrl: string, token: string | null, method: string,
  * POSTs and reads Server-Sent Events: `delta` events go to `onDelta` as the
  * text is written, `done` resolves with its payload, `error` throws.
  */
-async function postStream<T>(url: string, token: string, body: unknown, onDelta: (text: string) => void): Promise<T> {
+async function postStream<T>(url: string, token: string, body: unknown, onDelta: (text: string) => void, signal?: AbortSignal): Promise<T> {
   let res;
   try {
     res = await streamingFetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
+      signal,
     });
   } catch (error) {
     throw new ApiError(0, 'network', error instanceof Error ? error.message : 'Network error');
@@ -215,10 +217,17 @@ export function createApi(baseUrl: string, token: string) {
     saveMood: (input: MoodInput) => call<MoodCheckIn>('PUT', '/api/mood', input),
     deleteMood: (date: string) => call<void>('DELETE', `/api/mood/${date}`),
 
-    createCraving: (input: CravingInput) => call<{ craving: Craving; alternative: string }>('POST', '/api/cravings', input, 60_000),
-    updateCraving: (id: string, outcome: CravingOutcome) => call<Craving>('PATCH', `/api/cravings/${id}`, { outcome }),
+    /** The day's check-ins between two days, newest first, for « Historique ». */
+    moodCheckIns: (from: string, to: string) => call<MoodCheckIn[]>('GET', `/api/mood/check-ins?from=${from}&to=${to}`),
 
-    /** Health journal (« Carnet »): newest first, optionally between two days and of one kind. */
+    /** Saved at once (`tip: 'stream'`): the tip comes from `streamCravingTip`. */
+    createCraving: (input: CravingInput) => call<{ craving: Craving; alternative: string | null }>('POST', '/api/cravings', input),
+    updateCraving: (id: string, patch: CravingPatch) => call<Craving>('PATCH', `/api/cravings/${id}`, patch),
+    /** The tip, a line break, the alternative, as they are written; `done` has the craving with its tip saved. */
+    streamCravingTip: (id: string, request: CravingTipRequest, onDelta: (text: string) => void, signal?: AbortSignal) =>
+      postStream<{ craving: Craving; alternative: string }>(`${baseUrl}/api/cravings/${id}/tip/stream`, token, request, onDelta, signal),
+
+    /** Health journal (the notes of « Historique »): newest first, optionally between two days and of one kind. */
     journal: (range: { from?: string; to?: string; kind?: JournalKind } = {}) => {
       const query = new URLSearchParams(Object.entries(range).filter((entry): entry is [string, string] => Boolean(entry[1]))).toString();
       return call<JournalEntry[]>('GET', `/api/journal${query ? `?${query}` : ''}`);

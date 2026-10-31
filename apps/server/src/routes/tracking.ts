@@ -4,7 +4,8 @@ import {
   ActivityInputSchema,
   addDays,
   CravingInputSchema,
-  CravingOutcomeSchema,
+  CravingPatchSchema,
+  CravingTipRequestSchema,
   LocalDateSchema,
   localTime,
   toLocalDate,
@@ -21,9 +22,11 @@ import {
 } from '@symbiose/shared';
 import { and, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 
 import { requireAuth, type AuthEnv } from '../auth';
+import type { CravingOutput } from '../ai/types';
 import { activity, cravings } from '../db/schema';
 import { HttpError, notFound } from '../errors';
 import { nowIso, validate, type Deps } from '../http';
@@ -109,25 +112,52 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
     return c.json<WeightTrend>(weightTrend(db, c.get('userId'), to, days));
   });
 
-  app.post('/cravings', validate('json', CravingInputSchema), async (c) => {
-    const input = c.req.valid('json');
-    const userId = c.get('userId');
-    const resolved = resolveUser(db, userId, input.localDate);
-    let advice = FALLBACK_TIPS[resolved.context.locale][Math.floor(Math.random() * 2)]!;
-    if (ai.enabled) {
-      try {
-        advice = await ai.cravingTip({
+  /** Advice for a craving: the AI's, streamed through `onText` when asked, else a kind fallback. */
+  async function cravingAdvice(
+    userId: string,
+    craving: { at: string; localDate: string; what: string; intensity: number | null },
+    onText?: (delta: string) => void,
+    signal?: AbortSignal,
+  ): Promise<CravingOutput> {
+    const resolved = resolveUser(db, userId, craving.localDate);
+    const fallback = FALLBACK_TIPS[resolved.context.locale][Math.floor(Math.random() * 2)]!;
+    if (!ai.enabled) return fallback;
+    try {
+      return await ai.cravingTip(
+        {
           ...resolved.context,
-          what: input.what,
-          intensity: input.intensity,
-          localTime: localTime(input.at),
-          activityToday: activityToday(db, userId, input.localDate),
-          life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, input.localDate),
-        });
-      } catch (error) {
-        console.warn('craving tip failed, using fallback', error);
-      }
+          what: craving.what,
+          intensity: craving.intensity,
+          localTime: localTime(craving.at),
+          activityToday: activityToday(db, userId, craving.localDate),
+          life: lifeBrief(db, userId, resolved.row.profile ?? null, resolved.row.plan ?? null, craving.localDate),
+        },
+        onText,
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      console.warn('craving tip failed, using fallback', error);
+      return fallback;
     }
+  }
+
+  const findCraving = (userId: string, id: string) =>
+    db
+      .select()
+      .from(cravings)
+      .where(and(eq(cravings.id, id), eq(cravings.userId, userId)))
+      .get();
+
+  /**
+   * Saved the moment « J'ai une envie » is tapped. With `tip: 'stream'` it
+   * answers at once and the advice comes from /cravings/:id/tip/stream; older
+   * apps (`tip: 'inline'`, the default) wait for it here.
+   */
+  app.post('/cravings', validate('json', CravingInputSchema), async (c) => {
+    const { tip: mode, ...input } = c.req.valid('json');
+    const userId = c.get('userId');
+    const advice = mode === 'inline' ? await cravingAdvice(userId, input) : null;
     const row = db
       .insert(cravings)
       .values({
@@ -138,23 +168,60 @@ export function trackingRoutes({ db, ai, photos, config, fetch: fetchImpl }: Dep
         what: input.what,
         intensity: input.intensity,
         outcome: 'pending',
-        tip: advice.tip,
+        tip: advice?.tip ?? null,
         createdAt: nowIso(),
       })
       .returning()
       .get();
-    return c.json<{ craving: Craving; alternative: string }>({ craving: toCraving(row), alternative: advice.alternative }, 201);
+    return c.json<{ craving: Craving; alternative: string | null }>({ craving: toCraving(row), alternative: advice?.alternative ?? null }, 201);
   });
 
-  app.patch('/cravings/:id', validate('json', z.object({ outcome: CravingOutcomeSchema })), (c) => {
+  /** What the sheet learns after saving: the chip, the intensity, then the outcome. */
+  app.patch('/cravings/:id', validate('json', CravingPatchSchema), (c) => {
+    const patch = Object.fromEntries(Object.entries(c.req.valid('json')).filter(([, value]) => value !== undefined));
     const row = db
       .update(cravings)
-      .set({ outcome: c.req.valid('json').outcome })
+      .set(patch)
       .where(and(eq(cravings.id, c.req.param('id')), eq(cravings.userId, c.get('userId'))))
       .returning()
       .get();
     if (!row) throw notFound('Craving');
     return c.json<Craving>(toCraving(row));
+  });
+
+  /**
+   * The advice for a saved craving, as Server-Sent Events: `delta` while it is
+   * written (the tip, a line break, the alternative), then `done` with the
+   * craving (its tip saved) and the alternative. `what` and `intensity` may
+   * name a chip just tapped. A request the app drops (another chip, the sheet
+   * closed) stops the AI and saves nothing.
+   */
+  app.post('/cravings/:id/tip/stream', validate('json', CravingTipRequestSchema), (c) => {
+    const userId = c.get('userId');
+    const row = findCraving(userId, c.req.param('id'));
+    if (!row) throw notFound('Craving');
+    const { what, intensity } = c.req.valid('json');
+    c.header('X-Accel-Buffering', 'no');
+    return streamSSE(c, async (stream) => {
+      const dropped = new AbortController();
+      stream.onAbort(() => dropped.abort());
+      try {
+        const advice = await cravingAdvice(
+          userId,
+          { at: row.at, localDate: row.localDate, what: what ?? row.what, intensity: intensity === undefined ? row.intensity : intensity },
+          (delta) => void stream.writeSSE({ event: 'delta', data: JSON.stringify({ text: delta }) }),
+          dropped.signal,
+        );
+        if (stream.aborted) return;
+        const saved = db.update(cravings).set({ tip: advice.tip }).where(eq(cravings.id, row.id)).returning().get();
+        await stream.writeSSE({ event: 'done', data: JSON.stringify({ craving: toCraving(saved), alternative: advice.alternative }) });
+      } catch (error) {
+        if (stream.aborted) return;
+        const known = error instanceof HttpError ? error : null;
+        if (!known) console.error(error);
+        await stream.writeSSE({ event: 'error', data: JSON.stringify({ code: known?.code ?? 'internal', message: known?.message ?? 'Something went wrong' }) });
+      }
+    });
   });
 
   const rangeQuery = z.object({

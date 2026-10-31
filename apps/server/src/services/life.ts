@@ -3,10 +3,10 @@ import { addDays, localTime, SHORT_NIGHT_MIN, type GoalPlan, type Profile } from
 import type { LifeBrief } from '../ai/types';
 import type { Db } from '../db';
 import { dayHydration, hydrationTrend } from './hydration';
-import { moodTrend } from './mood';
+import { visibleMoodTrend } from './mood';
 import { sleepTrend } from './sleep';
 
-/** What the AI is told about sleep, hydration and mood on a given day: only the modules the person turned on. */
+/** What the AI is told about sleep, hydration and mood on a given day: the modules the person turned on, and mood once logged. */
 export function lifeBrief(db: Db, userId: string, profile: Profile | null, plan: GoalPlan | null, date: string): LifeBrief {
   const brief: LifeBrief = {};
   if (!profile) return brief;
@@ -29,17 +29,18 @@ export function lifeBrief(db: Db, userId: string, profile: Profile | null, plan:
     brief.hydration = { todayMl: today.totalMl, goalMl: today.goalMl, average7Ml: before.averageMl, daysReached7: before.daysReached };
   }
 
-  if (profile.trackMood) {
-    // 30 days for the « les jours où » link; the AI sees the last week day by day.
-    const trend = moodTrend(db, userId, profile, plan, date, 30);
-    const last7 = trend.days.filter((d) => d.date >= addDays(date, -6));
-    const today = trend.latest?.localDate === date ? trend.latest : null;
+  // A mood logged counts whatever the switch, which only adds the pill on Today.
+  // 30 days for the « les jours où » link; the AI sees the last week day by day, with the words.
+  const mood = visibleMoodTrend(db, userId, profile, plan, date, 30);
+  if (mood) {
+    const last7 = mood.days.filter((d) => d.date >= addDays(date, -6));
+    const today = mood.latest?.localDate === date ? mood.latest : null;
     brief.mood = {
       today: today ? { mood: today.mood, note: today.note, time: localTime(today.at) } : null,
       last7,
       average7: last7.length ? Math.round((last7.reduce((sum, d) => sum + d.mood, 0) / last7.length) * 10) / 10 : null,
-      persistentLow: trend.persistentLow,
-      link: trend.link,
+      persistentLow: mood.persistentLow,
+      link: mood.link,
     };
   }
 

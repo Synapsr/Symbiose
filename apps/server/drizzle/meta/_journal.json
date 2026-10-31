@@ -57,6 +57,13 @@
       "when": 1793399669701,
       "tag": "0007_proactive_coach",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793404384608,
+      "tag": "0008_craving_optional_intensity",
+      "breakpoints": true
     }
   ]
 }

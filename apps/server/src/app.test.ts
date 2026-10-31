@@ -1188,15 +1188,21 @@ describe('life modules', () => {
 
   it('keeps the modules out of the day, insights and the AI while they are off', async () => {
     expect((await request<WaterEntry>('POST', '/api/hydration', { at: at(today, '08:00'), localDate: today, ml: 250 })).status).toBe(201);
-    expect((await request('PUT', '/api/mood', { at: at(today, '09:00'), localDate: today, mood: 2 })).status).toBe(200);
 
     const summary = await day();
     expect([summary.sleep, summary.hydration, summary.mood]).toEqual([null, null, null]);
     const stats = await insights();
     expect([stats.sleep, stats.hydration, stats.mood]).toEqual([null, null, null]);
     expect((await askCoach()).life).toEqual({});
+  });
+
+  it('counts a mood logged from « + » whatever the Humeur switch, which only adds the pill on Today', async () => {
+    expect((await request('PUT', '/api/mood', { at: at(today, '09:00'), localDate: today, mood: 2 })).status).toBe(200);
+    expect((await day()).mood).toMatchObject({ mood: 2, at: at(today, '09:00') });
+    expect((await insights()).mood).toMatchObject({ days: [{ date: today, mood: 2 }], average: 2 });
+    expect(Object.keys((await askCoach()).life)).toEqual(['mood']);
     await request('POST', '/api/cravings', { at: at(today, '16:00'), localDate: today, what: 'chocolat', intensity: 2 });
-    expect(seen.craving.at(-1)?.life).toEqual({});
+    expect(seen.craving.at(-1)?.life).toEqual({ mood: expect.objectContaining({ today: { mood: 2, note: null, time: '09:00' } }) });
   });
 
   it('sets a drinks goal from the profile and the workouts, logs glasses and imports drinks once', async () => {
@@ -1404,6 +1410,7 @@ describe('health journal', () => {
     const detailed = await note(1, '07:45', { kind: 'transit', text: '  Un peu long  ', data: { bristol: 2, ease: 'difficult', feeling: 2 } });
     expect(detailed.body).toMatchObject({ text: 'Un peu long', data: { bristol: 2, ease: 'difficult' } });
     expect(detailed.body.data).not.toHaveProperty('feeling');
+    // Older apps still write « Ressenti » notes: they are kept, and read as the day's mood.
     expect((await note(0, '15:00', { kind: 'feeling', data: { feeling: 4 } })).status).toBe(201);
     expect((await note(2, '21:00', { text: 'Dîner tard, ventre gonflé' })).body.kind).toBe('other');
     // Words, or a face for a feeling: an empty note isn't one.
@@ -1443,10 +1450,11 @@ describe('health journal', () => {
     await note(3, '22:00', { kind: 'medication', text: 'x'.repeat(1000) });
     await request('POST', '/api/coach/messages', { text: 'Mon ventre ?', localDate: today });
     const journal = seen.coach.at(-1)!.journal!;
-    expect(journal.entries.map((e) => e.kind)).toEqual(['medication', 'other', 'transit', 'transit', 'feeling']);
+    // Today's « Ressenti » face is the day's mood: the coach reads it there, once.
+    expect(journal.entries.map((e) => e.kind)).toEqual(['medication', 'other', 'transit', 'transit']);
+    expect(seen.coach.at(-1)!.life.mood).toMatchObject({ today: { mood: 4, note: null, time: '15:00' }, last7: [{ date: today, mood: 4 }] });
     expect(journal.entries[1]).toEqual({ date: addDays(today, -2), time: '21:00', kind: 'other', text: 'Dîner tard, ventre gonflé' });
     expect(journal.entries[2]).toEqual({ date: addDays(today, -1), time: '07:45', kind: 'transit', consistency: 'hard', bristol: 2, ease: 'difficult', text: 'Un peu long' });
-    expect(journal.entries.at(-1)).toEqual({ date: today, time: '15:00', kind: 'feeling', feeling: 4 });
     expect(journal.entries[0]!.text).toHaveLength(280);
     // Counted over the whole window: transits were tracked before it started.
     expect(journal.transit).toMatchObject({ days: 14, total: 2, perDay: 0.1, daysSinceLast: 0, longestGap: 12, difficult: 1, painful: 0 });
@@ -1458,7 +1466,7 @@ describe('health journal', () => {
     const capped = seen.coach.at(-1)!.journal!;
     expect(capped.omitted).toBeGreaterThan(0);
     expect(JSON.stringify(capped.entries).length).toBeLessThanOrEqual(6100);
-    expect(capped.entries.at(-1)).toMatchObject({ kind: 'feeling', date: today });
+    expect(capped.entries.at(-1)).toMatchObject({ kind: 'transit', date: today });
 
     // No notes, no journal.
     await request('POST', '/api/coach/messages', { text: 'Salut', localDate: today }, stranger);
@@ -1483,5 +1491,209 @@ describe('health journal', () => {
     const userId = (await request<User>('GET', '/api/me')).body.id;
     expect((await request('DELETE', '/api/me')).status).toBe(204);
     expect(app.db.select().from(journalEntries).where(eq(journalEntries.userId, userId)).all()).toEqual([]);
+  });
+});
+
+describe('one mood: check-ins and the older « Ressenti » notes', () => {
+  const seen = { coach: [] as CoachInput[], review: [] as ReviewInput[] };
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async coach(input) {
+        seen.coach.push(input);
+        return { reply: 'ok', planChange: null, mealActions: [] };
+      },
+      async review(input) {
+        seen.review.push(input);
+        return fakeAi.review(input);
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const ago = (days: number) => addDays(today, -days);
+  const feeling = (daysAgo: number, time: string, face: number | undefined, text = '') =>
+    request<JournalEntry>('POST', '/api/journal', { at: at(ago(daysAgo), time), localDate: ago(daysAgo), kind: 'feeling', text, data: face === undefined ? {} : { feeling: face } });
+  const checkIn = (daysAgo: number, mood: number, note: string | null = null) => request<MoodCheckIn>('PUT', '/api/mood', { at: at(ago(daysAgo), '20:00'), localDate: ago(daysAgo), mood, note });
+  let shadowed = '';
+
+  beforeAll(async () => {
+    owner = await register('humeur@example.com');
+    stranger = await register('other-humeur@example.com');
+    // The Humeur switch stays off: these moods were noted in the journal, the way « Ressenti » used to work.
+    for (const token of [owner, stranger]) expect((await request('PUT', '/api/me/profile', profile, token)).status).toBe(200);
+    // Low on craving days, good on the others: enough for « Les jours où ».
+    for (const d of [1, 2, 3, 4, 5, 6]) {
+      await feeling(d, '08:00', 5, 'Matin');
+      await feeling(d, '21:00', d % 2 ? 2 : 4, d === 1 ? 'Journée lourde' : '');
+      if (d % 2) await request('POST', '/api/cravings', { at: at(ago(d), '16:00'), localDate: ago(d), what: 'sucre', intensity: 2 });
+    }
+    // A day with both: the check-in wins, the note stays a note.
+    shadowed = (await feeling(0, '07:30', 1, 'Réveil difficile')).body.id;
+    await checkIn(0, 4, 'Bonne journée');
+    // Words without a face carry no mood.
+    await feeling(2, '12:00', undefined, 'Un peu à plat');
+    await request('POST', '/api/meals', { eatenAt: at(today, '12:00'), localDate: today, text: 'croissant' });
+  });
+
+  it('reads a mood a day: the check-in, else the latest face noted, with its words', async () => {
+    const trend = (await request<{ days: { date: string; mood: number; note?: string }[]; link: unknown }>('GET', '/api/mood?days=7')).body;
+    expect(trend.days).toEqual([
+      { date: ago(6), mood: 4 },
+      { date: ago(5), mood: 2 },
+      { date: ago(4), mood: 4 },
+      { date: ago(3), mood: 2 },
+      { date: ago(2), mood: 4 },
+      { date: ago(1), mood: 2, note: 'Journée lourde' },
+      { date: today, mood: 4, note: 'Bonne journée' },
+    ]);
+    expect(trend.link).toMatchObject({ factor: 'craving', withAvg: 2, withoutAvg: 4 });
+    // Today and « + » change the check-in itself: an older note is never edited from there.
+    expect((await request<DaySummary>('GET', `/api/days/${ago(1)}`)).body.mood).toBeNull();
+    expect((await request<DaySummary>('GET', `/api/days/${today}`)).body.mood).toMatchObject({ mood: 4, note: 'Bonne journée' });
+    // « Historique » lists the check-ins next to the notes, newest first.
+    const listed = await request<MoodCheckIn[]>('GET', `/api/mood/check-ins?from=${ago(6)}&to=${today}`);
+    expect(listed.body.map((c) => [c.localDate, c.mood])).toEqual([[today, 4]]);
+    expect((await request('GET', `/api/mood/check-ins?from=${today}&to=${ago(1)}`)).status).toBe(400);
+    expect((await request<MoodCheckIn[]>('GET', `/api/mood/check-ins?from=${ago(6)}&to=${today}`, undefined, stranger)).body).toEqual([]);
+  });
+
+  it('shows it in Progrès with « Les jours où », switch or not', async () => {
+    const insights = (await request<InsightsResponse>('GET', '/api/insights?days=7')).body;
+    expect(insights.mood).toMatchObject({ average: 3.1, link: { factor: 'craving' } });
+    expect(insights.mood?.days).toHaveLength(7);
+    expect((await request<InsightsResponse>('GET', '/api/insights?days=7', undefined, stranger)).body.mood).toBeNull();
+  });
+
+  it('tells the coach each mood once, in `life.mood` with its words, never again as a note', async () => {
+    await request('POST', '/api/coach/messages', { text: 'Comment je vais ?', localDate: today });
+    const input = seen.coach.at(-1)!;
+    expect(input.life.mood).toMatchObject({ today: { mood: 4, note: 'Bonne journée', time: '20:00' }, average7: 3.1, link: { factor: 'craving' } });
+    expect(input.life.mood?.last7.find((d) => d.date === ago(1))).toEqual({ date: ago(1), mood: 2, note: 'Journée lourde' });
+    // Left in the journal: the faces that weren't the day's mood, and words without a face.
+    const notes = input.journal!.entries;
+    expect(notes.filter((e) => e.kind === 'feeling')).toHaveLength(8);
+    expect(notes.find((e) => e.date === today)).toEqual({ date: today, time: '07:30', kind: 'feeling', feeling: 1, text: 'Réveil difficile' });
+    expect(notes.find((e) => e.date === ago(2) && e.time === '12:00')).toEqual({ date: ago(2), time: '12:00', kind: 'feeling', text: 'Un peu à plat' });
+    expect(notes.some((e) => e.time === '21:00')).toBe(false);
+  });
+
+  it('gives the review the same moods once: in the days, with their words, not in the journal', async () => {
+    await request('POST', '/api/insights/review', { days: 7 });
+    const input = seen.review.at(-1)!;
+    expect(input.insights.mood?.days.find((d) => d.date === ago(1))).toEqual({ date: ago(1), mood: 2, note: 'Journée lourde' });
+    expect(input.journal!.entries.some((e) => e.kind === 'feeling' && e.time === '21:00')).toBe(false);
+    expect(input.journal!.entries.filter((e) => e.kind === 'feeling')).toHaveLength(8);
+  });
+
+  it('keeps every older note: nothing is moved or lost', async () => {
+    const notes = await request<JournalEntry[]>('GET', '/api/journal?kind=feeling');
+    expect(notes.body).toHaveLength(14);
+    expect(notes.body.find((e) => e.id === shadowed)).toMatchObject({ data: { feeling: 1 }, text: 'Réveil difficile' });
+  });
+});
+
+describe('instant cravings', () => {
+  const seen: CravingInput[] = [];
+  let failNext = false;
+  const app = makeApp(
+    {
+      ...fakeAi,
+      async cravingTip(input, onText) {
+        seen.push(input);
+        if (failNext) {
+          failNext = false;
+          onText?.('Bois ');
+          throw new Error('overloaded');
+        }
+        const alternative = input.what ? `Moins de ${input.what}` : 'Un fruit';
+        for (const part of ['Bois un verre ', "d'eau.", '\n', alternative]) onText?.(part);
+        return { tip: "Bois un verre d'eau.", alternative };
+      },
+    },
+    { allowSignup: true },
+  );
+  const today = toLocalDate();
+  const now = toLocalDateTime();
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const stream = async (id: string, body: unknown = {}, token = owner) => {
+    const res = await app.request(`/api/cravings/${id}/tip/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    if (!res.headers.get('content-type')?.includes('text/event-stream')) return { status: res.status, deltas: '', done: undefined, error: null };
+    const events = (await res.text())
+      .split('\n\n')
+      .filter(Boolean)
+      .map((block) => ({ event: /^event: (.*)$/m.exec(block)?.[1], data: JSON.parse(/^data: (.*)$/m.exec(block)?.[1] ?? 'null') as Record<string, any> }));
+    return {
+      status: res.status,
+      deltas: events
+        .filter((e) => e.event === 'delta')
+        .map((e) => e.data.text)
+        .join(''),
+      done: events.find((e) => e.event === 'done')?.data as { craving: { id: string; tip: string; what: string }; alternative: string } | undefined,
+      error: events.find((e) => e.event === 'error')?.data ?? null,
+    };
+  };
+
+  beforeAll(async () => {
+    owner = await register('envie@example.com');
+    stranger = await register('other-envie@example.com');
+    for (const token of [owner, stranger]) expect((await request('PUT', '/api/me/profile', profile, token)).status).toBe(200);
+  });
+
+  it('saves the craving at once, with nothing said yet and no AI call', async () => {
+    const created = await request<{ craving: { id: string }; alternative: string | null }>('POST', '/api/cravings', { at: now, localDate: today, tip: 'stream' });
+    expect(created.status).toBe(201);
+    expect(created.body).toEqual({ craving: expect.objectContaining({ what: '', intensity: null, tip: null, outcome: 'pending' }), alternative: null });
+    expect(seen).toHaveLength(0);
+    const day = await request<DaySummary>('GET', `/api/days/${today}`);
+    expect(day.body.cravings).toMatchObject({ total: 1, resisted: 0, items: [{ what: '', intensity: null }] });
+  });
+
+  it('streams the advice for the chip just tapped, saves the tip, then settles in one tap', async () => {
+    const { body } = await request<{ craving: { id: string } }>('POST', '/api/cravings', { at: now, localDate: today, tip: 'stream' });
+    const id = body.craving.id;
+    const tip = await stream(id, { what: 'Chocolat' });
+    expect(tip.status).toBe(200);
+    expect(tip.deltas).toBe("Bois un verre d'eau.\nMoins de Chocolat");
+    expect(tip.done).toEqual({ craving: expect.objectContaining({ id, tip: "Bois un verre d'eau.", what: '' }), alternative: 'Moins de Chocolat' });
+    expect(seen.at(-1)).toMatchObject({ what: 'Chocolat', intensity: null });
+
+    // The chip, the optional intensity and the outcome are saved as they come.
+    expect((await request('PATCH', `/api/cravings/${id}`, {})).status).toBe(400);
+    expect((await request('PATCH', `/api/cravings/${id}`, { intensity: 4 })).status).toBe(400);
+    expect((await request('PATCH', `/api/cravings/${id}`, { what: 'Chocolat', intensity: 3 })).body).toMatchObject({ what: 'Chocolat', intensity: 3, outcome: 'pending' });
+    expect((await request('PATCH', `/api/cravings/${id}`, { outcome: 'resisted' })).body).toMatchObject({ what: 'Chocolat', intensity: 3, outcome: 'resisted', tip: "Bois un verre d'eau." });
+    expect((await request('PATCH', `/api/cravings/${id}`, { outcome: 'gave_in' }, stranger)).status).toBe(404);
+    expect((await stream(id, {}, stranger)).status).toBe(404);
+
+    // A craving with nothing said counts, without an empty word among the top ones.
+    const insights = await request<InsightsResponse>('GET', '/api/insights?days=7');
+    expect(insights.body.cravings).toMatchObject({ total: 2, resisted: 1, topWhat: ['Chocolat'] });
+  });
+
+  it('falls back to a kind tip when the AI fails mid-way', async () => {
+    const { body } = await request<{ craving: { id: string } }>('POST', '/api/cravings', { at: now, localDate: today, tip: 'stream' });
+    failNext = true;
+    const tip = await stream(body.craving.id);
+    expect(tip.error).toBeNull();
+    expect(tip.done?.craving.tip).toMatch(/eau|activité/);
+    expect(tip.done?.alternative).toBeTruthy();
+  });
+
+  it('still answers older apps with the advice inline', async () => {
+    const res = await request('POST', '/api/cravings', { at: now, localDate: today, what: 'chips', intensity: 2 });
+    expect(res.body).toMatchObject({ craving: { tip: "Bois un verre d'eau.", intensity: 2 }, alternative: 'Moins de chips' });
   });
 });

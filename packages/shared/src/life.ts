@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { addDays } from './dates';
+import type { JournalEntry } from './journal';
 import { LocalDateSchema, LocalDateTimeSchema, type Profile, type Sex } from './schemas';
 
 /**
@@ -229,7 +230,17 @@ export function everydayWaterGoalMl(profile: Pick<Profile, 'sex' | 'waterGoalMl'
 
 // ---------------------------------------------------------------- Mood
 
+/**
+ * « Humeur » is one concept: the day's mood check-in, a face and an optional
+ * word. It is logged from « + » (and from Today's pill when the module is on)
+ * and read by Today, the history, Progrès and the coach. The older journal
+ * kind « Ressenti » used the same faces: those notes are kept, and read as the
+ * day's mood when the day has no check-in (`dayMoods`).
+ */
 export const MoodLevelSchema = z.number().int().min(1).max(5);
+
+/** The optional word of a check-in. */
+export const MOOD_NOTE_MAX = 280;
 
 /** One check-in per day: the latest one wins. */
 export const MoodInputSchema = z.object({
@@ -237,12 +248,41 @@ export const MoodInputSchema = z.object({
   localDate: LocalDateSchema,
   /** 1 (very low) to 5 (very good). */
   mood: MoodLevelSchema,
-  note: z.string().trim().max(280).nullable().default(null),
+  note: z.string().trim().max(MOOD_NOTE_MAX).nullable().default(null),
 });
 export type MoodInput = z.input<typeof MoodInputSchema>;
 
 export interface MoodCheckIn extends z.output<typeof MoodInputSchema> {
   updatedAt: string;
+}
+
+/** The day's mood as everything reads it; `noteId` when it comes from an older « Ressenti » note. */
+export interface DayMood extends MoodCheckIn {
+  noteId?: string;
+}
+
+type FeelingNote = Pick<JournalEntry, 'id' | 'kind' | 'at' | 'localDate' | 'text' | 'data' | 'updatedAt'>;
+
+const clip = (text: string) => (text.length > MOOD_NOTE_MAX ? `${text.slice(0, MOOD_NOTE_MAX - 1).trimEnd()}…` : text);
+
+/**
+ * One mood per day, oldest first: the check-in, or on a day without one, the
+ * latest face among the older « Ressenti » notes, with its words. Notes
+ * without a face carry no mood and stay plain notes.
+ */
+export function dayMoods(checkIns: MoodCheckIn[], notes: FeelingNote[]): DayMood[] {
+  const byDate = new Map<string, DayMood>(checkIns.map((c) => [c.localDate, c]));
+  const latest = new Map<string, FeelingNote>();
+  for (const note of notes) {
+    if (note.kind !== 'feeling' || note.data.feeling === undefined || byDate.has(note.localDate)) continue;
+    const kept = latest.get(note.localDate);
+    if (!kept || Date.parse(note.at) > Date.parse(kept.at)) latest.set(note.localDate, note);
+  }
+  for (const [date, note] of latest) {
+    const text = note.text.trim();
+    byDate.set(date, { localDate: date, at: note.at, mood: note.data.feeling!, note: text ? clip(text) : null, updatedAt: note.updatedAt, noteId: note.id });
+  }
+  return [...byDate.values()].sort((a, b) => a.localDate.localeCompare(b.localDate));
 }
 
 export type MoodFactor = 'shortSleep' | 'craving' | 'sugarOver';
@@ -257,8 +297,8 @@ export interface MoodLink {
 }
 
 export interface MoodTrend {
-  /** Check-in days of the window, oldest first. */
-  days: { date: string; mood: number }[];
+  /** Days of the window with a mood, oldest first, with their word when there is one. */
+  days: { date: string; mood: number; note?: string }[];
   average: number | null;
   latest: MoodCheckIn | null;
   link: MoodLink | null;

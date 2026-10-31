@@ -72,7 +72,7 @@ export function useCravingActivitySync() {
       const retry: Record<string, Settled> = {};
       for (const [id, outcome] of Object.entries(pending)) {
         try {
-          await api?.updateCraving(id, outcome);
+          await api?.updateCraving(id, { outcome });
         } catch (error) {
           // Still offline: next time. Any other answer is final.
           if (error instanceof ApiError && error.status === 0) retry[id] = outcome;

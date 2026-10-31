@@ -194,8 +194,10 @@ export const cravings = sqliteTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     at: text('at').notNull(),
     localDate: text('local_date').notNull(),
+    /** Empty when not said. */
     what: text('what').notNull(),
-    intensity: integer('intensity').notNull(),
+    /** 1–3, null when not said. */
+    intensity: integer('intensity'),
     outcome: text('outcome', { enum: ['pending', 'resisted', 'gave_in'] }).notNull().default('pending'),
     tip: text('tip'),
     createdAt: text('created_at').notNull(),
@@ -204,7 +206,7 @@ export const cravings = sqliteTable(
 );
 
 /**
- * The health journal (« Carnet »): short notes the person and their coach read.
+ * The health journal (the notes of « Historique »): short notes the person and their coach read.
  * Kind-specific fields (Bristol type, ease, feeling) share one JSON column: they
  * are sparse, never filtered on in SQL, validated by zod, and new ones need no migration.
  */

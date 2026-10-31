@@ -94,8 +94,9 @@ export function WorkoutRow({ workout, hideCalories }: { workout: Workout; hideCa
 export function CravingRow({ craving }: { craving: Craving }) {
   const { t } = useI18n();
   const { colors } = useTheme();
-  const key = craving.outcome === 'resisted' ? 'today.cravingRow.resisted' : craving.outcome === 'gave_in' ? 'today.cravingRow.gaveIn' : 'today.cravingRow.pending';
-  const title = t(key, { what: craving.what.toLowerCase() });
+  const outcome = craving.outcome === 'resisted' ? 'resisted' : craving.outcome === 'gave_in' ? 'gaveIn' : 'pending';
+  // Nothing said is fine: « Envie surmontée » on its own.
+  const title = craving.what ? t(`today.cravingRow.${outcome}`, { what: craving.what.toLowerCase() }) : t(`today.cravingRow.${outcome}Plain`);
   return (
     <SmallRow
       bubble={

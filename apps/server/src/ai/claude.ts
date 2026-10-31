@@ -128,7 +128,19 @@ const MEAL_ACTION_TOOL: Anthropic.Beta.BetaTool = {
   eager_input_streaming: true,
 };
 
-const CravingOut = z.object({ tip: z.string(), alternative: z.string() });
+/** "tip\nalternative" → both, without the labels or list markers a model sometimes adds anyway. */
+export function parseCravingAdvice(text: string): { tip: string; alternative: string } {
+  const lines = text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '')
+        .replace(/^\**(?:tip|conseil|astuce|alternative)\**\s*[:：]\s*\**/i, '')
+        .trim(),
+    )
+    .filter(Boolean);
+  return { tip: lines[0] ?? '', alternative: lines.slice(1).join(' ') };
+}
 const NudgesOut = z.object({ lines: z.array(z.string()) });
 
 type Effort = 'low' | 'medium' | 'high';
@@ -299,9 +311,32 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       }
     },
 
-    async cravingTip(input) {
-      const text = `${contextBlock(input, { localTime: input.localTime, activityToday: input.activityToday, ...input.life })}\n\nI'm craving: ${input.what} (intensity ${input.intensity}/3)`;
-      return run({ system: CRAVING, content: [{ type: 'text', text }], schema: CravingOut, effort: 'low' });
+    async cravingTip(input, onText, signal) {
+      const craving = input.what ? `I'm craving: ${input.what}` : "I'm having a craving (I didn't say what).";
+      const text = `${contextBlock(input, { localTime: input.localTime, activityToday: input.activityToday, ...input.life })}\n\n${craving}${input.intensity ? ` Intensity ${input.intensity}/3.` : ''}`;
+      try {
+        // Plain text, streamed: the tip shows up while it is written, the buttons never wait for it.
+        const stream = client.beta.messages.stream(
+          {
+            model,
+            max_tokens: 2000,
+            betas: ['server-side-fallback-2026-07-01'],
+            fallbacks: 'default',
+            system: [{ type: 'text', text: CRAVING, cache_control: { type: 'ephemeral' } }],
+            messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+            output_config: { effort: 'low' },
+          },
+          { signal },
+        );
+        if (onText) stream.on('text', (delta) => onText(delta));
+        const message = await stream.finalMessage();
+        if (message.stop_reason === 'refusal') throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
+        const advice = parseCravingAdvice(message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join(''));
+        if (!advice.tip) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
+        return advice;
+      } catch (error) {
+        throw mapError(error);
+      }
     },
 
     async review(input) {
@@ -311,7 +346,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       const moves = new Map(activityDays.map((d) => [d.date, d]));
       const asleep = new Map(sleep?.nights.map((n) => [n.localDate, n.asleepMin]));
       const water = new Map(hydration?.days.map((d) => [d.date, d.ml]));
-      const moods = new Map(mood?.days.map((d) => [d.date, d.mood]));
+      const moods = new Map(mood?.days.map((d) => [d.date, d]));
       const compactDays = days.map((d) => ({
         date: d.date,
         logged: d.logged,
@@ -323,7 +358,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         workouts: moves.get(d.date)?.workouts ?? 0,
         ...(sleep ? { asleepMin: asleep.get(d.date) ?? null } : {}),
         ...(hydration ? { waterMl: water.get(d.date) ?? 0 } : {}),
-        ...(mood ? { mood: moods.get(d.date) ?? null } : {}),
+        ...(mood ? { mood: moods.get(d.date)?.mood ?? null, ...(moods.get(d.date)?.note ? { moodNote: moods.get(d.date)!.note } : {}) } : {}),
       }));
       const life = {
         ...(sleep ? { sleep: { averageMin: sleep.averageMin, bedtime: sleep.bedtime, wakeTime: sleep.wakeTime, regularityMin: sleep.regularityMin, cravingsAfterShortNights: sleep.cravingsAfterShortNights } } : {}),

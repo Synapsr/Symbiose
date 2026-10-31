@@ -3,12 +3,19 @@ import { z } from 'zod';
 import { addDays, dateRange, daysBetween } from './dates';
 import { LocalDateSchema, LocalDateTimeSchema } from './schemas';
 
-// ---------------------------------------------------------------- Health journal (« Carnet »)
+// ---------------------------------------------------------------- Health journal (the notes of « Historique »)
 
-/** What a note is about. "other" is the free note, the default. */
+/**
+ * What a note is about. "other" is the free note, the default.
+ * "feeling" is the older « Ressenti »: mood now has one home, the day's mood
+ * check-in (see `life.ts`). Notes of that kind are kept and still read, as the
+ * day's mood when it has no check-in; older app versions may still write them.
+ */
 export const JournalKindSchema = z.enum(['feeling', 'symptom', 'medication', 'transit', 'other']);
 export type JournalKind = z.infer<typeof JournalKindSchema>;
-export const JOURNAL_KINDS = JournalKindSchema.options;
+/** The kinds a new note can take, in the order the app shows them (transit never first). */
+export const JOURNAL_KINDS = ['symptom', 'medication', 'transit', 'other'] as const satisfies readonly JournalKind[];
+export type NoteKind = (typeof JOURNAL_KINDS)[number];
 
 /** A simplified Bristol scale in plain words; the Bristol type (1–7) is what gets stored. */
 export const StoolConsistencySchema = z.enum(['hard', 'normal', 'soft', 'liquid']);
@@ -35,7 +42,7 @@ export const JournalDataSchema = z.object({
   bristol: z.number().int().min(1).max(7).optional(),
   /** transit: how it went. */
   ease: TransitEaseSchema.optional(),
-  /** feeling: 1 (very low) to 5 (very good). */
+  /** feeling (older notes): 1 (very low) to 5 (very good). */
   feeling: z.number().int().min(1).max(5).optional(),
 });
 export type JournalData = z.infer<typeof JournalDataSchema>;

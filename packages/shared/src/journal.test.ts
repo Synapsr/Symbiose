@@ -7,6 +7,7 @@ import {
   journalDataFor,
   JournalEntryInputSchema,
   JournalEntryPatchSchema,
+  JOURNAL_KINDS,
   transitSummary,
   type JournalData,
   type JournalKind,
@@ -19,6 +20,10 @@ describe('health journal entries', () => {
   it('maps the plain words to Bristol types and back', () => {
     for (const [word, bristol] of Object.entries(CONSISTENCY_BRISTOL)) expect(consistencyOf(bristol)).toBe(word);
     expect([1, 2, 3, 4, 5, 6, 7].map(consistencyOf)).toEqual(['hard', 'hard', 'normal', 'normal', 'soft', 'soft', 'liquid']);
+  });
+
+  it('offers every kind but the older « Ressenti », transit never first', () => {
+    expect(JOURNAL_KINDS).toEqual(['symptom', 'medication', 'transit', 'other']);
   });
 
   it('keeps only the fields that belong to the kind', () => {

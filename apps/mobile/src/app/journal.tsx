@@ -1,4 +1,5 @@
-import { addDays, JOURNAL_KINDS, toLocalDate, transitSummary, type JournalEntry, type JournalKind } from '@symbiose/shared';
+import { addDays, JOURNAL_KINDS, toLocalDate, transitSummary, type JournalEntry, type JournalKind, type MoodCheckIn } from '@symbiose/shared';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Lock, NotebookPen, X } from 'lucide-react-native';
 import { Fragment, useState } from 'react';
@@ -9,13 +10,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { JournalItem } from '@/components/journal/journal-row';
 import { KIND_META, kindLabel } from '@/components/journal/meta';
 import { TransitCard } from '@/components/journal/transit-card';
+import { MOOD_CHECK_INS, MoodEntry } from '@/components/today/mood-row';
 import { Button, Card, Chip, IconButton, Pressy, Reveal, Row, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatDay } from '@/lib/format';
 import { errorMessage, useToday } from '@/lib/hooks';
 import { useJournal } from '@/lib/journal';
 import { dismiss } from '@/lib/nav';
-import { useUser } from '@/lib/session';
+import { useApi, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { useHiddenIds } from '@/lib/undo';
 import { Radius, Space, useTheme } from '@/theme';
@@ -24,10 +26,19 @@ import { Radius, Space, useTheme } from '@/theme';
 const PAGE_DAYS = 90;
 
 type Filter = JournalKind | 'all';
+/** « Humeur » first (the check-ins, and the older « Ressenti » notes), then the notes' kinds: transit never leads. */
+const FILTERS: JournalKind[] = ['feeling', ...JOURNAL_KINDS];
 
-const newNote = (kind?: JournalKind) => router.push({ pathname: '/note', params: kind ? { kind } : {} });
+/** A mood is logged where its faces are, « + »; anything else is a note. */
+const add = (kind?: JournalKind) =>
+  kind === 'feeling' ? router.push('/log') : router.push({ pathname: '/note', params: kind ? { kind } : {} });
 
-/** The whole journal, by day: filter by kind, tap to edit, long-press to delete. */
+type Item = { type: 'note'; at: number; entry: JournalEntry } | { type: 'mood'; at: number; mood: MoodCheckIn };
+
+/**
+ * « Historique »: every day, newest first, the notes and the moods. Filter by
+ * kind, tap to edit (a mood opens in place), long-press a note to delete it.
+ */
 export default function Journal() {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
@@ -39,21 +50,29 @@ export default function Journal() {
   const [pages, setPages] = useState(1);
 
   const from = addDays(today, -(PAGE_DAYS * pages - 1));
+  const api = useApi();
   const journal = useJournal({ from, to: today }, { keepPrevious: true });
+  const moods = useQuery({ queryKey: [MOOD_CHECK_INS, from, today], queryFn: () => api.moodCheckIns(from, today), placeholderData: keepPreviousData });
   // A note just deleted stays out while « Annuler » is on screen.
   const hidden = useHiddenIds();
-  const all = (journal.data ?? []).filter((e) => !hidden[e.id]);
-  const entries = filter === 'all' ? all : all.filter((e) => e.kind === filter);
-  // The frequency card belongs to the Transit filter: the Carnet opens on the notes themselves.
-  const transit = filter === 'transit' ? transitSummary(all, today) : null;
+  const notes = (journal.data ?? []).filter((e) => !hidden[e.id]);
+  const all: Item[] = [
+    ...notes.map((entry) => ({ type: 'note' as const, at: Date.parse(entry.at), entry })),
+    ...(moods.data ?? []).map((mood) => ({ type: 'mood' as const, at: Date.parse(mood.at), mood })),
+  ];
+  const kindOf = (item: Item): JournalKind => (item.type === 'mood' ? 'feeling' : item.entry.kind);
+  const items = filter === 'all' ? all : all.filter((item) => kindOf(item) === filter);
+  // The frequency card belongs to the Transit filter: the history opens on the days themselves.
+  const transit = filter === 'transit' ? transitSummary(notes, today) : null;
   // Nothing can be older than the account.
   const hasOlder = from > toLocalDate(new Date(user.createdAt));
 
-  const days: { date: string; entries: JournalEntry[] }[] = [];
-  for (const entry of entries) {
+  const days: { date: string; items: Item[] }[] = [];
+  const dateOf = (item: Item) => (item.type === 'mood' ? item.mood.localDate : item.entry.localDate);
+  for (const item of [...items].sort((a, b) => dateOf(b).localeCompare(dateOf(a)) || b.at - a.at)) {
     const last = days.at(-1);
-    if (last?.date === entry.localDate) last.entries.push(entry);
-    else days.push({ date: entry.localDate, entries: [entry] });
+    if (last?.date === dateOf(item)) last.items.push(item);
+    else days.push({ date: dateOf(item), items: [item] });
   }
   const dayLabel = (date: string) => {
     const label = formatDay(date, locale, { today: t('common.today'), yesterday: t('common.yesterday') });
@@ -90,7 +109,7 @@ export default function Journal() {
           <Reveal index={1}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -Space.lg }} contentContainerStyle={{ gap: 6, paddingHorizontal: Space.lg, paddingVertical: 4 }}>
               <Chip label={t('journal.all')} selected={filter === 'all'} onPress={() => setFilter('all')} />
-              {JOURNAL_KINDS.map((kind) => {
+              {FILTERS.map((kind) => {
                 const Icon = KIND_META[kind].icon;
                 const selected = filter === kind;
                 return (
@@ -109,11 +128,11 @@ export default function Journal() {
 
         {transit ? (
           <Reveal index={2}>
-            <TransitCard summary={transit} onAdd={() => newNote('transit')} />
+            <TransitCard summary={transit} onAdd={() => add('transit')} />
           </Reveal>
         ) : null}
 
-        {journal.isPending ? (
+        {journal.isPending || moods.isPending ? (
           <View style={{ gap: Space.md }}>
             <Skeleton width="40%" height={14} />
             <Skeleton width="100%" height={140} radius={Radius.xl} />
@@ -126,10 +145,10 @@ export default function Journal() {
           <Reveal index={1}>
             <EmptyJournal />
           </Reveal>
-        ) : !entries.length ? (
+        ) : !items.length ? (
           <Animated.View entering={FadeIn.duration(200)} style={{ alignItems: 'center', gap: Space.md, paddingVertical: Space.xxl }}>
             <Txt tone="secondary">{t('journal.empty.kind')}</Txt>
-            {filter !== 'all' && filter !== 'transit' ? <Button title={t('journal.note')} variant="secondary" size="md" onPress={() => newNote(filter)} /> : null}
+            {filter !== 'all' && filter !== 'transit' ? <Button title={t('journal.note')} variant="secondary" size="md" onPress={() => add(filter)} /> : null}
           </Animated.View>
         ) : (
           days.map((day, i) => (
@@ -138,10 +157,10 @@ export default function Journal() {
                 {dayLabel(day.date)}
               </Txt>
               <Card padded={false}>
-                {day.entries.map((entry, j) => (
-                  <Fragment key={entry.id}>
+                {day.items.map((item, j) => (
+                  <Fragment key={item.type === 'mood' ? `mood-${item.mood.localDate}` : item.entry.id}>
                     {j > 0 ? <View style={{ height: 1, backgroundColor: colors.border, marginLeft: Space.lg + 36 + Space.md }} /> : null}
-                    <JournalItem entry={entry} />
+                    {item.type === 'mood' ? <MoodEntry mood={item.mood} variant="item" /> : <JournalItem entry={item.entry} />}
                   </Fragment>
                 ))}
               </Card>
@@ -149,14 +168,14 @@ export default function Journal() {
           ))
         )}
 
-        {all.length && hasOlder ? <Button title={t('journal.older')} variant="ghost" size="md" loading={journal.isPlaceholderData} onPress={() => setPages((p) => p + 1)} /> : null}
+        {all.length && hasOlder ? <Button title={t('journal.older')} variant="ghost" size="md" loading={journal.isPlaceholderData || moods.isPlaceholderData} onPress={() => setPages((p) => p + 1)} /> : null}
       </ScrollView>
 
       {/* On the thumb's side, like the camera button on Today. */}
       <Pressy
         accessibilityRole="button"
         accessibilityLabel={t('journal.note')}
-        onPress={() => newNote(filter === 'all' ? undefined : filter)}
+        onPress={() => add(filter === 'all' ? undefined : filter)}
         style={{
           position: 'absolute',
           [leftHanded ? 'left' : 'right']: Space.xl,
@@ -179,7 +198,7 @@ export default function Journal() {
   );
 }
 
-/** First visit: what the journal is for, in one line, and a way in for each kind. */
+/** First visit: what the history is for, in one line, and a way in for each kind. */
 function EmptyJournal() {
   const { t } = useI18n();
   const { colors } = useTheme();
@@ -193,9 +212,9 @@ function EmptyJournal() {
         {t('journal.empty.body')}
       </Txt>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: Space.sm, marginTop: Space.sm }}>
-        {JOURNAL_KINDS.filter((kind) => kind !== 'other').map((kind) => {
+        {FILTERS.filter((kind) => kind !== 'other').map((kind) => {
           const Icon = KIND_META[kind].icon;
-          return <Chip key={kind} label={t(kindLabel(kind))} onPress={() => newNote(kind)} icon={<Icon size={15} color={KIND_META[kind].color(colors)} />} />;
+          return <Chip key={kind} label={t(kindLabel(kind))} onPress={() => add(kind)} icon={<Icon size={15} color={KIND_META[kind].color(colors)} />} />;
         })}
       </View>
     </View>

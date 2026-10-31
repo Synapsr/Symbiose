@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { everydayWaterGoalMl, hydrationGoalMl, mergeSleepSegments, moodLink, moodPersistentlyLow, nightsByWakeDate, type MoodDay, type SleepSegment } from './life';
+import { dayMoods, everydayWaterGoalMl, hydrationGoalMl, mergeSleepSegments, moodLink, moodPersistentlyLow, nightsByWakeDate, type MoodDay, type SleepSegment } from './life';
 
 /** Local time on 29–31 Oct 2026, whatever the machine's time zone. */
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);
@@ -91,6 +91,39 @@ describe('mood', () => {
     expect(moodLink(days.slice(2))).toBeNull();
     // A gap under half a point is noise.
     expect(moodLink([3, 4, 3, 4, 4, 3].map((mood, i) => ({ mood, sugarOver: i % 2 === 0 })))).toBeNull();
+  });
+
+  it('reads one mood a day: the check-in, else the latest face of an older « Ressenti » note', () => {
+    const checkIn = (localDate: string, mood: number, note: string | null = null) => ({ localDate, at: `${localDate}T20:00:00+01:00`, mood, note, updatedAt: '' });
+    const feeling = (id: string, localDate: string, time: string, feeling: number | undefined, text = '') => ({
+      id,
+      kind: 'feeling' as const,
+      at: `${localDate}T${time}:00+01:00`,
+      localDate,
+      text,
+      data: feeling === undefined ? {} : { feeling },
+      updatedAt: '',
+    });
+    const moods = dayMoods(
+      [checkIn('2026-10-29', 4, 'Bonne soirée')],
+      [
+        // A check-in that day: the note stays a note.
+        feeling('a', '2026-10-29', '09:00', 1),
+        // Two faces on one day: the latest one, with its words.
+        feeling('b', '2026-10-28', '08:00', 2, 'Fatigué'),
+        feeling('c', '2026-10-28', '21:00', 3, `  ${'x'.repeat(400)} `),
+        // Words without a face carry no mood.
+        feeling('d', '2026-10-27', '10:00', undefined, 'Bof'),
+        { ...feeling('e', '2026-10-26', '10:00', 5), kind: 'symptom' as const },
+      ],
+    );
+    expect(moods.map((m) => [m.localDate, m.mood, m.noteId ?? null])).toEqual([
+      ['2026-10-28', 3, 'c'],
+      ['2026-10-29', 4, null],
+    ]);
+    expect(moods[0]!.note).toHaveLength(280);
+    expect(moods[0]!.note!.endsWith('…')).toBe(true);
+    expect(moods[1]!.note).toBe('Bonne soirée');
   });
 
   it('flags very low moods only when they last and are still there', () => {

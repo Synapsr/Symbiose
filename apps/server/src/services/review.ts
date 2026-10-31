@@ -12,6 +12,7 @@ import { bloodPressureBrief } from './blood-pressure';
 import { computeInsights } from './day';
 import { energyExpenditureBrief } from './expenditure';
 import { journalBrief } from './journal';
+import { moodNoteIds } from './mood';
 import { resolveUser } from './users';
 
 /** « Bilan de la semaine »: the 7 days ending today. */
@@ -33,7 +34,8 @@ function reviewInputs(db: Db, ai: Ai, userId: string, to: string, days: number) 
   const insights = computeInsights(db, userId, addDays(to, -(days - 1)), to);
   const resolved = resolveUser(db, userId, to);
   const bloodPressure = bloodPressureBrief(db, userId, resolved.row.profile ?? null, to);
-  const journal = journalBrief(db, userId, insights.from, to);
+  // The period's moods come with the insights: the older « Ressenti » notes they come from aren't repeated.
+  const journal = journalBrief(db, userId, insights.from, to, insights.mood ? moodNoteIds(db, userId, insights.from, to) : undefined);
   const key = createHash('sha256')
     .update(JSON.stringify({ userId, insights, bloodPressure, journal, plan: resolved.row.plan, model: ai.model }))
     .digest('hex');

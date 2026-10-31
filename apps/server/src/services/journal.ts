@@ -114,8 +114,10 @@ function noteBrief(entry: JournalEntry): JournalNoteBrief {
 /**
  * What the AI reads of the journal between two days: the notes, oldest first and
  * compact, and the transit frequency over the same days. Null when there's nothing.
+ * `readAsMood` are the older « Ressenti » notes the AI already reads as a day's
+ * mood (`moodNoteIds`): left out here so each mood is read once.
  */
-export function journalBrief(db: Db, userId: string, from: string, to: string): JournalBrief | null {
+export function journalBrief(db: Db, userId: string, from: string, to: string, readAsMood: ReadonlySet<string> = new Set()): JournalBrief | null {
   const entries = db
     .select()
     .from(journalEntries)
@@ -125,18 +127,19 @@ export function journalBrief(db: Db, userId: string, from: string, to: string): 
     .map(toJournalEntry)
     .sort((a, b) => a.localDate.localeCompare(b.localDate) || Date.parse(a.at) - Date.parse(b.at));
   const summary = transitSummary(entries, to, daysBetween(from, to) + 1, firstTransitDate(db, userId));
-  if (!entries.length && !summary) return null;
+  const notesOnly = entries.filter((e) => !readAsMood.has(e.id));
+  if (!notesOnly.length && !summary) return null;
 
   // Newest first until the cap, then back in time order.
   const notes: JournalNoteBrief[] = [];
   let chars = 0;
-  for (const entry of [...entries].reverse()) {
+  for (const entry of [...notesOnly].reverse()) {
     const note = noteBrief(entry);
     chars += JSON.stringify(note).length;
     if (chars > BRIEF_CHARS) break;
     notes.unshift(note);
   }
-  return { entries: notes, omitted: entries.length - notes.length, transit: summary ? transitBrief(summary) : null };
+  return { entries: notes, omitted: notesOnly.length - notes.length, transit: summary ? transitBrief(summary) : null };
 }
 
 /** The coach reads the frequency; the day-by-day strip is for the app. */
