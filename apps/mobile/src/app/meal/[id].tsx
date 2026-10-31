@@ -4,11 +4,12 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { ArrowUp, ChevronDown, RotateCcw, Sparkles, Star, Trash2, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ItemRow } from '@/components/meal/item-row';
 import { Bar, Card, Chip, Dot, IconButton, Pressy, Row, SectionTitle, SwapIcon, Txt, webInput, webSingleRow } from '@/components/ui';
+import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { MicButton } from '@/components/ui/mic-button';
 import { InlineProse } from '@/components/ui/prose';
 import { dismiss } from '@/lib/nav';
@@ -113,7 +114,7 @@ function MealEditor({ meal }: { meal: Meal }) {
   const busy = refine.isPending;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoiding style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + Space.xxxl }}>
         <Header meal={meal} />
 
@@ -299,7 +300,7 @@ function MealEditor({ meal }: { meal: Meal }) {
           </Row>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoiding>
   );
 }
 

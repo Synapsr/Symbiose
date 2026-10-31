@@ -15,12 +15,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { Check, Dumbbell, Footprints, Leaf, Minus, PenLine, Plus, Sparkles, SportShoe, X } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoalComposer } from '@/components/goal-composer';
 import { PlanPreview } from '@/components/plan-preview';
 import { Button, Card, Dot, IconButton, Row, Skeleton, Txt } from '@/components/ui';
+import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { formatAmount, formatNumber, unitOf } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -103,7 +104,7 @@ export default function Goals() {
   const dirty = edited !== null && !save.isPending;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoiding style={{ flex: 1, backgroundColor: colors.bg }}>
       <Row style={{ justifyContent: 'space-between', padding: Space.lg, paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.lg }}>
         <Txt variant="heading">{t('me.goals')}</Txt>
         <Row gap={Space.sm}>
@@ -147,7 +148,7 @@ export default function Goals() {
           )}
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoiding>
   );
 }
 
