@@ -322,7 +322,12 @@ export const webInput = Platform.OS === 'web' ? ({ outlineWidth: 0, outlineStyle
 /** A web textarea defaults to two rows: start at one, like on native. */
 export const webSingleRow = Platform.OS === 'web' ? { numberOfLines: 1 } : null;
 
-export function Field({ label, style, onFocus, onBlur, ...props }: TextInputProps & { label?: string }) {
+/**
+ * A labelled text field. `accessory` (the dictation mic) sits inside it, at the
+ * end of a single line or in the bottom corner of a multiline field;
+ * `highlighted` draws the accent border while it listens.
+ */
+export function Field({ label, style, onFocus, onBlur, accessory, highlighted, ...props }: TextInputProps & { label?: string; accessory?: ReactNode; highlighted?: boolean }) {
   const { colors } = useTheme();
   const [focused, setFocused] = useState(false);
   return (
@@ -332,33 +337,37 @@ export function Field({ label, style, onFocus, onBlur, ...props }: TextInputProp
           {label}
         </Txt>
       ) : null}
-      <TextInput
-        placeholderTextColor={colors.text3}
-        {...props}
-        onFocus={(e) => {
-          setFocused(true);
-          onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          setFocused(false);
-          onBlur?.(e);
-        }}
-        style={[
-          {
-            minHeight: 56,
-            borderRadius: Radius.lg,
-            backgroundColor: colors.surface,
-            borderWidth: 1.5,
-            borderColor: focused ? colors.text : colors.border,
-            paddingHorizontal: Space.lg,
-            fontSize: 17,
-            color: colors.text,
-          },
-          webInput,
-          props.multiline && { paddingTop: 16, paddingBottom: 16, minHeight: 120, textAlignVertical: 'top' },
-          style,
-        ]}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={colors.text3}
+          {...props}
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
+          style={[
+            {
+              minHeight: 56,
+              borderRadius: Radius.lg,
+              backgroundColor: colors.surface,
+              borderWidth: 1.5,
+              borderColor: highlighted ? colors.accent : focused ? colors.text : colors.border,
+              paddingHorizontal: Space.lg,
+              fontSize: 17,
+              color: colors.text,
+            },
+            webInput,
+            props.multiline && { paddingTop: 16, paddingBottom: 16, minHeight: 120, textAlignVertical: 'top' },
+            accessory ? (props.multiline ? { paddingBottom: 56 } : { paddingRight: 56 }) : null,
+            style,
+          ]}
+        />
+        {accessory ? <View style={{ position: 'absolute', right: 8, ...(props.multiline ? { bottom: 8 } : { top: 0, bottom: 0, justifyContent: 'center' }) }}>{accessory}</View> : null}
+      </View>
     </View>
   );
 }

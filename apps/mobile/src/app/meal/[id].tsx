@@ -9,8 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ItemRow } from '@/components/meal/item-row';
 import { Bar, Card, Chip, Dot, IconButton, Pressy, Row, SectionTitle, SwapIcon, Txt, webInput, webSingleRow } from '@/components/ui';
+import { MicButton } from '@/components/ui/mic-button';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
+import { useDictation } from '@/lib/dictation';
 import { formatAmount, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage, useDeleteMeal, useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
@@ -51,6 +53,7 @@ function MealEditor({ meal }: { meal: Meal }) {
   const [baseGrams] = useState(() => Object.fromEntries(meal.items.map((i) => [i.id, i.grams])));
   const [expanded, setExpanded] = useState<string | null>(null);
   const [correction, setCorrection] = useState('');
+  const dictation = useDictation(correction, setCorrection);
   const [error, setError] = useState<string | null>(null);
   const [allValues, setAllValues] = useState(false);
 
@@ -261,13 +264,14 @@ function MealEditor({ meal }: { meal: Meal }) {
             <TextInput
               value={correction}
               onChangeText={setCorrection}
-              placeholder={busy ? t('detail.fixing') : `${t('detail.fix')} — ${t('detail.fixPlaceholder')}`}
+              placeholder={busy ? t('detail.fixing') : dictation.listening ? t('dictation.listening') : t('detail.fixPlaceholder')}
               placeholderTextColor={colors.text3}
               multiline
               editable={!busy}
               {...webSingleRow}
               style={[{ flex: 1, minHeight: 44, maxHeight: 120, color: colors.text, fontSize: 16, lineHeight: 20, paddingTop: 12, paddingBottom: 12 }, webInput]}
             />
+            {busy ? null : <MicButton dictation={dictation} size={44} />}
             <IconButton
               label={t('detail.fix')}
               variant="inverted"

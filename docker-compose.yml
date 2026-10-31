@@ -9,6 +9,9 @@ services:
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # AI_MODEL: claude-opus-5-5
+      # Another provider (see README): openai, mistral, gemini, openrouter, ollama, openai-compatible
+      # AI_PROVIDER: openai
+      # AI_API_KEY: ${AI_API_KEY:-}
       # PUBLIC_URL: https://symbiose.example.com
       # SIGNUP: request   # or open; closed by default
       # ADMIN_EMAILS: you@example.com

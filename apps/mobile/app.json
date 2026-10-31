@@ -24,7 +24,7 @@
       "entitlements": {
         "com.apple.security.application-groups": ["group.io.synapsr.symbiose"]
       },
-      "buildNumber": "9",
+      "buildNumber": "10",
       "appleTeamId": "3RZSUHDN87"
     },
     "android": {
@@ -114,7 +114,14 @@
         }
       ],
       "./plugins/with-watch-shared",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Symbiose uses the microphone so you can dictate your meals, notes and questions instead of typing them. Your voice is turned into text and never recorded.",
+          "speechRecognitionPermission": "Symbiose turns what you dictate into text, on your iPhone whenever it can."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

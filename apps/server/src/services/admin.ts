@@ -256,12 +256,8 @@ function backups(dataDir: string): AdminOverview['system']['backups'] {
   }
 }
 
-/** The configured provider. */
-function aiProvider(config: Config, ai: Ai): string | null {
-  if (config.aiMock) return 'mock';
-  if (!ai.enabled) return null;
-  return config.anthropicApiKey ? 'anthropic' : null;
-}
+/** Who answers, as the AI says (`anthropic`, `openai`, `mock`…); null when it is off. */
+const aiProvider = (ai: Ai): string | null => (ai.enabled ? (ai.provider ?? null) : null);
 
 function systemSection(db: Db, ai: Ai, config: Config): AdminOverview['system'] {
   const { dbBytes } = db.get<{ dbBytes: number }>(sql`SELECT page_count * page_size AS dbBytes FROM pragma_page_count(), pragma_page_size()`)!;
@@ -272,7 +268,7 @@ function systemSection(db: Db, ai: Ai, config: Config): AdminOverview['system'] 
     dbBytes,
     ...photos,
     backups: backups(config.dataDir),
-    ai: { enabled: ai.enabled, provider: aiProvider(config, ai), model: ai.model },
+    ai: { enabled: ai.enabled, provider: aiProvider(ai), model: ai.model },
     signup: signupMode(config),
   };
 }

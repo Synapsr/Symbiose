@@ -29,7 +29,7 @@ const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 
-function makeApp(overrides: Partial<Config> = {}, ai: Ai = { ...createDisabledAi(), enabled: true, model: 'claude-opus-5-5' }) {
+function makeApp(overrides: Partial<Config> = {}, ai: Ai = { ...createDisabledAi(), enabled: true, provider: 'anthropic', model: 'claude-opus-5-5' }) {
   const dataDir = mkdtempSync(join(dir, 'data-'));
   const config: Config = {
     port: 0,
@@ -123,6 +123,8 @@ describe('AI prices', () => {
     expect(prices['gpt-test']).toEqual({ input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 1.25 });
     expect(prices['qwen2.5:7b']).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
     expect(priceOf('claude-opus-5-5', prices)).toMatchObject({ input: 3, output: 15 });
+    // Providers answer with dated ids: the alias's price applies.
+    expect(priceOf('gpt-test-2026-09-01', prices)).toBe(prices['gpt-test']);
     expect(invalid).toEqual(['broken', 'nope=1', 'bad=a/b']);
   });
 

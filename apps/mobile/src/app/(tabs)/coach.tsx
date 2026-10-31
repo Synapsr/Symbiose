@@ -10,7 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MealActionCard } from '@/components/coach/meal-action-card';
 import { Button, Chip, IconButton, Pressy, Row, Txt, webInput, webSingleRow } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
+import { MicButton } from '@/components/ui/mic-button';
 import { useI18n, type TranslationKey } from '@/i18n';
+import { useDictation } from '@/lib/dictation';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
 import { markMorningSeen, useMorningDraft, useProactive } from '@/lib/proactive';
@@ -48,6 +50,7 @@ export default function Coach() {
   const api = useApi();
   const queryClient = useQueryClient();
   const [text, setText] = useState('');
+  const dictation = useDictation(text, setText);
   const [live, setLive] = useState<Live | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [menu, setMenu] = useState(false);
@@ -208,13 +211,14 @@ export default function Coach() {
             ref={input}
             value={text}
             onChangeText={setText}
-            placeholder={t('coach.placeholder')}
+            placeholder={dictation.listening ? t('dictation.listening') : t('coach.placeholder')}
             placeholderTextColor={colors.text3}
             multiline
             // One row when empty, so the placeholder lines up with the send button.
             {...webSingleRow}
             style={[{ flex: 1, minHeight: 44, maxHeight: 140, color: colors.text, fontSize: 16, lineHeight: 20, paddingTop: 12, paddingBottom: 12 }, webInput]}
           />
+          <MicButton dictation={dictation} size={44} />
           <IconButton label={t('coach.send')} variant="inverted" icon={<ArrowUp size={20} color={colors.onInverted} />} onPress={() => void submit(text)} />
         </View>
       </View>

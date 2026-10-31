@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 
 import type { SignupMode } from '@symbiose/shared';
 
+import { AI_PROVIDERS, isAiProvider } from './ai/providers';
 import { parsePrices, type Rates } from './services/ai-prices';
 
 export const VERSION = '0.1.0';
@@ -17,9 +18,18 @@ export interface Config {
   allowSignup: boolean;
   /** SIGNUP; wins over `allowSignup` when set. */
   signup?: SignupMode;
+  /** AI_PROVIDER as given (anthropic when unset): see `ai/providers.ts`. */
+  aiProvider?: string;
+  /** The provider's key: AI_API_KEY, else its own variable (ANTHROPIC_API_KEY, OPENAI_API_KEY…). */
+  aiApiKey?: string | null;
+  /** AI_BASE_URL: an OpenAI-compatible server; each named provider has a default. */
+  aiBaseUrl?: string | null;
+  /** AI_VISION=false for a model that can't read photos: photo meals answer `ai_no_vision`. */
+  aiVision?: boolean;
   anthropicApiKey: string | null;
   /** Required by Anthropic keys that are not scoped to a workspace. */
   anthropicWorkspaceId: string | null;
+  /** AI_MODEL, else the provider's default. */
   aiModel: string;
   /** Development only: canned AI answers, no API key needed. */
   aiMock: boolean;
@@ -66,6 +76,9 @@ export function loadConfig(env = process.env): Config {
   const prices = parsePrices(env.AI_PRICES);
   const signup = readSignup(env);
   for (const entry of prices.invalid) console.warn(`AI_PRICES: ignoring "${entry}" (expected model=input/output, USD per million tokens)`);
+  const aiProvider = env.AI_PROVIDER?.trim().toLowerCase() || undefined;
+  const name = aiProvider ?? 'anthropic';
+  const provider = isAiProvider(name) ? AI_PROVIDERS[name] : null;
   return {
     port: Number(env.PORT ?? 3000),
     dataDir,
@@ -73,9 +86,13 @@ export function loadConfig(env = process.env): Config {
     jwtSecret: loadSecret(dataDir),
     allowSignup: signup !== 'closed',
     signup,
+    aiProvider,
+    aiApiKey: env.AI_API_KEY || (provider?.keyVar ? env[provider.keyVar] : undefined) || null,
+    aiBaseUrl: env.AI_BASE_URL?.trim() || null,
+    aiVision: bool(env.AI_VISION, true),
     anthropicApiKey: env.ANTHROPIC_API_KEY || null,
     anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID || null,
-    aiModel: env.AI_MODEL || 'claude-opus-5-5',
+    aiModel: env.AI_MODEL?.trim() || provider?.model || '',
     aiMock: bool(env.AI_MOCK, false),
     corsOrigins: (env.CORS_ORIGINS ?? '*').split(',').map((s) => s.trim()).filter(Boolean),
     adminEmails: (env.ADMIN_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),

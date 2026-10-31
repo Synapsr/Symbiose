@@ -32,7 +32,7 @@ const CLAUDE_PRICES: Record<string, ModelPrice> = {
 
 /**
  * `AI_PRICES`: `model=input/output[/cacheRead[/cacheWrite]]`, USD per million
- * tokens, comma-separated (`gpt-5.1=1.25/10/0.125,mistral-large-latest=2/6`).
+ * tokens, comma-separated (`my-model=1.25/10/0.125,gemma4=0/0`).
  * Cache tokens cost the input price unless given. Wins over the built-in prices.
  */
 export function parsePrices(value: string | undefined): { prices: Record<string, Rates>; invalid: string[] } {
@@ -52,11 +52,10 @@ export function parsePrices(value: string | undefined): { prices: Record<string,
   return { prices, invalid };
 }
 
-/** The price of a model: an override first, then Claude's (by alias, or a dated id of it). */
+/** The price of a model: an override first, then Claude's; a dated id (`-20261001`, `-2026-09-01`) is priced as its alias. */
 export function priceOf(model: string, overrides: Record<string, Rates> = {}): ModelPrice | null {
-  if (overrides[model]) return overrides[model];
-  const alias = model.replace(/-\d{8}$/, '');
-  return CLAUDE_PRICES[alias] ?? null;
+  const alias = model.replace(/-(\d{8}|\d{4}-\d{2}-\d{2})$/, '');
+  return overrides[model] ?? overrides[alias] ?? CLAUDE_PRICES[alias] ?? null;
 }
 
 export interface TokenCounts {

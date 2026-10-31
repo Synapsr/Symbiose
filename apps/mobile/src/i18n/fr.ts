@@ -185,7 +185,7 @@ export const fr = {
   // Meal detail
   'detail.items': 'Aliments',
   'detail.fix': 'Corriger avec l’IA',
-  'detail.fixPlaceholder': 'Ex : pas de sucre dans le café, la moitié des frites',
+  'detail.fixPlaceholder': 'Corriger : café sans sucre…',
   'detail.fixing': 'Je corrige…',
   'detail.favorite': 'Favori',
   'detail.relog': 'Remanger',
@@ -667,6 +667,12 @@ export const fr = {
   'coach.settings': 'Réglages du coach',
   'coach.clearConfirm': 'Toute la conversation sera effacée, points du matin compris.',
   'coach.clearAction': 'Effacer',
+  'dictation.start': 'Dicter',
+  'dictation.stop': 'Arrêter la dictée',
+  'dictation.listening': 'Je t’écoute…',
+  'dictation.denied': 'Autorise le micro pour dicter',
+  'dictation.settings': 'Réglages',
+  'dictation.unavailable': 'La dictée n’est pas disponible pour le moment',
 
   // Admin
   'admin.title': 'Admin',
