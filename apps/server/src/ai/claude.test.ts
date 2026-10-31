@@ -141,6 +141,12 @@ describe('Claude adapter', () => {
     ]);
   });
 
+  it('maps an answer that isn’t the schema’s JSON to ai_bad_output', async () => {
+    respond = () => json(message([{ type: 'text', text: 'Je ne peux pas analyser ce repas.' }], 'refusal'));
+    await expect(ai().analyzeMeal(mealInput)).rejects.toMatchObject({ status: 424, code: 'ai_bad_output' });
+    expect(usage.map((u) => [u.feature, u.ok, u.error])).toEqual([['meal', false, 'ai_bad_output']]);
+  });
+
   it('maps a bad key to the app’s code', async () => {
     const claude = ai();
     respond = () => json({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }, 401);

@@ -191,5 +191,9 @@ function mapError(error: unknown): unknown {
   if (error instanceof Anthropic.APIError) {
     return new HttpError(424, 'ai_error', `AI provider error (${error.status ?? 'unknown'})`);
   }
+  // The SDK's structured-output parser throws a plain AnthropicError on text that isn't the schema's JSON.
+  if (error instanceof Anthropic.AnthropicError) {
+    return new HttpError(424, 'ai_bad_output', 'The AI returned an answer the app could not use, please retry');
+  }
   return error;
 }
