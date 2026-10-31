@@ -19,6 +19,14 @@ export function mayPlay(cue: Cue, now: number, last: { cue: Cue; at: number } | 
   return RANK[cue] > RANK[last.cue];
 }
 
+/** How long the smaller sound's opening lasts: a bigger one that follows waits for it, so they read as two beats. */
+export const FOLLOW_MS = 380;
+
+export function followDelay(cue: Cue, now: number, last: { cue: Cue; at: number } | null): number {
+  if (!last || RANK[cue] <= RANK[last.cue]) return 0;
+  return Math.max(0, last.at + FOLLOW_MS - now);
+}
+
 /** « C'est noté », a little brighter when the meal clearly suits the plan. */
 export function mealCue(meal: Pick<Meal, 'insight'> | null | undefined): Cue {
   return meal?.insight?.verdict === 'great' ? 'popBright' : 'pop';

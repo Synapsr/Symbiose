@@ -2,7 +2,7 @@ import type { Meal } from '@symbiose/shared';
 import { createAudioPlayer, setAudioModeAsync, type AudioMode, type AudioPlayer } from 'expo-audio';
 
 import { isDictating } from './dictation';
-import { LIVE_MS, mayPlay, mealCue, rewardsDue, type Cue } from './feedback-logic';
+import { followDelay, LIVE_MS, mayPlay, mealCue, rewardsDue, type Cue } from './feedback-logic';
 import { haptics } from './haptics';
 import { useSettings } from './stores';
 
@@ -42,13 +42,9 @@ function load(): Partial<Record<Cue, AudioPlayer>> {
   return players;
 }
 
-async function play(cue: Cue, volume = 1) {
-  if (!useSettings.getState().sounds || isDictating()) return;
-  const now = Date.now();
-  if (!mayPlay(cue, now, last)) return;
-  last = { cue, at: now };
+async function play(cue: Cue, volume: number) {
   const player = load()[cue];
-  if (!player) return;
+  if (!player || isDictating()) return;
   try {
     // Every time: dictation leaves the session ready to record (and deaf to the silent switch).
     await setAudioModeAsync(AMBIENT);
@@ -69,11 +65,27 @@ export function claimReward(date: string, key: string): boolean {
 }
 
 /** Haptic steps at their offsets (ms), in time with the sound. */
-function pattern(steps: [number, () => unknown][]) {
-  for (const [at, step] of steps) {
-    if (at) setTimeout(step, at);
-    else step();
-  }
+type Haptic = [number, () => unknown][];
+
+/**
+ * One moment: its haptic steps and its sound, together. A bigger moment right
+ * after a smaller one waits for the smaller sound's opening (two beats, not a
+ * blur); a smaller or equal one right after stays quiet, its haptic still felt.
+ */
+function moment(cue: Cue, steps: Haptic, volume = 1) {
+  const now = Date.now();
+  const wait = followDelay(cue, now, last);
+  const audible = useSettings.getState().sounds && mayPlay(cue, now, last);
+  if (audible) last = { cue, at: now + wait };
+  const run = () => {
+    for (const [at, step] of steps) {
+      if (at) setTimeout(step, at);
+      else step();
+    }
+    if (audible) void play(cue, volume);
+  };
+  if (wait) setTimeout(run, wait);
+  else run();
 }
 
 export const feedback = {
@@ -89,56 +101,43 @@ export const feedback = {
   /** A meal saved and analysed: « c'est noté », brighter when it clearly suits the plan, a bloom when it marks a milestone. */
   mealLogged: (meal?: Pick<Meal, 'insight'> | null, milestone = false) => {
     feedback.acted();
-    haptics.success();
-    void play(milestone ? 'bloom' : mealCue(meal));
+    moment(milestone ? 'bloom' : mealCue(meal), [[0, haptics.success]]);
   },
 
   /** « Pareil » in one tap: the same « c'est noté », with the lighter haptic it always had. */
   mealRelogged: (meal?: Pick<Meal, 'insight'> | null) => {
     feedback.acted();
-    haptics.soft();
-    void play(mealCue(meal));
+    moment(mealCue(meal), [[0, haptics.soft]]);
   },
 
   /** A session added by hand: effort, noted. */
   workoutLogged: () => {
     feedback.acted();
-    haptics.soft();
-    void play('pop');
+    moment('pop', [[0, haptics.soft]]);
   },
 
   /** A daily goal reached for the first time today. */
-  goalReached: () => {
-    haptics.success();
-    void play('chime');
-  },
+  goalReached: () => moment('chime', [[0, haptics.success]]),
 
   /** A real milestone: the plan created. */
-  milestone: () => {
-    pattern([
+  milestone: () =>
+    moment('bloom', [
       [0, haptics.soft],
       [90, haptics.success],
-    ]);
-    void play('bloom');
-  },
+    ]),
 
   /** Yesterday recognised as a good day, the next morning: the same bloom, softer. */
-  goodDay: () => {
-    haptics.soft();
-    void play('bloom', 0.7);
-  },
+  goodDay: () => moment('bloom', [[0, haptics.soft]], 0.7),
 
   /** « J'ai tenu »: the biggest one, a crescendo with the climbing notes, landing on their chord. */
-  resisted: () => {
-    pattern([
+  resisted: () =>
+    moment('rise', [
       [0, haptics.soft],
       [120, haptics.soft],
       [240, haptics.impact],
       [330, haptics.success],
-    ]);
-    void play('rise');
-  },
+    ]),
 
   /** « Sons » switched on: a taste of what they sound like. */
-  preview: () => void play('chime'),
+  preview: () => moment('chime', []),
 };

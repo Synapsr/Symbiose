@@ -1,7 +1,7 @@
 import { progressFor, type DayHydration, type Meal, type NutrientKey, type NutrientProgress, type TargetKind } from '@symbiose/shared';
 import { describe, expect, it } from 'vitest';
 
-import { goodDay, mayPlay, mealCue, mealMilestone, QUIET_MS, reachedGoals, rewardsDue, type RewardLog } from './feedback-logic';
+import { FOLLOW_MS, followDelay, goodDay, mayPlay, mealCue, mealMilestone, QUIET_MS, reachedGoals, rewardsDue, type RewardLog } from './feedback-logic';
 
 const progress = (nutrient: NutrientKey, consumed: number, value: number, kind: TargetKind): NutrientProgress => progressFor(nutrient, consumed, { value, kind });
 const meals = (count: number) => Array.from({ length: count }, (_, i) => ({ id: `m${i}` }) as Meal);
@@ -20,6 +20,18 @@ describe('mayPlay', () => {
   it('keeps a smaller or equal one quiet right after', () => {
     expect(mayPlay('pop', 10_400, { cue: 'chime', at: 10_000 })).toBe(false);
     expect(mayPlay('pop', 10_400, { cue: 'pop', at: 10_000 })).toBe(false);
+  });
+});
+
+describe('followDelay', () => {
+  it('lets a bigger reward wait for the opening of the smaller one before it', () => {
+    expect(followDelay('chime', 10_150, { cue: 'pop', at: 10_000 })).toBe(FOLLOW_MS - 150);
+    expect(followDelay('chime', 10_000 + FOLLOW_MS + 1, { cue: 'pop', at: 10_000 })).toBe(0);
+  });
+
+  it('never delays a first, smaller or equal one', () => {
+    expect(followDelay('chime', 10_000, null)).toBe(0);
+    expect(followDelay('pop', 10_100, { cue: 'chime', at: 10_000 })).toBe(0);
   });
 });
 
