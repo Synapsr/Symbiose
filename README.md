@@ -1,11 +1,9 @@
-<h1 align="center">
-  <a href="https://symbiose.synapsr.io">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg" />
-      <img src="docs/brand/lockup.svg" width="280" alt="Symbiose" />
-    </picture>
-  </a>
-</h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/lockup-dark.svg" />
+    <img src="docs/brand/lockup.svg" width="280" alt="Symbiose" />
+  </picture>
+</p>
 
 <div align="center">
 
