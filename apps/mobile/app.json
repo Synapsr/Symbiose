@@ -116,6 +116,13 @@
       "./plugins/with-watch-shared",
       "@bacons/apple-targets",
       [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-speech-recognition",
         {
           "microphonePermission": "Symbiose uses the microphone so you can dictate your meals, notes and questions instead of typing them. Your voice is turned into text and never recorded.",

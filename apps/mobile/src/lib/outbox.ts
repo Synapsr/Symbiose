@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { translate, useI18n } from '@/i18n';
 
 import { ApiError, type Api } from './api';
+import { feedback } from './feedback';
 import { haptics } from './haptics';
 import { health } from './health';
 import { outboxPhotos } from './outbox-files';
@@ -287,7 +288,8 @@ export function useOutboxSync() {
       void queryClient.invalidateQueries({ queryKey: ['day', meal.localDate] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
-      haptics.success();
+      // Several landing at once make one « c'est noté » (see `mayPlay`).
+      feedback.mealLogged(meal);
       showToast({
         message: count > 1 ? translate(locale, 'outbox.sentMany', { count }) : `${translate(locale, 'today.mealLogged')} · ${meal.title}`,
         onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),

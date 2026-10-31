@@ -436,7 +436,7 @@ export function Bar({ progress, color, height = 8 }: { progress: number; color: 
 
 /** Soft colored light behind hero content. */
 export function Glow({ color, size = 260, opacity = 0.28, style }: { color: string; size?: number; opacity?: number; style?: StyleProp<ViewStyle> }) {
-  const id = `glow-${color.replace('#', '')}`;
+  const id = `glow-${color.replace('#', '')}-${Math.round(opacity * 100)}`;
   return (
     <View pointerEvents="none" style={[{ position: 'absolute', width: size, height: size }, style]}>
       <Svg width={size} height={size}>

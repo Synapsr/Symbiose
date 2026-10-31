@@ -8,6 +8,7 @@ import Animated, { FadeIn, FadeInUp, FadeOut, useAnimatedStyle, useSharedValue, 
 
 import { Button, Pressy, Row, Txt } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
+import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { errorMessage } from '@/lib/hooks';
 import { useApi } from '@/lib/session';
@@ -39,7 +40,9 @@ export function MealActionCard({ messageId, index, action }: { messageId: string
   const apply = useMutation({
     mutationFn: () => api.applyCoachMealAction(messageId, index),
     onSuccess: ({ message, meal }) => {
-      haptics.success();
+      // A meal added through the coach is a meal logged; an edit or a delete just gets its haptic.
+      if (action.action === 'add' && meal) feedback.mealLogged(meal);
+      else haptics.success();
       replaceMessage(message);
       if (meal) queryClient.setQueryData(['meal', meal.id], meal);
       else if (action.mealId) queryClient.removeQueries({ queryKey: ['meal', action.mealId] });

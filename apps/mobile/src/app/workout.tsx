@@ -11,6 +11,7 @@ import { AnimatedNumber, Button, Chip, IconButton, Reveal, Row, Segmented, Txt }
 import { intensityKey, WORKOUT_ICONS, WORKOUT_INTENSITIES, WORKOUT_TYPES, workoutTypeKey } from '@/components/workout-meta';
 import { useI18n } from '@/i18n';
 import { formatDay, formatNumber } from '@/lib/format';
+import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { errorMessage, useDay, useRefreshAfterWorkout } from '@/lib/hooks';
 import { dismiss } from '@/lib/nav';
@@ -68,7 +69,7 @@ export default function WorkoutSheet() {
       });
     },
     onSuccess: (workout) => {
-      haptics.soft();
+      feedback.workoutLogged();
       refresh();
       showToast({
         message: `${t('workout.added')} · ${label}`,
