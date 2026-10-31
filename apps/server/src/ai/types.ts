@@ -307,6 +307,8 @@ export type AiUsageListener = (usage: AiUsage) => void;
 export interface Ai {
   readonly enabled: boolean;
   readonly model: string | null;
+  /** Who answers: `anthropic`, `openai`, `ollama`… (`mock` in development); null when the AI is off. */
+  readonly provider?: string | null;
   analyzeMeal(input: MealAnalysisInput): Promise<MealAnalysis>;
   draftPlan(input: PlanDraftInput): Promise<PlanDraft>;
   /** Streams the reply text through `onText` as it is written. */
