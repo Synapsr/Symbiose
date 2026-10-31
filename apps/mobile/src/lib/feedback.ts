@@ -1,5 +1,6 @@
 import type { Meal } from '@symbiose/shared';
 import { createAudioPlayer, setAudioModeAsync, type AudioMode, type AudioPlayer } from 'expo-audio';
+import { Platform } from 'react-native';
 
 import { isDictating } from './dictation';
 import { followDelay, LIVE_MS, mayPlay, mealCue, rewardsDue, type Cue } from './feedback-logic';
@@ -25,6 +26,7 @@ const SOURCES: Record<Cue, number> = {
 const AMBIENT: Partial<AudioMode> = { playsInSilentMode: false, interruptionMode: 'mixWithOthers', allowsRecording: false, shouldPlayInBackground: false };
 
 let players: Partial<Record<Cue, AudioPlayer>> | null = null;
+let moded = false;
 let last: { cue: Cue; at: number } | null = null;
 let actedAt = 0;
 
@@ -46,8 +48,11 @@ async function play(cue: Cue, volume: number) {
   const player = load()[cue];
   if (!player || isDictating()) return;
   try {
-    // Every time: dictation leaves the session ready to record (and deaf to the silent switch).
-    await setAudioModeAsync(AMBIENT);
+    // iOS, every time: dictation leaves the session ready to record (and deaf to the silent switch).
+    // Android, once: dictation leaves it alone, and each call also resets the phone's audio route
+    // (speaker on, normal mode), which must not cut into a call the person is on.
+    if (Platform.OS !== 'android' || !moded) await setAudioModeAsync(AMBIENT);
+    moded = true;
     player.volume = volume;
     // Back to the start once it has played; a fresh player (still loading, perhaps) starts there anyway.
     if (player.currentTime > 0) await player.seekTo(0);
