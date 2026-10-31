@@ -118,9 +118,16 @@ export function createMockAi(): Ai {
           ? `Parce que ta nuit a été plus courte que d’habitude${night ? ` (${Math.floor(night.asleepMin / 60)} h ${String(night.asleepMin % 60).padStart(2, '0')})` : ''} : après une nuit courte, la faim et l’envie de sucre montent souvent l’après-midi.${lower ? ' Ta récupération semble aussi un peu plus basse ce matin, d’où le « vas-y en douceur ».' : ''} Un en-cas protéiné prévu à l’avance t’évite de décider au moment où l’envie arrive.`
           : `Because your night was shorter than usual: after a short night, hunger and sugar cravings often rise in the afternoon.${lower ? ' Your recovery also seems a little lower this morning, hence the « go easy ».' : ''} A protein snack planned ahead saves you deciding when the craving hits.`
         : null;
+      // A detailed answer, in the light Markdown the real coach writes: what the app's renderer is for.
+      const detailed = /petit-d[ée]j|breakfast|d[ée]tail/i.test(input.message)
+        ? input.locale === 'fr'
+          ? `Oui, c'est un bon petit-déj 👍\n\n- **Sucre ajouté** : ${sugar} g sur 25, chocolat compris. C'est top pour ta glycémie.\n- **Protéines** : 29 g grâce aux œufs, une *bonne* base.\n- **Calories** : ${kcal} kcal, il te reste largement de quoi faire.\n\nDeux petites pistes pour la prochaine fois :\n1. **Plus de protéines** : un 3e œuf ou un skyr nature à côté, tu arrives vers 40 g.\n2. **Plus de fibres** : du pain complet, des tomates ou un fruit font vite monter ce chiffre.\n\nPour le déjeuner, vise environ 45 g de protéines et beaucoup de légumes.`
+          : `Yes, that's a good breakfast 👍\n\n- **Added sugar**: ${sugar} g out of 25, chocolate included.\n- **Protein**: 29 g thanks to the eggs, a *good* base.\n- **Calories**: ${kcal} kcal, plenty left for the day.\n\nTwo small ideas for next time:\n1. **More protein**: a 3rd egg or a plain skyr on the side gets you near 40 g.\n2. **More fibre**: wholegrain bread, tomatoes or a fruit add up fast.\n\nFor lunch, aim for about 45 g of protein and lots of vegetables.`
+        : null;
       const reply =
         meal?.reply ??
         why ??
+        detailed ??
         (transit && /transit|ventre|selles|digest|bowel|gut/i.test(input.message)
           ? `D'après ton carnet, c'est environ ${String(transit.perDay).replace('.', ',')} passage par jour sur ${transit.days} jours. Pour un transit régulier, vise une trentaine de grammes de fibres et 1,5 L d'eau par jour, et bouge un peu après les repas.`
           : `Aujourd'hui tu es à ${kcal} kcal et ${sugar} g de sucres ajoutés. Pour ce soir, vise une assiette avec des protéines et des légumes, et garde un fruit pour le dessert.`);
