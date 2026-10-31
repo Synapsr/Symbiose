@@ -22,6 +22,7 @@ import { formatDay } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { errorMessage, useDay, useHealthSync, useMealLogger, useToday } from '@/lib/hooks';
 import { useJournal } from '@/lib/journal';
+import { useBottomOverlap } from '@/lib/keyboard';
 import { dropEntry, isNetworkError, retryEntry, useOutbox, type OutboxEntry } from '@/lib/outbox';
 import { timeline, type TimelineRow } from '@/lib/outbox-logic';
 import { useGoalRewards, useGoodDay } from '@/lib/rewards';
@@ -78,13 +79,15 @@ export default function Today() {
   }, []);
 
   // The thumb buttons: the scroll ends far enough below them that nothing stays hidden underneath,
-  // and toasts rise above them while Today is on screen.
-  const thumbBottom = insets.bottom + (Platform.OS === 'web' ? 96 : Space.lg);
+  // and toasts rise above them while Today is on screen. On Android the screen ends at the tab bar,
+  // which already clears the navigation bar; toasts, drawn over the whole window, add its height.
+  const { overlap, onLayout } = useBottomOverlap();
+  const thumbBottom = Math.max(insets.bottom - overlap, 0) + (Platform.OS === 'web' ? 96 : Space.lg);
   useFocusEffect(
     useCallback(() => {
-      setLift(thumbBottom + CAPTURE_SIZE + Space.md);
+      setLift(overlap + thumbBottom + CAPTURE_SIZE + Space.md);
       return () => setLift(0);
-    }, [setLift, thumbBottom]),
+    }, [setLift, overlap, thumbBottom]),
   );
 
   // The previous day stays on screen while the next one loads, never in its place when that load fails.
@@ -127,7 +130,7 @@ export default function Today() {
   const good = useGoodDay(today, isToday && empty, user.plan, hideCalories);
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }} onLayout={onLayout}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingBottom: thumbBottom + CAPTURE_SIZE + Space.xxl, paddingHorizontal: Space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }}
