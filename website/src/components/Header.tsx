@@ -4,6 +4,7 @@ import { REPO } from '../i18n';
 import { useLang } from '../lang';
 import { GitHub, Moon, Sun } from './Icons';
 import { Logo } from './Logo';
+import { Wordmark } from './Wordmark';
 import './Header.css';
 
 const THEME_KEY = 'symbiose-theme';
@@ -103,7 +104,7 @@ export function Header() {
       <div className="wrap header-inner">
         <a className="brand" href="#top" aria-label={t.nav.home}>
           <Logo size={30} />
-          <span className="brand-name">Symbiose</span>
+          <Wordmark height={26} className="brand-name" />
         </a>
         <nav className="nav" aria-label={t.nav.primary}>
           {links.map(([href, label]) => (

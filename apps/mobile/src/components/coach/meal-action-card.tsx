@@ -72,7 +72,7 @@ export function MealActionCard({ messageId, index, action }: { messageId: string
       <Animated.View
         style={[{ backgroundColor: colors.accentSoft, borderRadius: Radius.lg, borderCurve: 'continuous', padding: Space.lg, paddingBottom: Space.md, gap: Space.sm }, mutedStyle]}>
         <Row gap={Space.sm}>
-          <Icon size={16} color={colors.accent} />
+          <Icon size={16} color={colors.accentText} />
           <Txt variant="label" tone="accent">
             {t(label)}
           </Txt>
@@ -108,7 +108,7 @@ export function MealActionCard({ messageId, index, action }: { messageId: string
               </>
             ) : status === 'applied' ? (
               <>
-                <Check size={18} color={colors.accent} strokeWidth={2.5} />
+                <Check size={18} color={colors.accentText} strokeWidth={2.5} />
                 <Txt variant="label" tone="accent" style={{ flex: 1 }}>
                   {t(done)}
                 </Txt>

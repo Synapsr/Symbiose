@@ -25,13 +25,13 @@ import {
   Activity,
 } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Platform, ScrollView, Switch, View } from 'react-native';
+import { Alert, Platform, ScrollView, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { signed } from '@/components/insights/adaptive-energy-card';
 import { CoachSettings } from '@/components/settings/coach-settings';
-import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Txt } from '@/components/ui';
+import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Toggle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
@@ -112,7 +112,7 @@ export default function Me() {
   const moduleSwitch = (key: ModuleKey) => {
     const pending = saveProfile.isPending && saveProfile.variables[key] !== undefined;
     return (
-      <Switch
+      <Toggle
         value={pending ? saveProfile.variables[key] === true : profile[key] === true}
         disabled={saveProfile.isPending}
         onValueChange={(on) => {
@@ -246,7 +246,7 @@ export default function Me() {
               icon={<Gauge size={20} color={colors.text} />}
               title={t('energy.auto')}
               subtitle={adaptiveHint}
-              right={<Switch value={adaptiveOn} disabled={toggleAdaptive.isPending} onValueChange={(on) => toggleAdaptive.mutate(on)} accessibilityLabel={t('energy.auto')} />}
+              right={<Toggle value={adaptiveOn} disabled={toggleAdaptive.isPending} onValueChange={(on) => toggleAdaptive.mutate(on)} accessibilityLabel={t('energy.auto')} />}
             />
           </>
         ) : null}
@@ -255,7 +255,7 @@ export default function Me() {
           icon={<EyeOff size={20} color={colors.text} />}
           title={t('me.hideCalories')}
           subtitle={t('me.hideCaloriesHint')}
-          right={<Switch value={settings.hideCalories} onValueChange={(v) => settings.set({ hideCalories: v })} />}
+          right={<Toggle value={settings.hideCalories} onValueChange={(v) => settings.set({ hideCalories: v })} />}
         />
       </Card>
 
@@ -281,7 +281,7 @@ export default function Me() {
           icon={<Activity size={20} color={colors.accent} />}
           title={healthAvailable ? health.storeName[locale] : t('me.healthStores')}
           subtitle={healthAvailable ? (settings.healthEnabled ? t('me.healthOn', { store: health.storeName[locale] }) : t('me.healthOff')) : t('me.healthUnavailable')}
-          right={healthAvailable ? <Switch value={settings.healthEnabled} onValueChange={(v) => void toggleHealth(v)} /> : null}
+          right={healthAvailable ? <Toggle value={settings.healthEnabled} onValueChange={(v) => void toggleHealth(v)} /> : null}
         />
         {Platform.OS === 'ios' ? (
           <>
@@ -297,7 +297,7 @@ export default function Me() {
           icon={<Hand size={20} color={colors.text} style={{ transform: [{ scaleX: -1 }] }} />}
           title={t('me.leftHanded')}
           subtitle={t('me.leftHandedHint')}
-          right={<Switch value={settings.leftHanded} onValueChange={(v) => settings.set({ leftHanded: v })} />}
+          right={<Toggle value={settings.leftHanded} onValueChange={(v) => settings.set({ leftHanded: v })} />}
         />
         <Divider />
         <Item

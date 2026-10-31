@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button, Dot, Field, IconButton, Pressy, Reveal, Row, Txt } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
+import { Wordmark } from '@/components/ui/wordmark';
 import { useI18n } from '@/i18n';
 import { ApiError, authenticate, getServerInfo, normalizeServerUrl } from '@/lib/api';
 import { haptics } from '@/lib/haptics';
@@ -110,11 +111,9 @@ export default function Welcome() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingTop: insets.top + Space.xxxl, paddingBottom: insets.bottom + Space.xxl, paddingHorizontal: Space.xxl, gap: Space.xxl, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
         <Reveal index={0}>
-          <Row gap={Space.md}>
+          <Row gap={Space.sm}>
             <Logo size={40} animated />
-            <Txt variant="heading" style={{ fontSize: 22 }}>
-              Symbiose
-            </Txt>
+            <Wordmark height={34} />
           </Row>
         </Reveal>
 

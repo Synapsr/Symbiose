@@ -185,7 +185,7 @@ export default function CravingSheet() {
       {/* Room for the tip from the start: it streams in without moving the buttons. */}
       <Card style={{ gap: Space.sm, backgroundColor: colors.accentSoft, borderColor: 'transparent' }} accessibilityLiveRegion="polite">
         <Row gap={Space.sm}>
-          <Sparkles size={18} color={colors.accent} />
+          <Sparkles size={18} color={colors.accentText} />
           <Txt variant="overline" tone="accent">
             {t('craving.tip')}
           </Txt>

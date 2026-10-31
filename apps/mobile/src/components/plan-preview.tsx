@@ -60,7 +60,7 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
           </Txt>
           {plan.adjustForActivity ? (
             <Row gap={6} style={{ marginTop: Space.sm }}>
-              <Watch size={14} color={colors.accent} />
+              <Watch size={14} color={colors.accentText} />
               <Txt variant="caption" tone="accent">
                 {t('plan.activityOn')}
               </Txt>
@@ -68,7 +68,7 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
           ) : null}
           {plan.adaptiveEnergy ? (
             <Row gap={6} style={{ marginTop: plan.adjustForActivity ? 0 : Space.sm }}>
-              <Gauge size={14} color={colors.accent} />
+              <Gauge size={14} color={colors.accentText} />
               <Txt variant="caption" tone="accent" style={{ flexShrink: 1, fontVariant: ['tabular-nums'] }}>
                 {energy.adaptiveKcal
                   ? t('plan.adaptiveOn', { kcal: `${energy.adaptiveKcal > 0 ? '+' : '−'}${formatNumber(Math.abs(energy.adaptiveKcal), locale)}` })
