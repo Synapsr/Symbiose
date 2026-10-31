@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Self-hosting guide
+    url: https://github.com/Synapsr/Symbiose/blob/main/docs/self-hosting.md
+    about: Every server setting, reverse proxies, backups and updates. Most setup questions are answered there.
+  - name: Questions and ideas
+    url: https://github.com/Synapsr/Symbiose/discussions
+    about: Ask how to do something, share your setup, or talk about an idea before it becomes an issue.
+  - name: Report a security vulnerability
+    url: https://github.com/Synapsr/Symbiose/security/advisories/new
+    about: Please don't open a public issue. Report it privately, as described in SECURITY.md.
