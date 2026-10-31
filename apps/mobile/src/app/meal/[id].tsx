@@ -1,10 +1,11 @@
-import { localTime, mealTotals, NUTRIENT_KEYS, toLocalDate, toLocalDateTime, type FoodItem, type Meal, type MealType } from '@symbiose/shared';
+import { courseItems, localTime, mealCourses, mealTotals, NUTRIENT_KEYS, toLocalDate, toLocalDateTime, withoutCourse, type FoodItem, type Meal, type MealCourse, type MealReference, type MealType } from '@symbiose/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { useLocalSearchParams } from 'expo-router';
-import { ArrowUp, ChevronDown, RotateCcw, Sparkles, Star, Trash2, X } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ArrowUp, ChevronDown, Ellipsis, History, Plus, RotateCcw, Sparkles, Split, Star, Trash2, X } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ItemRow } from '@/components/meal/item-row';
@@ -16,9 +17,11 @@ import { useI18n } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
 import { formatAmount, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { errorMessage, useDeleteMeal, useMealLogger, useRefreshAfterMeal } from '@/lib/hooks';
+import { basedOnLabel, courseName } from '@/lib/courses';
+import { errorMessage, useDeleteMeal, useMealLogger, useRefreshAfterMeal, useSeparateCourse } from '@/lib/hooks';
 import { useApi } from '@/lib/session';
-import { useSettings } from '@/lib/stores';
+import { usePending, useSettings } from '@/lib/stores';
+import { useUndoableDelete } from '@/lib/undo';
 import { NUTRIENT_COLORS, Radius, Space, useTheme, verdictColor } from '@/theme';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -42,7 +45,7 @@ export default function MealDetail() {
 
 function MealEditor({ meal }: { meal: Meal }) {
   const api = useApi();
-  const { t, locale, nutrient, nutrientShort } = useI18n();
+  const { t, plural, locale, nutrient, nutrientShort } = useI18n();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -92,6 +95,23 @@ function MealEditor({ meal }: { meal: Meal }) {
     deleteMeal(meal);
     dismiss();
   };
+  // Courses: one moved out as a meal of its own, or deleted with « Annuler » (the meal is judged again on the server).
+  const courses = mealCourses(meal);
+  const separate = useSeparateCourse();
+  const removeLater = useUndoableDelete();
+  const deleteCourse = (course: MealCourse, name: string) => {
+    queryClient.setQueryData(['meal', meal.id], withoutCourse(meal, course.id));
+    removeLater({
+      id: `${meal.id}/${course.id}`,
+      message: `${t('courses.deleted')} · ${name}`,
+      commit: () => api.deleteCourse(meal.id, course.id).then(apply),
+      restore: () => void queryClient.invalidateQueries({ queryKey: ['meal', meal.id] }),
+    });
+  };
+  // A course on its way to this meal, from « Ajouter un plat »: it shows here while the AI looks.
+  const arriving = usePending((s) => s.items).filter((p) => typeof p.input.course === 'object' && p.input.course.mealId === meal.id && p.status === 'analyzing');
+  const addCourse = () => router.push({ pathname: '/capture', params: { into: meal.id, date: meal.localDate } });
+
   // Sent, or kept for later without network (the logger says which); other errors stay on screen.
   const relog = useMutation({
     mutationFn: () => logger.relog(meal, { eatenAt: toLocalDateTime(), localDate: toLocalDate() }),
@@ -112,6 +132,22 @@ function MealEditor({ meal }: { meal: Meal }) {
   const insight = meal.insight;
   const busy = refine.isPending;
 
+  const itemRow = (item: FoodItem) => (
+    <ItemRow
+      key={item.id}
+      item={item}
+      baseGrams={baseGrams[item.id] ?? item.grams}
+      expanded={expanded === item.id}
+      hideCalories={hideCalories}
+      onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
+      onChange={(grams) => setItems(items.map((i) => (i.id === item.id ? { ...i, grams } : i)))}
+      onRemove={() => {
+        haptics.tap();
+        setItems(items.filter((i) => i.id !== item.id));
+      }}
+    />
+  );
+
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + Space.xxxl }}>
@@ -130,6 +166,7 @@ function MealEditor({ meal }: { meal: Meal }) {
               />
               {busy || update.isPending ? <ActivityIndicator /> : null}
             </Row>
+            {courses.length === 1 && courses[0]!.basedOn ? <BasedOn basedOn={courses[0]!.basedOn} mealDate={meal.localDate} /> : null}
           </View>
 
           {insight && (insight.headline || insight.tips.length) ? (
@@ -241,24 +278,40 @@ function MealEditor({ meal }: { meal: Meal }) {
             ) : null}
           </Card>
 
-          <SectionTitle>{t('detail.items')}</SectionTitle>
-          <View style={{ gap: Space.sm, marginTop: -Space.sm }}>
-            {items.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                baseGrams={baseGrams[item.id] ?? item.grams}
-                expanded={expanded === item.id}
-                hideCalories={hideCalories}
-                onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
-                onChange={(grams) => setItems(items.map((i) => (i.id === item.id ? { ...i, grams } : i)))}
-                onRemove={() => {
-                  haptics.tap();
-                  setItems(items.filter((i) => i.id !== item.id));
-                }}
-              />
-            ))}
-          </View>
+          {courses.length > 1 ? (
+            <>
+              {/* The courses in order, on a light thread: each with its items; one insight above for the whole meal. */}
+              <SectionTitle>{plural('courses.count', courses.length)}</SectionTitle>
+              <View style={{ marginTop: -Space.sm }}>
+                {courses.map((course, index) => (
+                  <CourseBlock
+                    key={course.id}
+                    course={course}
+                    name={courseName(t, course, index)}
+                    mealDate={meal.localDate}
+                    onSeparate={() => void separate(meal, course)}
+                    onDelete={() => deleteCourse(course, courseName(t, course, index))}>
+                    {courseItems({ ...meal, items }, course.id).map(itemRow)}
+                  </CourseBlock>
+                ))}
+                {arriving.map((p) => (
+                  <Arriving key={p.id} label={p.label} threaded />
+                ))}
+                <AddCourse onPress={addCourse} threaded />
+              </View>
+            </>
+          ) : (
+            <>
+              <SectionTitle>{t('detail.items')}</SectionTitle>
+              <View style={{ gap: Space.sm, marginTop: -Space.sm }}>
+                {items.map(itemRow)}
+                {arriving.map((p) => (
+                  <Arriving key={p.id} label={p.label} />
+                ))}
+                <AddCourse onPress={addCourse} />
+              </View>
+            </>
+          )}
 
           {/* One sentence fixes everything: "no sugar in the coffee", "half the fries". */}
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: Space.sm, backgroundColor: colors.surface, borderRadius: Radius.xl, borderWidth: 1, borderColor: colors.border, padding: 6, paddingLeft: Space.lg }}>
@@ -303,16 +356,54 @@ function MealEditor({ meal }: { meal: Meal }) {
   );
 }
 
+const PHOTO_HEIGHT = 300;
+
+/** Each course's photo, one page each, with its name: a meal in courses is told in pictures first. */
+function CoursePhotos({ photos }: { photos: { course: MealCourse; name: string }[] }) {
+  const api = useApi();
+  const { width } = useWindowDimensions();
+  const [page, setPage] = useState(0);
+  return (
+    <View>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={32}
+        onScroll={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}>
+        {photos.map(({ course, name }) => (
+          <View key={course.id} style={{ width, height: PHOTO_HEIGHT }}>
+            <Image source={{ uri: api.photoUrl(course.photoId!), headers: api.authHeaders }} style={{ width, height: PHOTO_HEIGHT }} contentFit="cover" transition={200} />
+            <View style={{ position: 'absolute', left: Space.lg, bottom: Space.lg, height: 28, paddingHorizontal: 12, borderRadius: Radius.pill, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center' }}>
+              <Txt variant="caption" style={{ color: '#fff', fontWeight: '600' }}>
+                {name}
+              </Txt>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+      <Row gap={5} style={{ position: 'absolute', bottom: Space.lg + 10, right: Space.lg }} pointerEvents="none">
+        {photos.map(({ course }, i) => (
+          <View key={course.id} style={{ width: i === page ? 14 : 6, height: 6, borderRadius: 3, backgroundColor: i === page ? '#fff' : 'rgba(255,255,255,0.5)' }} />
+        ))}
+      </Row>
+    </View>
+  );
+}
+
 function Header({ meal }: { meal: Meal }) {
   const api = useApi();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { t } = useI18n();
   const top = Platform.OS === 'ios' ? Space.md : insets.top + Space.sm;
+  const photos = mealCourses(meal).flatMap((course, i) => (course.photoId ? [{ course, name: courseName(t, course, i) }] : []));
   return (
     <View>
-      {meal.photoId ? (
-        <Image source={{ uri: api.photoUrl(meal.photoId), headers: api.authHeaders }} style={{ width: '100%', height: 300 }} contentFit="cover" transition={200} />
+      {photos.length > 1 ? (
+        <CoursePhotos photos={photos} />
+      ) : meal.photoId ? (
+        <Image source={{ uri: api.photoUrl(meal.photoId), headers: api.authHeaders }} style={{ width: '100%', height: PHOTO_HEIGHT }} contentFit="cover" transition={200} />
       ) : (
         <View style={{ height: 160, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: Space.md }}>
           <Txt style={{ fontSize: 64 }}>{meal.items.find((i) => i.emoji)?.emoji ?? '🍽️'}</Txt>
@@ -326,6 +417,111 @@ function Header({ meal }: { meal: Meal }) {
         style={{ position: 'absolute', top, right: Space.lg }}
       />
     </View>
+  );
+}
+
+/** « D'après ton dîner d'hier »: the past meal an analysis reused; a tap opens it. */
+function BasedOn({ basedOn, mealDate }: { basedOn: MealReference; mealDate: string }) {
+  const { t, locale } = useI18n();
+  const { colors } = useTheme();
+  return (
+    <Pressy
+      onPress={() => router.push({ pathname: '/meal/[id]', params: { id: basedOn.mealId } })}
+      accessibilityRole="link"
+      hitSlop={6}
+      style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <History size={13} color={colors.text3} />
+      <Txt variant="caption" tone="tertiary">
+        {basedOnLabel(t, locale, basedOn, mealDate)}
+      </Txt>
+    </Pressy>
+  );
+}
+
+const THREAD = 18;
+
+/** The thread's mark for one step: a dot, hollow for what comes next. */
+function ThreadDot({ hollow }: { hollow?: boolean }) {
+  const { colors } = useTheme();
+  return <View style={{ position: 'absolute', left: 0, top: 11, width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: hollow ? colors.border : colors.text3, backgroundColor: hollow ? colors.bg : colors.text3 }} />;
+}
+
+/** One course: its name and time, a quiet « ⋯ » for « Séparer » and « Supprimer », its items. */
+function CourseBlock({ course, name, mealDate, onSeparate, onDelete, children }: { course: MealCourse; name: string; mealDate: string; onSeparate: () => void; onDelete: () => void; children: ReactNode }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+  return (
+    <Animated.View layout={LinearTransition.duration(220)} exiting={FadeOut.duration(150)} style={{ paddingLeft: THREAD, paddingBottom: Space.lg }}>
+      <View style={{ position: 'absolute', left: 4, top: 11, bottom: 0, width: 2, borderRadius: 1, backgroundColor: colors.border }} />
+      <ThreadDot />
+      <Row style={{ justifyContent: 'space-between', minHeight: 32 }}>
+        <Row gap={Space.sm} style={{ flex: 1 }}>
+          <Txt variant="label" numberOfLines={1}>
+            {name}
+          </Txt>
+          <Txt variant="caption" tone="tertiary" style={{ fontVariant: ['tabular-nums'] }}>
+            {localTime(course.eatenAt)}
+          </Txt>
+        </Row>
+        <IconButton label={t('courses.options', { course: name })} variant="plain" size={32} icon={<Ellipsis size={18} color={colors.text3} />} onPress={() => setOpen(!open)} />
+      </Row>
+      {open ? (
+        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(120)}>
+          <Row gap={Space.sm} style={{ marginBottom: Space.sm }}>
+            <SmallAction icon={<Split size={15} color={colors.text} />} label={t('courses.separate')} onPress={onSeparate} />
+            <SmallAction icon={<Trash2 size={15} color={colors.danger} />} label={t('common.delete')} onPress={onDelete} />
+          </Row>
+        </Animated.View>
+      ) : null}
+      {course.basedOn ? (
+        <View style={{ marginBottom: Space.sm }}>
+          <BasedOn basedOn={course.basedOn} mealDate={mealDate} />
+        </View>
+      ) : null}
+      <View style={{ gap: Space.sm }}>{children}</View>
+    </Animated.View>
+  );
+}
+
+function SmallAction({ icon, label, onPress }: { icon: ReactNode; label: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressy onPress={onPress} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, height: 34, paddingHorizontal: 12, borderRadius: Radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
+      {icon}
+      <Txt variant="caption" style={{ fontWeight: '600' }}>
+        {label}
+      </Txt>
+    </Pressy>
+  );
+}
+
+/** « + Ajouter un plat »: a photo, words or a scan, into this meal. Threaded, it ends the courses' sequence. */
+function AddCourse({ onPress, threaded }: { onPress: () => void; threaded?: boolean }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  return (
+    <Pressy onPress={onPress} accessibilityRole="button" style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingLeft: threaded ? THREAD : 2, paddingRight: Space.md }}>
+      {threaded ? <ThreadDot hollow /> : null}
+      <Plus size={16} color={colors.text2} />
+      <Txt variant="label" tone="secondary">
+        {t('courses.add')}
+      </Txt>
+    </Pressy>
+  );
+}
+
+/** A course on its way from « Ajouter un plat »: a spinner while the AI looks. */
+function Arriving({ label, threaded }: { label: string; threaded?: boolean }) {
+  const { t } = useI18n();
+  return (
+    <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ flexDirection: 'row', alignItems: 'center', gap: Space.sm, paddingLeft: threaded ? THREAD : 2, paddingBottom: Space.md }}>
+      {threaded ? <ThreadDot hollow /> : null}
+      <ActivityIndicator size="small" />
+      <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flex: 1 }}>
+        {t('analyzing.1')} · {label}
+      </Txt>
+    </Animated.View>
   );
 }
 

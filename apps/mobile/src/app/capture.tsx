@@ -1,4 +1,4 @@
-import { mealTotals, shortId, toLocalDate, toLocalDateTime, type FoodItem, type Meal } from '@symbiose/shared';
+import { mealTotals, shortId, toLocalDate, toLocalDateTime, type CourseTarget, type FoodItem, type Meal } from '@symbiose/shared';
 import { useQuery } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -9,12 +9,14 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleShe
 import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CourseChip } from '@/components/meal/course-chip';
 import { PortionStepper } from '@/components/meal/portion-stepper';
 import { Button, IconButton, Pressy, Row, Txt, webInput } from '@/components/ui';
 import { MicButton } from '@/components/ui/mic-button';
 import { dismiss } from '@/lib/nav';
 import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
+import { useCourseTarget, yourMeal } from '@/lib/courses';
 import { useDictation } from '@/lib/dictation';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -30,6 +32,14 @@ const BARCODES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e'];
 const WHITE = '#FFFFFF';
 const DIM = 'rgba(255,255,255,0.6)';
 
+/** Where a capture goes, and when it was eaten: what every way of logging below shares. */
+interface Destination {
+  course?: CourseTarget;
+  /** « ton déjeuner », for the waiting card and the toast. */
+  joining: string | null;
+  at: () => { eatenAt: string; localDate: string };
+}
+
 /** When logging on a past day, keep the current time of day. */
 function timestampFor(date: string) {
   const now = new Date();
@@ -39,9 +49,20 @@ function timestampFor(date: string) {
 }
 
 export default function Capture() {
-  const params = useLocalSearchParams<{ date?: string; mode?: Mode }>();
+  // `into`: « Ajouter un plat » from a meal's page.
+  const params = useLocalSearchParams<{ date?: string; mode?: Mode; into?: string }>();
   const date = params.date ?? toLocalDate();
   const { t, locale } = useI18n();
+  // A capture that closely follows a meal joins it, unless the chip says otherwise.
+  const choice = useCourseTarget(date, params.into);
+  const [joined, setJoined] = useState(true);
+  const course = choice && joined ? choice.target : undefined;
+  const destination: Destination = {
+    course,
+    joining: choice && course ? yourMeal(t, choice.mealType) : null,
+    at: () => (course && choice?.at ? choice.at : timestampFor(date)),
+  };
+  const into = course ? { course } : null;
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -73,7 +94,7 @@ export default function Capture() {
     setBusy(true);
     try {
       const photo = await preparePhoto(uri, width, height);
-      void log({ ...timestampFor(date), photoBase64: photo.base64, text: note.trim() || undefined }, { photoUri: photo.uri, label: note.trim() || t('capture.photo') });
+      void log({ ...destination.at(), photoBase64: photo.base64, text: note.trim() || undefined, ...into }, { photoUri: photo.uri, label: note.trim() || t('capture.photo'), joining: destination.joining });
       close();
     } catch {
       setBusy(false);
@@ -117,13 +138,13 @@ export default function Capture() {
 
   const addProduct = () => {
     if (!product) return;
-    void log({ ...timestampFor(date), items: [{ ...product, grams }] }, { label: product.name });
+    void log({ ...destination.at(), items: [{ ...product, grams }], ...into }, { label: product.name, joining: destination.joining });
     close();
   };
 
   const keepOfflineCode = () => {
     if (!offlineCode) return;
-    queueBarcode(offlineCode, timestampFor(date));
+    queueBarcode(offlineCode, destination.at(), course);
     close();
   };
 
@@ -158,7 +179,7 @@ export default function Capture() {
         </View>
       ) : null}
 
-      {mode === 'text' ? <TextMode date={date} onDone={close} /> : null}
+      {mode === 'text' ? <TextMode date={date} destination={destination} onDone={close} /> : null}
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: WHITE }, flashStyle]} />
 
@@ -169,6 +190,13 @@ export default function Capture() {
           <IconButton label="torch" variant="glass" icon={torch ? <Zap size={20} color={WHITE} /> : <ZapOff size={20} color={WHITE} />} onPress={() => setTorch(!torch)} />
         ) : null}
       </Row>
+
+      {/* Where it goes, between the two buttons: only when it follows a meal. */}
+      {choice ? (
+        <View pointerEvents="box-none" style={{ position: 'absolute', top: insets.top + Space.sm + 4, left: 0, right: 0, alignItems: 'center' }}>
+          <CourseChip choice={choice} joined={joined} onToggle={() => setJoined(!joined)} />
+        </View>
+      ) : null}
 
       {/* Product sheet after a barcode scan */}
       {product ? (
@@ -298,7 +326,7 @@ function ProductPortion({ product, grams, onChange }: { product: FoodItem; grams
 }
 
 /** Describe the meal in words (keyboard dictation works great), or re-log a recent food in one tap. */
-function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
+function TextMode({ date, destination, onDone }: { date: string; destination: Destination; onDone: () => void }) {
   const { t, locale } = useI18n();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -310,19 +338,21 @@ function TextMode({ date, onDone }: { date: string; onDone: () => void }) {
 
   const send = () => {
     if (!text.trim()) return;
-    void log({ ...timestampFor(date), text: text.trim() }, { label: text.trim() });
+    const { course, joining, at } = destination;
+    void log({ ...at(), text: text.trim(), ...(course ? { course } : null) }, { label: text.trim(), joining });
     onDone();
   };
 
   const relogItem = (item: FoodItem) => {
-    void log({ ...timestampFor(date), items: [{ ...item, id: shortId(), source: 'library' }], title: item.name }, { label: item.name });
+    const { course, joining, at } = destination;
+    void log({ ...at(), items: [{ ...item, id: shortId(), source: 'library' }], title: item.name, ...(course ? { course } : null) }, { label: item.name, joining });
     onDone();
   };
 
   // Without network the copy waits in the queue; anything else is said in a toast once the screen is closed.
   const relogMeal = (meal: Meal) => {
     onDone();
-    relog(meal, timestampFor(date)).catch((error: unknown) => {
+    relog(meal, destination.at(), destination.course).catch((error: unknown) => {
       haptics.warning();
       showToast({ message: errorMessage(error, t('common.error'), t('common.offline')) });
     });
