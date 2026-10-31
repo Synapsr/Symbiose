@@ -3,6 +3,7 @@ export * from './schemas';
 export * from './targets';
 export * from './dates';
 export * from './meals';
+export * from './courses';
 export * from './activity';
 export * from './health';
 export * from './glance';
