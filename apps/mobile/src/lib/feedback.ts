@@ -49,7 +49,8 @@ async function play(cue: Cue, volume: number) {
     // Every time: dictation leaves the session ready to record (and deaf to the silent switch).
     await setAudioModeAsync(AMBIENT);
     player.volume = volume;
-    await player.seekTo(0);
+    // Back to the start once it has played; a fresh player (still loading, perhaps) starts there anyway.
+    if (player.currentTime > 0) await player.seekTo(0);
     player.play();
   } catch {
     // A sound is a bonus: never an error.
