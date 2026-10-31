@@ -8,6 +8,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { Pressy, Row, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
+import { claimReward, feedback } from '@/lib/feedback';
 import { formatClockTime } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useToday } from '@/lib/hooks';
@@ -23,10 +24,19 @@ const SWIPE_AWAY = 90;
  * Today's one coach sentence. Usually the day line; today, the proactive
  * coach may take the slot: the craving heads-up near the usual time, the
  * morning check-in until noon, the Monday review, or an offer. Swipe it
- * away for the day; tap it to answer the coach.
+ * away for the day; tap it to answer the coach. A `celebrate`d day line (a
+ * good day recognised) plays its note once it has been on screen a moment.
  */
-export function CoachLine({ date, fallback }: { date: string; fallback: string }) {
+export function CoachLine({ date, fallback, celebrate = false }: { date: string; fallback: string; celebrate?: boolean }) {
   const { line, nudge, dismiss } = useProactiveLine(date);
+  const focused = useIsFocused();
+  const shown = celebrate && focused && !line;
+  useEffect(() => {
+    if (!shown) return;
+    // A proactive line may still take the slot: only a sentence that stays gets its note.
+    const timer = setTimeout(() => claimReward(date, 'goodDay') && feedback.goodDay(), 900);
+    return () => clearTimeout(timer);
+  }, [shown, date]);
   if (!line) {
     return (
       <Txt variant="accent" tone="secondary" style={[VOICE, { paddingHorizontal: 6 }]}>

@@ -21,6 +21,7 @@ import {
   Server,
   ShieldCheck,
   Trash2,
+  Volume2,
   Watch,
   Activity,
 } from 'lucide-react-native';
@@ -35,6 +36,7 @@ import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Txt } from
 import { useI18n } from '@/i18n';
 import { ApiError } from '@/lib/api';
 import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
+import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules } from '@/lib/health';
 import { useHealthSync, useToday } from '@/lib/hooks';
@@ -298,6 +300,22 @@ export default function Me() {
           title={t('me.leftHanded')}
           subtitle={t('me.leftHandedHint')}
           right={<Switch value={settings.leftHanded} onValueChange={(v) => settings.set({ leftHanded: v })} />}
+        />
+        <Divider />
+        <Item
+          icon={<Volume2 size={20} color={colors.text} />}
+          title={t('me.sounds')}
+          subtitle={t('me.soundsHint')}
+          right={
+            <Switch
+              value={settings.sounds}
+              onValueChange={(on) => {
+                settings.set({ sounds: on });
+                // Switched on: a taste of what they sound like.
+                if (on) feedback.preview();
+              }}
+            />
+          }
         />
         <Divider />
         <Item

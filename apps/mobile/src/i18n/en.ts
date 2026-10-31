@@ -744,4 +744,13 @@ export const en: Record<TranslationKey, string> = {
   'admin.pending.still': 'Not approved yet, come back a little later.',
   'admin.pending.delete': 'Delete my request',
   'admin.pending.deleteConfirm': 'Your account and what you entered will be erased from this server.',
+
+  // Feedback: sounds and rewards at the right moments
+  'me.sounds': 'Sounds',
+  'me.soundsHint': 'A few soft notes at the right moments. Silent mode mutes them.',
+  'reward.firstMeal': 'First meal logged, welcome',
+  'reward.week': '7 days logged, well done',
+  'reward.month': '30 days logged, well done',
+  'reward.goodDay.max': 'Yesterday: {nutrient} under your limit. A good day, shall we keep going?',
+  'reward.goodDay.min': 'Yesterday: {nutrient} goal reached. A good day, shall we keep going?',
 };

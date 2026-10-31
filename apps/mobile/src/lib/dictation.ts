@@ -55,6 +55,9 @@ function isAvailable(): boolean {
 /** One field listens at a time: starting another hands the microphone over. */
 let current: { session: Session; end: () => void } | null = null;
 
+/** A field is listening: the microphone has the audio session, so feedback sounds stay quiet. */
+export const isDictating = () => current !== null;
+
 function release(session: Session) {
   session.released = true;
   clearTimeout(session.timer);

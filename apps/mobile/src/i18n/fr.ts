@@ -757,6 +757,15 @@ export const fr = {
   'admin.pending.still': 'Pas encore validée, reviens un peu plus tard.',
   'admin.pending.delete': 'Supprimer ma demande',
   'admin.pending.deleteConfirm': 'Ton compte et ce que tu as saisi seront effacés de ce serveur.',
+
+  // Feedback: sounds and rewards at the right moments
+  'me.sounds': 'Sons',
+  'me.soundsHint': 'Quelques notes douces aux bons moments. Le mode silencieux les coupe.',
+  'reward.firstMeal': 'Premier repas noté, bienvenue',
+  'reward.week': '7 jours notés, bravo',
+  'reward.month': '30 jours notés, bravo',
+  'reward.goodDay.max': 'Hier : {nutrient} sous ta limite. Une belle journée, on continue ?',
+  'reward.goodDay.min': 'Hier : objectif {nutrient} atteint. Une belle journée, on continue ?',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

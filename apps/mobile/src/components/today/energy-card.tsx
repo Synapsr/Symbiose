@@ -1,5 +1,7 @@
 import { heroNutrient as sharedHero, type DaySummary, type GoalPlan, type NutrientKey, type NutrientProgress } from '@symbiose/shared';
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
 import { AnimatedNumber, Bar, Card, Dot, Glow, Ring, Row, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
@@ -27,8 +29,21 @@ function secondary(day: DaySummary, plan: GoalPlan | null, hero: NutrientKey, hi
  * The hero: what's left today for the plan's first focus nutrient, with
  * calories and two other nutrients as quiet bars beside it. One card, not two.
  * Before the first meal there are no bars: a day starts with its budget, not a row of zeros.
+ * A goal reached today lights the ring up for a moment (`glow`, from `useGoalRewards`).
  */
-export function EnergyCard({ day, plan, hero: heroKey, hideCalories }: { day: DaySummary; plan: GoalPlan | null; hero: NutrientKey; hideCalories: boolean }) {
+export function EnergyCard({
+  day,
+  plan,
+  hero: heroKey,
+  hideCalories,
+  glow,
+}: {
+  day: DaySummary;
+  plan: GoalPlan | null;
+  hero: NutrientKey;
+  hideCalories: boolean;
+  glow?: SharedValue<number>;
+}) {
   const { t, locale, nutrient } = useI18n();
   const { colors } = useTheme();
 
@@ -60,18 +75,20 @@ export function EnergyCard({ day, plan, hero: heroKey, hideCalories }: { day: Da
     <Card style={{ overflow: 'hidden', padding: Space.lg + 2 }}>
       <Glow color={heroColor} size={260} opacity={0.2} style={{ left: -80, top: -80 }} />
       <Row gap={Space.lg + 2}>
-        <Ring progress={hero.ratio} size={118} stroke={11} color={heroColor}>
-          {reachedMin ? (
-            <Txt variant="display" style={{ fontSize: 34 }}>
-              ✓
+        <RingSwell glow={glow}>
+          <Ring progress={hero.ratio} size={118} stroke={11} color={heroColor}>
+            {reachedMin ? (
+              <Txt variant="display" style={{ fontSize: 34 }}>
+                ✓
+              </Txt>
+            ) : (
+              <AnimatedNumber value={Math.abs(remaining)} format={formatCenter} style={{ fontSize: centerValue.length > 4 ? 27 : 34, lineHeight: 40 }} />
+            )}
+            <Txt variant="caption" tone={over ? 'warning' : 'secondary'} numberOfLines={2} style={{ textAlign: 'center', fontSize: 12, lineHeight: 15, maxWidth: 84 }}>
+              {centerLabel}
             </Txt>
-          ) : (
-            <AnimatedNumber value={Math.abs(remaining)} format={formatCenter} style={{ fontSize: centerValue.length > 4 ? 27 : 34, lineHeight: 40 }} />
-          )}
-          <Txt variant="caption" tone={over ? 'warning' : 'secondary'} numberOfLines={2} style={{ textAlign: 'center', fontSize: 12, lineHeight: 15, maxWidth: 84 }}>
-            {centerLabel}
-          </Txt>
-        </Ring>
+          </Ring>
+        </RingSwell>
 
         <View style={{ flex: 1, gap: Space.md }}>
           <View style={{ gap: 3 }}>
@@ -96,6 +113,28 @@ export function EnergyCard({ day, plan, hero: heroKey, hideCalories }: { day: Da
         </View>
       </Row>
     </Card>
+  );
+}
+
+const RING = 118;
+const HALO = 300;
+
+/** The ring with its reward: a halo of the accent blooms behind it and the ring swells a hair, then both settle. */
+function RingSwell({ glow, children }: { glow?: SharedValue<number>; children: ReactNode }) {
+  const { colors } = useTheme();
+  const halo = useAnimatedStyle(() => {
+    const g = glow?.value ?? 0;
+    return { opacity: g, transform: [{ scale: 0.55 + 0.45 * g }] };
+  });
+  const swell = useAnimatedStyle(() => ({ transform: [{ scale: 1 + 0.045 * (glow?.value ?? 0) }] }));
+  if (!glow) return children;
+  return (
+    <View style={{ width: RING, height: RING }}>
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: (RING - HALO) / 2, top: (RING - HALO) / 2, width: HALO, height: HALO }, halo]}>
+        <Glow color={colors.accent} size={HALO} opacity={0.55} />
+      </Animated.View>
+      <Animated.View style={swell}>{children}</Animated.View>
+    </View>
   );
 }
 
