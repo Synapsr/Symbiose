@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { HttpError } from '../errors';
 import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, MORNING, NUDGES, REVIEWER } from './prompts';
-import type { Ai, BloodPressureBrief, EnergyExpenditureBrief, JournalBrief, MealAnalysisInput, RecoveryBrief, UserContext } from './types';
+import type { Ai, AiFeature, AiUsageListener, BloodPressureBrief, EnergyExpenditureBrief, JournalBrief, MealAnalysisInput, RecoveryBrief, UserContext } from './types';
 
 // Structured-output schemas. Kept free of numeric bounds: the server clamps
 // and validates everything afterwards.
@@ -184,7 +184,7 @@ function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): st
   return `<context>\n${JSON.stringify(payload, null, 1)}\n</context>`;
 }
 
-export function createClaudeAi(apiKey: string, model: string, workspaceId: string | null = null): Ai {
+export function createClaudeAi(apiKey: string, model: string, workspaceId: string | null = null, onUsage?: AiUsageListener): Ai {
   const client = new Anthropic({
     apiKey,
     maxRetries: 2,
@@ -193,13 +193,45 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     defaultHeaders: workspaceId ? { 'anthropic-workspace-id': workspaceId } : undefined,
   });
 
+  /** Reports each call once: answered (tokens were billed, even for a refusal) or failed. */
+  function meter(feature: AiFeature) {
+    const started = Date.now();
+    let reported = false;
+    const report = (usage: Anthropic.Beta.BetaUsage | null, answeredBy: string, error?: unknown) => {
+      if (reported || !onUsage) return;
+      reported = true;
+      try {
+        onUsage({
+          feature,
+          provider: 'anthropic',
+          model: answeredBy,
+          inputTokens: usage?.input_tokens ?? 0,
+          outputTokens: usage?.output_tokens ?? 0,
+          cacheReadTokens: usage?.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: usage?.cache_creation_input_tokens ?? 0,
+          durationMs: Date.now() - started,
+          ok: error === undefined,
+          ...(error === undefined ? {} : { error: (mapError(error) as { code?: string }).code ?? 'ai_error' }),
+        });
+      } catch {
+        // Metering never breaks an answer.
+      }
+    };
+    return {
+      answered: (message: { model: string; usage: Anthropic.Beta.BetaUsage }) => report(message.usage, message.model),
+      failed: (error: unknown) => report(null, model, error),
+    };
+  }
+
   async function run<S extends z.ZodType>(opts: {
+    feature: AiFeature;
     system: string;
     content: Anthropic.Beta.BetaContentBlockParam[];
     schema: S;
     effort: Effort;
     history?: Anthropic.Beta.BetaMessageParam[];
   }): Promise<z.infer<S>> {
+    const meterCall = meter(opts.feature);
     try {
       const response = await client.beta.messages.parse({
         model,
@@ -211,6 +243,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         messages: [...(opts.history ?? []), { role: 'user', content: opts.content }],
         output_config: { effort: opts.effort, format: betaZodOutputFormat(opts.schema) },
       });
+      meterCall.answered(response);
       if (response.stop_reason === 'refusal') {
         throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
       }
@@ -219,6 +252,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       }
       return response.parsed_output as z.infer<S>;
     } catch (error) {
+      meterCall.failed(error);
       throw mapError(error);
     }
   }
@@ -251,14 +285,14 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       if (input.correction) lines.push(`Correction to apply: ${input.correction}`);
       if (!input.text && !input.correction) lines.push('Analyse this meal.');
       content.push({ type: 'text', text: lines.join('\n\n') });
-      return run({ system: MEAL_ANALYST, content, schema: MealAnalysisOut, effort: 'medium' });
+      return run({ feature: 'meal', system: MEAL_ANALYST, content, schema: MealAnalysisOut, effort: 'medium' });
     },
 
     async draftPlan(input) {
       const ctx: UserContext = { locale: input.locale, profile: input.profile, plan: input.previousPlan, targets: null };
       const weight = { latestKg: input.weight.latest?.kg ?? null, changeKgOver90Days: input.weight.changeKg, readings: input.weight.points.length };
       const text = `${contextBlock(ctx, { weightTrend: weight, ...bloodPressureExtra(input.bloodPressure) })}\n\nMy goals, in my own words:\n${input.intentions}`;
-      return run({ system: GOAL_PLANNER, content: [{ type: 'text', text }], schema: PlanOut, effort: 'medium' });
+      return run({ feature: 'plan', system: GOAL_PLANNER, content: [{ type: 'text', text }], schema: PlanOut, effort: 'medium' });
     },
 
     async coach(input, onText) {
@@ -274,6 +308,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         ...recoveryExtra(input.recovery),
       };
       const text = `${contextBlock(input, extra)}\n\n${input.message}`;
+      const meterCall = meter('coach');
       try {
         const stream = client.beta.messages.stream({
           model,
@@ -288,6 +323,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         });
         if (onText) stream.on('text', (delta) => onText(delta));
         const message = await stream.finalMessage();
+        meterCall.answered(message);
         if (message.stop_reason === 'refusal') {
           throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
         }
@@ -307,6 +343,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         if (!reply && !fallback) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
         return { reply: reply || fallback!, planChange, mealActions };
       } catch (error) {
+        meterCall.failed(error);
         throw mapError(error);
       }
     },
@@ -314,6 +351,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     async cravingTip(input, onText, signal) {
       const craving = input.what ? `I'm craving: ${input.what}` : "I'm having a craving (I didn't say what).";
       const text = `${contextBlock(input, { localTime: input.localTime, activityToday: input.activityToday, ...input.life })}\n\n${craving}${input.intensity ? ` Intensity ${input.intensity}/3.` : ''}`;
+      const meterCall = meter('craving');
       try {
         // Plain text, streamed: the tip shows up while it is written, the buttons never wait for it.
         const stream = client.beta.messages.stream(
@@ -330,11 +368,13 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         );
         if (onText) stream.on('text', (delta) => onText(delta));
         const message = await stream.finalMessage();
+        meterCall.answered(message);
         if (message.stop_reason === 'refusal') throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
         const advice = parseCravingAdvice(message.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join(''));
         if (!advice.tip) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
         return advice;
       } catch (error) {
+        meterCall.failed(error);
         throw mapError(error);
       }
     },
@@ -367,12 +407,13 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
       };
       const stats = { ...rest, activity: activityStats, ...life };
       const text = `${contextBlock(input, { stats, days: compactDays, ...bloodPressureExtra(input.bloodPressure), ...expenditureExtra(input.energyExpenditure), ...journalExtra(input.journal) })}\n\nWrite my review for this period.`;
-      return run({ system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
+      return run({ feature: 'review', system: REVIEWER, content: [{ type: 'text', text }], schema: ReviewSchema, effort: 'medium' });
     },
 
     async morning(input, onText) {
       const { locale: _l, profile: _p, plan: _pl, targets: _t, ...data } = input;
       const text = `${contextBlock(input, data)}\n\nWrite my morning check-in for ${input.date}.`;
+      const meterCall = meter('morning');
       try {
         const stream = client.beta.messages.stream({
           model,
@@ -385,6 +426,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         });
         if (onText) stream.on('text', (delta) => onText(delta));
         const message = await stream.finalMessage();
+        meterCall.answered(message);
         if (message.stop_reason === 'refusal') throw new HttpError(422, 'ai_refused', 'The AI declined to answer this request');
         const reply = message.content
           .flatMap((block) => (block.type === 'text' ? [block.text] : []))
@@ -393,6 +435,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
         if (!reply) throw new HttpError(424, 'ai_bad_output', 'The AI returned an empty answer, please retry');
         return { text: reply };
       } catch (error) {
+        meterCall.failed(error);
         throw mapError(error);
       }
     },
@@ -400,7 +443,7 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
     async cravingNudges(input) {
       const { locale: _l, profile: _p, plan: _pl, targets: _t, ...data } = input;
       const text = `${contextBlock(input, data)}\n\nWrite this week's nudges.`;
-      return run({ system: NUDGES, content: [{ type: 'text', text }], schema: NudgesOut, effort: 'low' });
+      return run({ feature: 'nudges', system: NUDGES, content: [{ type: 'text', text }], schema: NudgesOut, effort: 'low' });
     },
   };
 }

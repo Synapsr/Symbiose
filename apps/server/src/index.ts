@@ -2,8 +2,7 @@ import { join } from 'node:path';
 
 import { serve } from '@hono/node-server';
 
-import { createClaudeAi, createDisabledAi } from './ai/claude';
-import { createMockAi } from './ai/mock';
+import { createAi } from './ai';
 import { createApp } from './app';
 import { openDb } from './db';
 import { loadConfig, VERSION } from './env';
@@ -11,11 +10,7 @@ import { PhotoStore } from './services/photos';
 
 const config = loadConfig();
 const db = openDb(join(config.dataDir, 'symbiose.db'));
-const ai = config.aiMock
-  ? createMockAi()
-  : config.anthropicApiKey
-    ? createClaudeAi(config.anthropicApiKey, config.aiModel, config.anthropicWorkspaceId)
-    : createDisabledAi();
+const ai = createAi(config);
 const photos = new PhotoStore(db, join(config.dataDir, 'photos'));
 
 const app = createApp({ db, ai, photos, config }, { log: true });

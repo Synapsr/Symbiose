@@ -281,6 +281,29 @@ export interface NudgesInput extends UserContext {
   topCravings: string[];
 }
 
+export type AiFeature = 'meal' | 'plan' | 'coach' | 'craving' | 'review' | 'morning' | 'nudges';
+
+/**
+ * One call to the AI provider, for the admin's global view: what it cost and
+ * how it went. Never who asked or what was said.
+ */
+export interface AiUsage {
+  feature: AiFeature;
+  provider: string;
+  /** The model that answered (a fallback may answer instead of the configured one). */
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  durationMs: number;
+  /** False when the call failed before an answer came back; the error is its code (`ai_rate_limited`…). */
+  ok: boolean;
+  error?: string;
+}
+
+export type AiUsageListener = (usage: AiUsage) => void;
+
 export interface Ai {
   readonly enabled: boolean;
   readonly model: string | null;
