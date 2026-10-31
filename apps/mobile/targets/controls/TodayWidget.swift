@@ -379,16 +379,24 @@ struct CaptureButton: View {
   }
 }
 
-/// The app's logo (« Bourgeon »): a cell and the bud that grows out of it. Its emerald-to-lime
-/// gradient in full colour; one accent tint on the Lock Screen and in tinted modes.
+/// The app's logo (« Bourgeon », Graphite): the cell in ink and the bud as the only light.
+/// One accent tint on the Lock Screen and in tinted modes.
 struct SymbioseMark: View {
   var size: CGFloat = 30
   @Environment(\.widgetRenderingMode) private var renderingMode
 
   var body: some View {
+    let s = size / 68.5
     Group {
       if renderingMode == .fullColor {
-        LogoMark().fill(Palette.bourgeon)
+        ZStack {
+          LogoMark().fill(Palette.markInk)
+          // The bud: centre (53, 15.5), radius 15.5 in the 68.5 box.
+          Circle()
+            .fill(Palette.budLight(radius: 22.3 * s))
+            .frame(width: 31 * s, height: 31 * s)
+            .offset(x: 18.75 * s, y: -18.75 * s)
+        }
       } else {
         LogoMark().fill(Palette.accent).widgetAccentable()
       }

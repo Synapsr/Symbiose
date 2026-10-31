@@ -15,7 +15,7 @@ module.exports = {
   icon: '../../assets/images/watch-icon.png',
   frameworks: ['SwiftUI', 'WatchKit', 'WatchConnectivity', 'WidgetKit'],
   colors: {
-    $accent: { light: '#2EE68A', dark: '#2EE68A' },
+    $accent: { light: '#5FD6B4', dark: '#5FD6B4' },
   },
   entitlements: {
     'com.apple.security.application-groups': ['group.io.synapsr.symbiose'],

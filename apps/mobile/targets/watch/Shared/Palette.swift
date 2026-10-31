@@ -2,25 +2,32 @@ import SwiftUI
 
 /// The app's dark palette (src/theme): the watch is always dark.
 enum Palette {
-  static let accent = Color(hex: 0x2EE68A)
-  static let accentSoft = Color(hex: 0x0D3320)
+  static let accent = Color(hex: 0x5FD6B4)
+  static let accentSoft = Color(hex: 0x122C27)
   static let warning = Color(hex: 0xFFB224)
   static let surface = Color(hex: 0x161618)
   static let surface2 = Color(hex: 0x222225)
   static let text2 = Color(hex: 0x9A9AA0)
   static let text3 = Color(hex: 0x5F5F66)
 
-  /// The logo's fill (dark stops), emerald in the cell to acid lime in the bud, for a square `LogoMark`.
-  static let bourgeon = LinearGradient(
-    stops: [
-      .init(color: Color(hex: 0x00B85C), location: 0),
-      .init(color: Color(hex: 0x1FE584), location: 0.48),
-      .init(color: Color(hex: 0x8DFF62), location: 0.76),
-      .init(color: Color(hex: 0xE2FF4D), location: 1),
-    ],
+  /// The logo's body: silver ink (the watch is always dark), for a square `LogoMark`.
+  static let markInk = LinearGradient(
+    colors: [Color(hex: 0xB9BEC4), Color(hex: 0xF5F5F3)],
     startPoint: UnitPoint(x: 0.153, y: 0.934),
     endPoint: UnitPoint(x: 0.898, y: 0.073)
   )
+
+  /// The bud's light, the mark's only colour. `radius` in points: 22.3 × size / 68.5.
+  static func budLight(radius: CGFloat) -> RadialGradient {
+    RadialGradient(
+      stops: [
+        .init(color: Color(hex: 0xF0FFF7), location: 0),
+        .init(color: Color(hex: 0x6FF2BE), location: 0.55),
+        .init(color: Color(hex: 0x1DBF8A), location: 1),
+      ],
+      center: UnitPoint(x: 0.38, y: 0.34), startRadius: 0, endRadius: radius
+    )
+  }
 
   /// One colour per nutrient, as in rings, bars and chips on the phone.
   static func nutrient(_ key: String) -> Color {

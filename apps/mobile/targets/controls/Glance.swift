@@ -221,25 +221,32 @@ enum Nutrient {
 
 /// src/theme in Swift, in sRGB like the app (asset catalog colours would be read as Display P3).
 enum Palette {
-  static let accent = Color(light: 0x00803F, dark: 0x2EE68A)
-  static let accentSoft = Color(light: 0xE2F9EA, dark: 0x0D3320)
+  static let accent = Color(light: 0x0F7663, dark: 0x5FD6B4)
+  static let accentSoft = Color(light: 0xE6F2EE, dark: 0x122C27)
   /// Text and icons on the accent.
   static let onAccent = Color(light: 0xFFFFFF, dark: 0x0A0A0B)
   static let surface = Color(light: 0xFFFFFF, dark: 0x161618)
   static let track = Color(light: 0xEDECE7, dark: 0x2A2A2E)
   static let warning = Color(light: 0xE8890C, dark: 0xFFB224)
 
-  /// The logo's fill, emerald in the cell to acid lime in the bud, for a square `LogoMark`.
-  static let bourgeon = LinearGradient(
-    stops: [
-      .init(color: Color(light: 0x00934A, dark: 0x00B85C), location: 0),
-      .init(color: Color(light: 0x0DC466, dark: 0x1FE584), location: 0.48),
-      .init(color: Color(light: 0x5BE65E, dark: 0x8DFF62), location: 0.76),
-      .init(color: Color(light: 0xC2FF2E, dark: 0xE2FF4D), location: 1),
-    ],
+  /// The logo's body: the theme's ink, graphite in light and silver in dark (for a square `LogoMark`).
+  static let markInk = LinearGradient(
+    colors: [Color(light: 0x0E1012, dark: 0xB9BEC4), Color(light: 0x3A4048, dark: 0xF5F5F3)],
     startPoint: UnitPoint(x: 0.153, y: 0.934),
     endPoint: UnitPoint(x: 0.898, y: 0.073)
   )
+
+  /// The bud's light, the mark's only colour. `radius` in points: 22.3 × size / 68.5.
+  static func budLight(radius: CGFloat) -> RadialGradient {
+    RadialGradient(
+      stops: [
+        .init(color: Color(light: 0xD9FFEE, dark: 0xF0FFF7), location: 0),
+        .init(color: Color(light: 0x4BE0A6, dark: 0x6FF2BE), location: 0.55),
+        .init(color: Color(light: 0x12A27A, dark: 0x1DBF8A), location: 1),
+      ],
+      center: UnitPoint(x: 0.38, y: 0.34), startRadius: 0, endRadius: radius
+    )
+  }
 }
 
 extension Color {
