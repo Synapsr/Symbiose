@@ -38,7 +38,7 @@ export default function ScanServer() {
           <Txt tone="inverted" style={{ textAlign: 'center', color: '#fff' }}>
             {t('scan.permission')}
           </Txt>
-          <Button title={t('scan.allow')} variant="accent" onPress={requestPermission} />
+          <Button title={t('scan.allow')} variant="primary" onPress={requestPermission} />
         </View>
       )}
 

@@ -50,7 +50,7 @@ export default function ProfileScreen() {
         <Txt variant="heading">{t('me.editProfile')}</Txt>
         <Row gap={Space.sm}>
           {/* Saving sits at the top, where the keyboard never hides it. */}
-          <Button title={t('common.save')} size="md" variant="accent" onPress={() => save.mutate()} loading={save.isPending} disabled={!parsed || !name.trim()} />
+          <Button title={t('common.save')} size="md" variant="primary" onPress={() => save.mutate()} loading={save.isPending} disabled={!parsed || !name.trim()} />
           <IconButton label={t('common.close')} icon={<X size={20} color={colors.text} />} onPress={() => dismiss()} />
         </Row>
       </Row>

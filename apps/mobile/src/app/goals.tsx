@@ -108,7 +108,7 @@ export default function Goals() {
         <Txt variant="heading">{t('me.goals')}</Txt>
         <Row gap={Space.sm}>
           {/* Saving sits at the top, where the keyboard never hides it. */}
-          {!rewriting && (dirty || save.isPending) ? <Button title={t('common.save')} size="md" variant="accent" loading={save.isPending} onPress={() => edited && save.mutate(edited)} /> : null}
+          {!rewriting && (dirty || save.isPending) ? <Button title={t('common.save')} size="md" variant="primary" loading={save.isPending} onPress={() => edited && save.mutate(edited)} /> : null}
           <IconButton label={t('common.close')} icon={<X size={20} color={colors.text} />} onPress={() => dismiss()} />
         </Row>
       </Row>

@@ -316,7 +316,7 @@ function Bubble({ message, streaming, review }: { message: CoachMessage; streami
           <Txt variant="caption" tone="secondary">
             <InlineProse text={message.suggestion.rationale} />
           </Txt>
-          <Button title={t('coach.apply')} size="md" variant="accent" onPress={() => router.push({ pathname: '/goals', params: { intentions: message.suggestion!.intentions } })} />
+          <Button title={t('coach.apply')} size="md" variant="primary" onPress={() => router.push({ pathname: '/goals', params: { intentions: message.suggestion!.intentions } })} />
         </View>
       ) : null}
       {review ? (
