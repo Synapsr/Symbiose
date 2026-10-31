@@ -32,7 +32,7 @@ export const context: UserContext = { locale: 'fr', profile, plan, targets };
 
 export const mealInput: MealAnalysisInput = {
   ...context,
-  photo: { base64: 'aGVsbG8=', mime: 'image/jpeg' },
+  photos: [{ base64: 'aGVsbG8=', mime: 'image/jpeg' }],
   text: 'Pâtes carbonara et un coca',
   localTime: '12:30',
   mealTypeHint: 'lunch',
@@ -44,13 +44,49 @@ export const mealInput: MealAnalysisInput = {
 
 export const mealOutput = {
   isFood: true,
+  reusedMeal: null,
   title: 'Pâtes carbonara',
   mealType: 'lunch',
-  items: [{ name: 'Pâtes carbonara', emoji: '🍝', portion: '1 assiette', grams: 320, confidence: 0.7, per100g: nutrients(190) }],
+  courses: [],
+  items: [{ name: 'Pâtes carbonara', emoji: '🍝', portion: '1 assiette', grams: 320, confidence: 0.7, per100g: nutrients(190), course: 1 }],
   verdict: 'ok',
   headline: 'Assez riche, pense aux légumes ce soir.',
   tips: ['Ajoute une salade.'],
   clarification: null,
+};
+
+const food = (name: string, grams: number, kcal: number) => ({ id: name, name, emoji: '', portion: '', grams, per100g: nutrients(kcal), source: 'ai' as const, confidence: 0.8, brand: null, barcode: null });
+
+/** A correction of a meal in three courses, with words that refer to yesterday: each photo labelled, every course, the last days' meals. */
+export const mealCorrectionInput: MealAnalysisInput = {
+  ...mealInput,
+  photos: [
+    { base64: 'aGVsbG8=', mime: 'image/jpeg', course: 1 },
+    { base64: 'd29ybGQ=', mime: 'image/jpeg', course: 3 },
+  ],
+  text: null,
+  previous: {
+    title: 'Salade, gratin et tarte',
+    items: [],
+    courses: [
+      { course: 1, label: 'Entrée', time: '12:30', text: null, items: [food('Salade verte', 80, 20)] },
+      { course: 2, label: 'Plat', time: '12:50', text: 'le gratin', items: [food('Gratin dauphinois', 300, 145)] },
+      { course: 3, label: 'Dessert', time: '13:10', text: null, items: [food('Tarte aux pommes', 120, 255)] },
+    ],
+  },
+  correction: 'le gratin c’était le reste d’hier soir, et le dessert une demi-part',
+  history: {
+    today: 'Sat 2026-10-31',
+    meals: [{ ref: 'h1', when: 'Fri 2026-10-30 19:45', type: 'dinner', title: 'Gratin et salade', items: 'Gratin dauphinois 350 g · Salade verte 80 g' }],
+  },
+};
+
+/** A course joining a meal: the courses before it, its own words. */
+export const courseInput: MealAnalysisInput = {
+  ...mealInput,
+  photos: [],
+  text: 'une tarte aux pommes',
+  meal: { title: 'Salade et gratin', courses: [{ course: 1, label: 'Entrée', time: '12:30', items: 'Salade verte 80 g', nutrients: nutrients(16) }] },
 };
 
 export const planInput: PlanDraftInput = {

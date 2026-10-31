@@ -244,6 +244,8 @@ export const FoodItemSchema = z.object({
   confidence: z.number().min(0).max(1).nullable().default(null),
   brand: z.string().max(80).nullable().default(null),
   barcode: z.string().max(32).nullable().default(null),
+  /** The course it belongs to (see `Meal.courses`); absent: the first one. */
+  courseId: z.string().max(40).optional(),
 });
 export type FoodItem = z.infer<typeof FoodItemSchema>;
 export type FoodItemInput = z.input<typeof FoodItemSchema>;
@@ -278,21 +280,54 @@ export const MealInsightSchema = z.object({
 });
 export type MealInsight = z.infer<typeof MealInsightSchema>;
 
+/** A past meal an analysis reused (« le reste du gratin d'hier soir »). */
+export interface MealReference {
+  mealId: string;
+  localDate: string;
+  mealType: MealType;
+  title: string;
+}
+
+/** One course of a meal (a starter, the main, dessert…): each capture added to a meal is one. */
+export interface MealCourse {
+  id: string;
+  /** "Entrée", "Plat", "Dessert"… as the AI named it; "" when unnamed. */
+  label: string;
+  eatenAt: string;
+  photoId: string | null;
+  /** The past meal it was based on, when its words referred to one. */
+  basedOn: MealReference | null;
+}
+
 export interface Meal {
   id: string;
+  /** When it started: its first course. */
   eatenAt: string;
   localDate: string;
   mealType: MealType;
   title: string;
+  /** Every course's items; `courseId` says whose (none: the first course). */
   items: FoodItem[];
+  /** The cover: the first course's photo. */
   photoId: string | null;
   note: string | null;
+  /** The whole meal's, all courses together. */
   insight: MealInsight | null;
   favorite: boolean;
   totals: Nutrients;
+  /** In order, at least one (see `mealCourses`). Absent on older servers: the meal is its one course. */
+  courses?: MealCourse[];
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Where a capture goes. Absent: a new meal (what older apps get). `auto`: the
+ * meal it closely follows, if any (see `courseTarget`). `{ mealId }`: that
+ * meal, as its next course; a new meal if it is gone or on another day.
+ */
+export const CourseTargetSchema = z.union([z.literal('auto'), z.object({ mealId: z.string().min(1).max(60) })]);
+export type CourseTarget = z.infer<typeof CourseTargetSchema>;
 
 export const CreateMealInputSchema = z
   .object({
@@ -306,6 +341,8 @@ export const CreateMealInputSchema = z
     /** Already-known items (barcode, library, manual entry). */
     items: z.array(FoodItemSchema).max(40).optional(),
     title: z.string().trim().max(120).optional(),
+    /** Absent: a new meal. */
+    course: CourseTargetSchema.optional(),
   })
   .refine((v) => Boolean(v.text || v.photoBase64 || v.items?.length), {
     message: 'A meal needs a photo, a description or items',
@@ -331,7 +368,18 @@ export const DuplicateMealInputSchema = z.object({
   eatenAt: localDateTime,
   localDate: isoDate,
   mealType: MealTypeSchema.optional(),
+  /** Absent: a new meal; otherwise the copy's courses join that meal. */
+  course: CourseTargetSchema.optional(),
 });
+
+/** Moves every course of `mealId` into the meal: « Séparer », undone. */
+export const MergeMealInputSchema = z.object({ mealId: z.string().min(1).max(60) });
+
+/** A course moved out of its meal (« Séparer »): what is left of the meal, and the new one. */
+export interface SeparateCourseResult {
+  meal: Meal;
+  separated: Meal;
+}
 
 // ---------------------------------------------------------------- Activity (watch / phone)
 

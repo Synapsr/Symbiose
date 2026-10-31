@@ -2,7 +2,7 @@
  * The offline queue's rules, kept free of React Native so they can be unit
  * tested on their own (`pnpm --filter @symbiose/mobile test`).
  */
-import type { CreateMealInput, Meal, MealType } from '@symbiose/shared';
+import { mealCourses, type CourseTarget, type CreateMealInput, type Meal, type MealType } from '@symbiose/shared';
 
 /** A meal captured without network, waiting to be sent. Persisted as is; a photo lives in its own file. */
 export type OutboxEntry = {
@@ -18,6 +18,8 @@ export type OutboxEntry = {
   emoji: string | null;
   /** Set when the server refused it for good: shown on the card until retried or deleted. */
   error: string | null;
+  /** Where it goes (see `CourseTarget`): the meal it follows, as the capture screen said. Absent: a new meal. */
+  course?: CourseTarget;
 } & (
   | { kind: 'create'; input: Pick<CreateMealInput, 'text' | 'items' | 'title'>; photo: boolean }
   /** "Same as yesterday": `photoId` is the source meal's photo, which the copy shares. */
@@ -76,24 +78,27 @@ export function nextToSend<T extends Pick<OutboxEntry, 'id' | 'createdAt' | 'err
 
 // ---------------------------------------------------------------- Duplicates
 
-type SentCandidate = Pick<Meal, 'eatenAt' | 'localDate' | 'mealType' | 'photoId'>;
+type SentCandidate = Pick<Meal, 'eatenAt' | 'localDate' | 'mealType' | 'photoId' | 'courses'>;
 type DedupeKey = Pick<OutboxEntry, 'eatenAt' | 'localDate' | 'mealType'> &
   ({ kind: 'create'; photo: boolean } | { kind: 'duplicate'; photoId: string | null } | { kind: 'barcode' });
 
 /**
- * The meal an earlier attempt already created, if its answer got lost on the
- * way back: same day, same exact `eatenAt` (unique per capture, see
- * `uniqueEatenAt`), same type when the capture set one, and the same kind of
- * meal (a photo meal has a photo, a copy shares its source's photo).
+ * The meal an earlier attempt already created (or joined), if its answer got
+ * lost on the way back: same day, a course at the same exact `eatenAt`
+ * (unique per capture, see `uniqueEatenAt`; a meal of one course is its own),
+ * same type when the capture set one, and the same kind of course (a photo
+ * has a photo, a copy shares its source's photo).
  */
 export function findSentMeal<M extends SentCandidate>(entry: DedupeKey, meals: readonly M[]): M | null {
   return (
     meals.find((meal) => {
-      if (meal.localDate !== entry.localDate || meal.eatenAt !== entry.eatenAt) return false;
+      if (meal.localDate !== entry.localDate) return false;
+      const course = mealCourses(meal).find((c) => c.eatenAt === entry.eatenAt);
+      if (!course) return false;
       if (entry.mealType && meal.mealType !== entry.mealType) return false;
-      if (entry.kind === 'create') return Boolean(meal.photoId) === entry.photo;
-      if (entry.kind === 'duplicate') return meal.photoId === entry.photoId;
-      return meal.photoId === null;
+      if (entry.kind === 'create') return Boolean(course.photoId) === entry.photo;
+      if (entry.kind === 'duplicate') return course.photoId === entry.photoId || meal.photoId === entry.photoId;
+      return course.photoId === null;
     }) ?? null
   );
 }

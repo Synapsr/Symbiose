@@ -1,4 +1,4 @@
-import type { CoachMealAction, CoachMessageKind, CoachSuggestion, FoodItem, GoalPlan, JournalData, JournalKind, MealInsight, Profile, VitalMetric, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
+import type { CoachMealAction, CoachMessageKind, CoachSuggestion, FoodItem, GoalPlan, JournalData, JournalKind, MealCourse, MealInsight, Profile, VitalMetric, WorkoutIntensity, WorkoutType } from '@symbiose/shared';
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
@@ -14,6 +14,11 @@ export const users = sqliteTable('users', {
   plan: text('plan', { mode: 'json' }).$type<GoalPlan>(),
   createdAt: text('created_at').notNull(),
 });
+
+/** A course as stored: what the app sees, and the words it was logged with (the AI reads them again on a correction). */
+export interface MealCourseRow extends MealCourse {
+  text: string | null;
+}
 
 export const meals = sqliteTable(
   'meals',
@@ -32,6 +37,12 @@ export const meals = sqliteTable(
     note: text('note'),
     insight: text('insight', { mode: 'json' }).$type<MealInsight>(),
     favorite: integer('favorite', { mode: 'boolean' }).notNull().default(false),
+    /**
+     * Its courses once it has more than one (or one based on a past meal);
+     * null for a meal of one course, whose photo and words are the columns
+     * above. `eaten_at`, `photo_id` and `input_text` follow the first course.
+     */
+    courses: text('courses', { mode: 'json' }).$type<MealCourseRow[]>(),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },

@@ -5,6 +5,7 @@ import {
   glanceMetric,
   heroNutrient,
   LocalDateSchema,
+  mealSpan,
   toLocalDate,
   type Glance,
   type GlanceRelog,
@@ -80,7 +81,8 @@ export function glanceRoutes({ db, config }: Deps) {
         hero: metrics[0]!,
         metrics,
         meals: day.meals.length,
-        lastMealAt: day.meals.at(-1)?.eatenAt ?? null,
+        // The last course eaten, not when its meal started.
+        lastMealAt: day.meals.map((m) => mealSpan(m).end).sort((a, b) => Date.parse(a) - Date.parse(b)).at(-1) ?? null,
         cravings: { total: day.cravings.total, resisted: day.cravings.resisted },
         activity: {
           activeMinutes: day.activityWeek.activeMinutes,

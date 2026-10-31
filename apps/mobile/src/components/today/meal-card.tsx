@@ -1,4 +1,4 @@
-import { localTime, type Meal } from '@symbiose/shared';
+import { courseItems, localTime, mealCourses, type Meal } from '@symbiose/shared';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { RotateCw, Sparkles, X } from 'lucide-react-native';
@@ -18,9 +18,64 @@ export const PAD = Space.md;
 // Concentric radii: the thumbnail's corner follows the card's corner minus the padding.
 export const THUMB_RADIUS = Radius.lg - PAD;
 
+/** Back to front, a few degrees apart, like prints on a table: the cover in front. */
+const FAN = {
+  2: [
+    { left: 12, top: 0, rotate: '6deg' },
+    { left: 0, top: 12, rotate: '-3deg' },
+  ],
+  3: [
+    { left: 14, top: 0, rotate: '9deg' },
+    { left: 7, top: 6, rotate: '3deg' },
+    { left: 0, top: 14, rotate: '-4deg' },
+  ],
+} as const;
+
+/** One course's face: its photo, else its first emoji. */
+function Face({ photoId, emoji, size, style }: { photoId: string | null; emoji: string; size: number; style: object }) {
+  const { api } = useSession();
+  const { colors, imageOutline } = useTheme();
+  const frame = { position: 'absolute' as const, width: size, height: size, borderRadius: THUMB_RADIUS - 2, borderCurve: 'continuous' as const, borderWidth: 2, borderColor: colors.surface, overflow: 'hidden' as const };
+  return (
+    <View style={[frame, { backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }, style]}>
+      {photoId && api ? (
+        <Image source={{ uri: api.photoUrl(photoId), headers: api.authHeaders }} style={[{ width: '100%', height: '100%' }, imageOutline]} contentFit="cover" transition={250} recyclingKey={photoId} />
+      ) : (
+        <Txt style={{ fontSize: 22 }}>{emoji}</Txt>
+      )}
+    </View>
+  );
+}
+
+/** A meal in courses: its courses fanned out, the cover in front. */
+function CourseThumbs({ meal }: { meal: Meal }) {
+  const courses = mealCourses(meal);
+  const coverIndex = Math.max(0, courses.findIndex((c) => c.photoId));
+  // The cover, then the courses after it: at most three faces.
+  const shown = [courses[coverIndex]!, ...courses.filter((_, i) => i !== coverIndex)].slice(0, 3);
+  const fan = FAN[shown.length as 2 | 3];
+  return (
+    <View style={{ width: THUMB, height: THUMB }}>
+      {shown
+        .map((course, i) => ({ course, place: fan[shown.length - 1 - i]! }))
+        .reverse()
+        .map(({ course, place }) => (
+          <Face
+            key={course.id}
+            photoId={course.photoId}
+            emoji={courseItems(meal, course.id).find((i) => i.emoji)?.emoji ?? '🍽️'}
+            size={THUMB - (shown.length === 3 ? 14 : 12)}
+            style={{ left: place.left, top: place.top, transform: [{ rotate: place.rotate }] }}
+          />
+        ))}
+    </View>
+  );
+}
+
 function Thumb({ meal }: { meal: Meal }) {
   const { api } = useSession();
   const { colors, imageOutline } = useTheme();
+  if (mealCourses(meal).length > 1) return <CourseThumbs meal={meal} />;
   if (meal.photoId && api) {
     return (
       <Image
@@ -43,17 +98,20 @@ function Thumb({ meal }: { meal: Meal }) {
 const openMeal = (meal: Meal) => router.push({ pathname: '/meal/[id]', params: { id: meal.id } });
 
 export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boolean }) {
-  const { t, locale, nutrient } = useI18n();
+  const { t, plural, locale, nutrient } = useI18n();
   const { colors, elevation } = useTheme();
   const flag = meal.insight?.flags.find((f) => f.nutrient !== 'kcal' && f.share >= 0.15);
   const question = meal.insight?.clarification?.question;
+  // « Déjeuner · 3 plats »: one row for the whole meal.
+  const courses = mealCourses(meal).length;
+  const kind = [t(`meal.${meal.mealType}`), ...(courses > 1 ? [plural('courses.count', courses)] : [])].join(' · ');
 
   return (
     <Animated.View entering={FadeInDown.duration(320).easing(Easing.out(Easing.cubic))} exiting={FadeOut.duration(150)} layout={LinearTransition.duration(250)}>
       <Pressy
         onPress={() => openMeal(meal)}
         accessibilityRole="button"
-        accessibilityLabel={question ? `${meal.title}. ${t('today.question')} : ${question}` : meal.title}
+        accessibilityLabel={`${meal.title}, ${kind}${question ? `. ${t('today.question')} : ${question}` : ''}`}
         style={[{ flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: PAD, backgroundColor: colors.surface, borderRadius: Radius.lg }, elevation]}>
         <Thumb meal={meal} />
         <View style={{ flex: 1, gap: 3 }}>
@@ -61,7 +119,7 @@ export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boo
             {meal.title}
           </Txt>
           <Txt variant="caption" tone="secondary">
-            {localTime(meal.eatenAt)} · {t(`meal.${meal.mealType}`)}
+            {localTime(meal.eatenAt)} · {kind}
           </Txt>
           {flag ? (
             <Row gap={6}>
@@ -139,7 +197,7 @@ export function PendingMealCard({ pending, onRetry, onDismiss }: { pending: Pend
           </Animated.View>
         )}
         <Txt variant="caption" tone={failed ? 'warning' : 'secondary'} numberOfLines={2}>
-          {failed ? pending.error : pending.label}
+          {failed ? pending.error : pending.joining ? `${t('courses.joining', { meal: pending.joining })} · ${pending.label}` : pending.label}
         </Txt>
       </View>
       {failed ? (

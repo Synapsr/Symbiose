@@ -766,6 +766,30 @@ export const fr = {
   'reward.month': '30 jours notés, bravo',
   'reward.goodDay.max': 'Hier : {nutrient} sous ta limite. Une belle journée, on continue ?',
   'reward.goodDay.min': 'Hier : objectif {nutrient} atteint. Une belle journée, on continue ?',
+
+  // Courses: one meal, several courses
+  'courses.your.breakfast': 'ton petit-déjeuner',
+  'courses.your.lunch': 'ton déjeuner',
+  'courses.your.dinner': 'ton dîner',
+  'courses.your.snack': 'ton en-cas',
+  'courses.with': 'Avec {meal} · {time}',
+  'courses.withHint': 'Touche pour en faire un nouveau repas',
+  'courses.newMeal': 'Nouveau repas',
+  'courses.newMealHint': 'Touche pour l’ajouter à {meal}',
+  'courses.joining': 'Avec {meal}',
+  'courses.added': 'Ajouté à {meal}',
+  'courses.count.one': '{count} plat',
+  'courses.count.other': '{count} plats',
+  'courses.course': 'Plat {n}',
+  'courses.add': 'Ajouter un plat',
+  'courses.options': 'Options de {course}',
+  'courses.separate': 'Séparer',
+  'courses.separated': 'Séparé',
+  'courses.deleted': 'Plat supprimé',
+  'courses.basedOn': 'D’après {meal}{when}',
+  'courses.when.yesterday': ' d’hier',
+  'courses.when.weekday': ' de {day}',
+  'courses.when.date': ' du {date}',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

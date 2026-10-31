@@ -1,4 +1,4 @@
-import type { DaySummary, Locale, Meal } from '@symbiose/shared';
+import { courseAsMeal, type DaySummary, type Locale, type Meal } from '@symbiose/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Network from 'expo-network';
 import { router } from 'expo-router';
@@ -9,6 +9,7 @@ import { create } from 'zustand';
 import { translate, useI18n } from '@/i18n';
 
 import { ApiError, type Api } from './api';
+import { joinedCourse, withMeal, yourMeal } from './course-logic';
 import { feedback } from './feedback';
 import { haptics } from './haptics';
 import { health } from './health';
@@ -189,7 +190,8 @@ async function sendEntry(api: Api, entry: OutboxEntry): Promise<Meal> {
   // An earlier attempt may have reached the server and only lost its answer: look before posting again.
   const already = findSentMeal(entry, await api.meals(entry.localDate));
   if (already) return already;
-  const when = { eatenAt: entry.eatenAt, localDate: entry.localDate, ...(entry.mealType ? { mealType: entry.mealType } : null) };
+  // The course target goes along: a capture of the entrée sent first makes the meal the main then joins.
+  const when = { eatenAt: entry.eatenAt, localDate: entry.localDate, ...(entry.mealType ? { mealType: entry.mealType } : null), ...(entry.course ? { course: entry.course } : null) };
   switch (entry.kind) {
     case 'duplicate':
       return api.duplicateMeal(entry.sourceId, when);
@@ -279,23 +281,24 @@ export function useOutboxSync() {
   useEffect(() => {
     if (!api || !scope || !loaded) return;
 
-    // The real meal takes the waiting card's place in the same frame; the totals follow.
+    // The real meal takes the waiting card's place in the same frame (a course, its meal's); the totals follow.
     const landed = (entry: OutboxEntry, meal: Meal, count: number) => {
-      queryClient.setQueryData<DaySummary>(['day', meal.localDate], (day) =>
-        day && !day.meals.some((m) => m.id === meal.id) ? { ...day, meals: [...day.meals, meal].sort((a, b) => Date.parse(a.eatenAt) - Date.parse(b.eatenAt)) } : day,
-      );
+      queryClient.setQueryData<DaySummary>(['day', meal.localDate], (day) => (day ? withMeal(day, meal) : day));
       void dropEntry(entry.id);
+      void queryClient.invalidateQueries({ queryKey: ['meal', meal.id] });
       void queryClient.invalidateQueries({ queryKey: ['day', meal.localDate] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
+      const course = joinedCourse(meal, entry.eatenAt);
+      const t = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(locale, key, params);
       // Several landing at once make one « c'est noté » (see `mayPlay`).
       feedback.mealLogged(meal);
       showToast({
-        message: count > 1 ? translate(locale, 'outbox.sentMany', { count }) : `${translate(locale, 'today.mealLogged')} · ${meal.title}`,
+        message: count > 1 ? t('outbox.sentMany', { count }) : course ? t('courses.added', { meal: yourMeal(t, meal.mealType) }) : `${t('today.mealLogged')} · ${meal.title}`,
         onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
       });
-      // Same as logging online: copies aren't written to the health store.
-      if (entry.kind !== 'duplicate' && useSettings.getState().healthEnabled) void health.writeMeal(meal).catch(() => undefined);
+      // Same as logging online: copies aren't written to the health store, a course goes on its own.
+      if (entry.kind !== 'duplicate' && useSettings.getState().healthEnabled) void health.writeMeal(course ? courseAsMeal(meal, course.id) : meal).catch(() => undefined);
     };
 
     const flush = async () => {

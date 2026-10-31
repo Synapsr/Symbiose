@@ -10,6 +10,7 @@ import type {
   BloodPressureTrend,
   CoachMealActionResult,
   CoachMessage,
+  CourseTarget,
   CravingNudges,
   CreateMealInput,
   Craving,
@@ -38,6 +39,7 @@ import type {
   ProactiveSettingsPatch,
   Profile,
   Review,
+  SeparateCourseResult,
   ServerInfo,
   SleepInput,
   SleepTrend,
@@ -190,9 +192,14 @@ export function createApi(baseUrl: string, token: string) {
     meal: (id: string) => call<Meal>('GET', `/api/meals/${id}`),
     updateMeal: (id: string, input: UpdateMealInput) => call<Meal>('PATCH', `/api/meals/${id}`, input),
     refineMeal: (id: string, correction: string) => call<Meal>('POST', `/api/meals/${id}/refine`, { correction }, AI_TIMEOUT),
-    duplicateMeal: (id: string, body: { eatenAt: string; localDate: string; mealType?: MealType }) =>
-      call<Meal>('POST', `/api/meals/${id}/duplicate`, body),
+    /** A copy at a new time; with `course`, its courses join the meal it follows. */
+    duplicateMeal: (id: string, body: { eatenAt: string; localDate: string; mealType?: MealType; course?: CourseTarget }) =>
+      call<Meal>('POST', `/api/meals/${id}/duplicate`, body, AI_TIMEOUT),
     deleteMeal: (id: string) => call<void>('DELETE', `/api/meals/${id}`),
+    /** Courses: one moved out as a meal of its own (« Séparer »), joined back, or deleted; the meal is judged again. */
+    separateCourse: (mealId: string, courseId: string) => call<SeparateCourseResult>('POST', `/api/meals/${mealId}/courses/${courseId}/separate`, undefined, AI_TIMEOUT),
+    mergeMeal: (mealId: string, fromId: string) => call<Meal>('POST', `/api/meals/${mealId}/merge`, { mealId: fromId }, AI_TIMEOUT),
+    deleteCourse: (mealId: string, courseId: string) => call<Meal>('DELETE', `/api/meals/${mealId}/courses/${courseId}`, undefined, AI_TIMEOUT),
 
     library: (today: string) => call<LibraryResponse>('GET', `/api/foods/library?today=${today}`),
     glance: (date: string, hideCalories: boolean) => call<Glance>('GET', `/api/glance?date=${date}&hideCalories=${hideCalories ? 1 : 0}`),

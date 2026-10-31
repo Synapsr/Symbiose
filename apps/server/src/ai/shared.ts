@@ -1,4 +1,4 @@
-import { GoalTagSchema, NUTRIENT_KEYS } from '@symbiose/shared';
+import { GoalTagSchema, NUTRIENT_KEYS, roundNutrients, type FoodItem } from '@symbiose/shared';
 import { z } from 'zod';
 
 import { HttpError } from '../errors';
@@ -15,6 +15,7 @@ import type {
   EnergyExpenditureBrief,
   JournalBrief,
   MealAnalysisInput,
+  MealPhoto,
   MorningInput,
   NudgesInput,
   PlanDraftInput,
@@ -46,10 +47,13 @@ const NutrientsOut = z.object({
 const MealTypeOut = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
 const NutrientKeyOut = z.enum(NUTRIENT_KEYS);
 
+// The past meal reused comes first (its items follow from it), the courses' names before the items.
 export const MealAnalysisOut = z.object({
   isFood: z.boolean(),
+  reusedMeal: z.string().nullable(),
   title: z.string(),
   mealType: MealTypeOut,
+  courses: z.array(z.string()),
   items: z.array(
     z.object({
       name: z.string(),
@@ -58,6 +62,7 @@ export const MealAnalysisOut = z.object({
       grams: z.number(),
       confidence: z.number(),
       per100g: NutrientsOut,
+      course: z.number(),
     }),
   ),
   verdict: z.enum(['great', 'good', 'ok', 'watch']),
@@ -215,6 +220,11 @@ function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): st
 // What each feature sends after the system prompt. The meal's photo, when
 // there is one, goes before this text.
 
+const previousItem = (i: FoodItem) => ({ name: i.name, portion: i.portion, grams: i.grams, per100g: i.per100g });
+
+/** Said before each photo of a correction in courses, so the AI knows which course it shows. */
+export const photoCaption = (photo: MealPhoto): string | null => (photo.course ? `Photo of course ${photo.course}:` : null);
+
 export function mealText(input: MealAnalysisInput): string {
   const extra: Record<string, unknown> = {
     localTime: input.localTime,
@@ -224,16 +234,25 @@ export function mealText(input: MealAnalysisInput): string {
   if (input.recentWorkout) extra.recentWorkout = input.recentWorkout;
   if (input.activityToday) extra.activityToday = input.activityToday;
   if (input.bloodPressureCategory) extra.bloodPressureCategory = input.bloodPressureCategory;
+  if (input.meal) {
+    extra.meal = { title: input.meal.title, courses: input.meal.courses.map((c) => ({ ...c, nutrients: roundNutrients(c.nutrients) })) };
+  }
+  if (input.assessOnly) extra.assessOnly = true;
   if (input.previous) {
-    extra.previousAnalysis = {
-      title: input.previous.title,
-      items: input.previous.items.map((i) => ({ name: i.name, portion: i.portion, grams: i.grams, per100g: i.per100g })),
-    };
+    const { title, items, courses } = input.previous;
+    extra.previousAnalysis = courses?.length
+      ? { title, courses: courses.map((c) => ({ course: c.course, label: c.label, time: c.time, ...(c.text ? { text: c.text } : {}), items: c.items.map(previousItem) })) }
+      : { title, items: items.map(previousItem) };
+  }
+  if (input.history) {
+    extra.today = input.history.today;
+    extra.history = input.history.meals;
   }
   const lines = [contextBlock(input, extra)];
-  if (input.text) lines.push(`What I ate: ${input.text}`);
+  if (input.text) lines.push(`${input.meal ? 'Next course' : 'What I ate'}: ${input.text}`);
   if (input.correction) lines.push(`Correction to apply: ${input.correction}`);
-  if (!input.text && !input.correction) lines.push('Analyse this meal.');
+  if (input.assessOnly) lines.push('Assess this meal as a whole.');
+  else if (!input.text && !input.correction) lines.push(input.meal ? 'Analyse this next course.' : 'Analyse this meal.');
   return lines.join('\n\n');
 }
 

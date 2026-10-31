@@ -19,6 +19,7 @@ import {
   morningText,
   NudgesOut,
   nudgesText,
+  photoCaption,
   PlanOut,
   planText,
   refused,
@@ -131,8 +132,10 @@ export function createClaudeAi(apiKey: string, model: string, workspaceId: strin
 
     async analyzeMeal(input: MealAnalysisInput) {
       const content: Anthropic.Beta.BetaContentBlockParam[] = [];
-      if (input.photo) {
-        content.push({ type: 'image', source: { type: 'base64', media_type: input.photo.mime, data: input.photo.base64 } });
+      for (const photo of input.photos) {
+        const caption = photoCaption(photo);
+        if (caption) content.push({ type: 'text', text: caption });
+        content.push({ type: 'image', source: { type: 'base64', media_type: photo.mime, data: photo.base64 } });
       }
       content.push({ type: 'text', text: mealText(input) });
       return run({ feature: 'meal', system: MEAL_ANALYST, content, schema: MealAnalysisOut, effort: 'medium' });

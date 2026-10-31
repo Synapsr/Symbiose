@@ -105,6 +105,21 @@ describe('findSentMeal', () => {
     expect(findSentMeal(copy, [meal(at, { photoId: 'p1' })])).not.toBeNull();
     expect(findSentMeal({ kind: 'barcode', eatenAt: at, localDate: '2026-10-30' }, [meal(at)])).not.toBeNull();
   });
+
+  it('finds a capture that joined a meal as one of its courses, at its own time', () => {
+    const later = '2026-10-30T12:52:00+01:00';
+    const lunch = {
+      ...meal(at, { photoId: 'p1' }),
+      courses: [
+        { id: 'c0', label: 'Entrée', eatenAt: at, photoId: 'p1', basedOn: null },
+        { id: 'c1', label: 'Dessert', eatenAt: later, photoId: null, basedOn: null },
+      ],
+    };
+    expect(findSentMeal({ ...text, eatenAt: later }, [lunch])).toBe(lunch);
+    // The dessert had no photo: a photo capture at that time isn't it.
+    expect(findSentMeal({ ...text, eatenAt: later, photo: true }, [lunch])).toBeNull();
+    expect(findSentMeal({ ...text, eatenAt: '2026-10-30T12:53:00+01:00' }, [lunch])).toBeNull();
+  });
 });
 
 describe('uniqueEatenAt', () => {

@@ -42,6 +42,10 @@ Without an AI, a keyword-based planner produces a reasonable plan so the app sta
 
 Answering the question or typing a correction calls `/refine`, which re-runs the analysis with the previous items and the correction.
 
+**Courses.** A meal may have several courses: the starter noted, the main photographed 20 minutes later, then dessert. A capture sent with `course: 'auto'` joins the meal it closely follows (same day, within 75 min of its last course, 45 after a snack, never across to another main meal: `courseTarget` in `packages/shared`), or `course: { mealId }` the meal chosen on the phone. The AI analyses the new course knowing the ones before it and judges the whole meal: one verdict, one headline. A correction sends every course (each photo labelled with its course) and returns the whole meal. Courses live in one JSON column of the meal row, items say theirs with `courseId`, and a meal of one course keeps its photo and words in its own columns, so older meals need no rewrite and every total (day, Trends, coach, review, health store) still sums one meal's items.
+
+**Words about the past.** When a description or a correction refers to an earlier meal (« le reste du gratin d'hier soir », « comme mardi midi »: `refersToPast`), the analyst also gets the last week's meals, compact (title and items with grams, a few hundred tokens), and names the one it reused; the server copies that meal's values per 100 g as they were logged. Other captures send nothing more.
+
 **Barcodes** go to Open Food Facts. When a product doesn't report added sugars, they are inferred from the ingredient list.
 
 ## The coach
@@ -80,7 +84,7 @@ Accounts whose email is listed in `ADMIN_EMAILS` see the admin view (`/api/admin
 | Table | Content |
 | --- | --- |
 | `users` | credentials (scrypt), sign-up state, profile and goal plan as JSON |
-| `meals` | eaten-at (local time with offset), local date, items (JSON, per-100 g nutrients), photo id, AI insight |
+| `meals` | eaten-at (local time with offset), local date, items (JSON, per-100 g nutrients, each with its course), photo id, AI insight, courses (JSON, null for a meal of one course) |
 | `photos` | ownership and mime of files in `DATA_DIR/photos` |
 | `activity` | one row per day: steps, active/resting energy, source |
 | `weights` | one body-weight reading per day |
@@ -108,9 +112,11 @@ All routes except `/health`, `/` and `/api/info` require `Authorization: Bearer 
 | POST | `/api/auth/register`, `/api/auth/login` | email + password → token |
 | GET / PUT / DELETE | `/api/me`, `/api/me/profile`, `/api/me` | account; `GET /api/me/export` dumps everything |
 | GET / POST / PUT | `/api/goals`, `/api/goals/draft`, `/api/goals` | current plan, preview a plan from text, save |
-| GET / POST | `/api/meals?date=`, `/api/meals` | a day's meals; log one from a photo (base64 JPEG), text and/or items |
+| GET / POST | `/api/meals?date=`, `/api/meals` | a day's meals; log one from a photo (base64 JPEG), text and/or items, or a course of a meal |
 | GET / PATCH / DELETE | `/api/meals/:id` | edit portions, type, favourite… |
-| POST | `/api/meals/:id/refine`, `/api/meals/:id/duplicate` | AI correction, "eat again" |
+| POST | `/api/meals/:id/refine`, `/api/meals/:id/duplicate` | AI correction of the whole meal, "eat again" |
+| POST / DELETE | `/api/meals/:id/courses/:courseId/separate`, `/api/meals/:id/courses/:courseId` | a course as a meal of its own, or deleted |
+| POST | `/api/meals/:id/merge` | joins another meal of the day as courses (« Séparer », undone) |
 | GET | `/api/days/:date` | targets, totals, progress, meals, activity, cravings, streak |
 | GET | `/api/glance` | the key numbers for the watch, widgets and Live Activity, and meals to log again |
 | GET | `/api/foods/library`, `/api/foods/barcode/:code` | recents and favourites, Open Food Facts lookup |

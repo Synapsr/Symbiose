@@ -1,4 +1,4 @@
-import { shortId, toLocalDate, type CreateMealInput, type DaySummary, type Meal, type Workout } from '@symbiose/shared';
+import { courseAsMeal, mealCourses, shortId, toLocalDate, type CourseTarget, type CreateMealInput, type DaySummary, type Meal, type MealCourse, type Workout } from '@symbiose/shared';
 import { keepPreviousData, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -7,6 +7,7 @@ import { AppState } from 'react-native';
 import { useI18n } from '@/i18n';
 
 import { ApiError } from './api';
+import { joinedCourse, withMeal, yourMeal } from './course-logic';
 import { withoutMeal } from './day-logic';
 import { claimReward, feedback } from './feedback';
 import { mealMilestone } from './feedback-logic';
@@ -48,11 +49,12 @@ export function errorMessage(error: unknown, fallback: string, offline: string):
   return fallback;
 }
 
-/** Invalidates everything a meal change can affect. */
+/** Invalidates everything a meal change can affect (its own page too, when a course joined it from there). */
 export function useRefreshAfterMeal() {
   const queryClient = useQueryClient();
   return useCallback(
-    (meal: Pick<Meal, 'localDate'>) => {
+    (meal: Pick<Meal, 'localDate'> & Partial<Pick<Meal, 'id'>>) => {
+      if (meal.id) void queryClient.invalidateQueries({ queryKey: ['meal', meal.id] });
       void queryClient.invalidateQueries({ queryKey: ['day', meal.localDate] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
@@ -83,20 +85,65 @@ export function useDeleteMeal() {
   );
 }
 
-/** Every time already used that day, so a new capture gets its own (see `uniqueEatenAt`). */
+/** Every time already used that day, every course's included, so a new capture gets its own (see `uniqueEatenAt`). */
 function takenTimes(queryClient: QueryClient, localDate: string): string[] {
   return [
     ...useOutbox.getState().items.map((i) => i.eatenAt),
     ...usePending.getState().items.map((p) => p.input.eatenAt),
-    ...(queryClient.getQueryData<DaySummary>(['day', localDate])?.meals.map((m) => m.eatenAt) ?? []),
+    ...(queryClient.getQueryData<DaySummary>(['day', localDate])?.meals.flatMap((m) => mealCourses(m).map((c) => c.eatenAt)) ?? []),
   ];
 }
 
 /** A capture as the offline queue keeps it: everything but the photo bytes, which go to a file. */
-function captureEntry({ id, input, label, startedAt }: PendingMeal): OutboxEntry {
-  const { eatenAt, localDate, mealType, text, items, title, photoBase64 } = input;
+function captureEntry({ id, input, label, startedAt }: PendingMeal, queueLabel = label): OutboxEntry {
+  const { eatenAt, localDate, mealType, text, items, title, photoBase64, course } = input;
   const emoji = photoBase64 ? null : (items?.find((i) => i.emoji)?.emoji ?? (text ? '✍️' : '🍽️'));
-  return { id, kind: 'create', createdAt: startedAt, eatenAt, localDate, mealType, label, emoji, error: null, input: { text, items, title }, photo: Boolean(photoBase64) };
+  return { id, kind: 'create', createdAt: startedAt, eatenAt, localDate, mealType, course, label: queueLabel, emoji, error: null, input: { text, items, title }, photo: Boolean(photoBase64) };
+}
+
+/**
+ * « Séparer »: a course that joined a meal becomes a meal of its own, then
+ * « Annuler » joins it back. Both meals are judged again on the server.
+ */
+export function useSeparateCourse() {
+  const api = useApi();
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const refresh = useRefreshAfterMeal();
+  const showToast = useToast((s) => s.show);
+  return useCallback(
+    async (meal: Pick<Meal, 'id' | 'localDate'>, course: Pick<MealCourse, 'id'>) => {
+      haptics.tap();
+      try {
+        const { meal: left, separated } = await api.separateCourse(meal.id, course.id);
+        queryClient.setQueryData(['meal', left.id], left);
+        queryClient.setQueryData<DaySummary>(['day', left.localDate], (day) => (day ? withMeal(withMeal(day, left), separated) : day));
+        refresh(left);
+        showToast({
+          message: `${t('courses.separated')} · ${separated.title}`,
+          onPress: () => router.push({ pathname: '/meal/[id]', params: { id: separated.id } }),
+          action: {
+            label: t('today.undo'),
+            onPress: () =>
+              void api
+                .mergeMeal(left.id, separated.id)
+                .then((joined) => {
+                  queryClient.setQueryData(['meal', joined.id], joined);
+                  queryClient.removeQueries({ queryKey: ['meal', separated.id] });
+                  refresh(joined);
+                })
+                .catch(() => haptics.warning()),
+          },
+        });
+        return left;
+      } catch (error) {
+        haptics.warning();
+        showToast({ message: errorMessage(error, t('common.error'), t('common.offline')) });
+        return null;
+      }
+    },
+    [api, queryClient, refresh, showToast, t],
+  );
 }
 
 /**
@@ -112,6 +159,7 @@ export function useMealLogger() {
   const upsert = usePending((s) => s.upsert);
   const remove = usePending((s) => s.remove);
   const showToast = useToast((s) => s.show);
+  const separate = useSeparateCourse();
   const healthEnabled = useSettings((s) => s.healthEnabled);
   const { session, user } = useSession();
   const serverUrl = session?.serverUrl;
@@ -143,31 +191,43 @@ export function useMealLogger() {
 
   const run = useCallback(
     async (entry: PendingMeal) => {
-      keep(captureEntry(entry), entry.input.photoBase64);
+      keep(captureEntry(entry, entry.joining ? `${t('courses.joining', { meal: entry.joining })} · ${entry.label}` : entry.label), entry.input.photoBase64);
       if (useOutbox.getState().online === false) return park(entry.id);
       upsert({ ...entry, status: 'analyzing', error: null });
       try {
         const meal = await api.createMeal(entry.input);
+        // A course that joined a meal: the meal is already there, the day already opened.
+        const course = joinedCourse(meal, entry.input.eatenAt);
         // Today as it stood before this meal: the one that opens a day can mark a milestone.
-        const milestone = mealMilestone(queryClient.getQueryData<DaySummary>(['day', meal.localDate]), toLocalDate(), joined);
+        const milestone = course ? null : mealMilestone(queryClient.getQueryData<DaySummary>(['day', meal.localDate]), toLocalDate(), joined);
         const celebrated = milestone && claimReward(meal.localDate, milestone) ? milestone : null;
         void dropEntry(entry.id);
         remove(entry.id);
+        queryClient.setQueryData<DaySummary>(['day', meal.localDate], (day) => (day && course ? withMeal(day, meal) : day));
         refresh(meal);
-        // A milestone: the meal is analysed.
+        // A milestone: the meal is analysed. A course plays the same « noté ».
         feedback.mealLogged(meal, Boolean(celebrated));
-        showToast({
-          // The AI has a question: the toast says so, and a tap opens it.
-          message: meal.insight?.clarification
-            ? `${t('today.mealLogged')} · ${t('today.question')} ›`
-            : `${celebrated ? t(`reward.${celebrated}`) : t('today.mealLogged')} · ${meal.title}`,
-          onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
-          action: {
-            label: t('today.undo'),
-            onPress: () => void api.deleteMeal(meal.id).then(() => refresh(meal)),
-          },
-        });
-        if (healthEnabled) void health.writeMeal(meal).catch(() => undefined);
+        const question = meal.insight?.clarification ? ` · ${t('today.question')} ›` : '';
+        showToast(
+          course
+            ? {
+                // « Ajouté à ton déjeuner », and the guess undone in one tap.
+                message: `${t('courses.added', { meal: yourMeal(t, meal.mealType) })}${question}`,
+                onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
+                action: { label: t('courses.separate'), onPress: () => void separate(meal, course) },
+              }
+            : {
+                // The AI has a question: the toast says so, and a tap opens it.
+                message: question ? `${t('today.mealLogged')}${question}` : `${celebrated ? t(`reward.${celebrated}`) : t('today.mealLogged')} · ${meal.title}`,
+                onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
+                action: {
+                  label: t('today.undo'),
+                  onPress: () => void api.deleteMeal(meal.id).then(() => refresh(meal)),
+                },
+              },
+        );
+        // The health store gets each course once, when it is logged: never the meal again.
+        if (healthEnabled) void health.writeMeal(course ? courseAsMeal(meal, course.id) : meal).catch(() => undefined);
         return meal;
       } catch (error) {
         if (isNetworkError(error)) return park(entry.id, error);
@@ -178,16 +238,18 @@ export function useMealLogger() {
         return null;
       }
     },
-    [api, healthEnabled, joined, keep, park, queryClient, refresh, remove, showToast, t, upsert],
+    [api, healthEnabled, joined, keep, park, queryClient, refresh, remove, separate, showToast, t, upsert],
   );
 
+  /** `preview.joining`: the meal it joins as a course, as the toast and the waiting card say it (« ton déjeuner »). */
   const log = useCallback(
-    (input: CreateMealInput, preview: { photoUri?: string | null; label: string }) =>
+    (input: CreateMealInput, preview: { photoUri?: string | null; label: string; joining?: string | null }) =>
       run({
         id: shortId(),
         input: { ...input, eatenAt: uniqueEatenAt(input.eatenAt, takenTimes(queryClient, input.localDate)) },
         photoUri: preview.photoUri ?? null,
         label: preview.label,
+        joining: preview.joining ?? null,
         status: 'analyzing',
         error: null,
         startedAt: Date.now(),
@@ -195,15 +257,19 @@ export function useMealLogger() {
     [queryClient, run],
   );
 
-  /** "Same again": copies a meal to a new time, or queues the copy without network. Other errors are thrown. */
+  /**
+   * "Same again": copies a meal to a new time, or queues the copy without
+   * network. With `course`, the copy joins the meal it follows. Other errors are thrown.
+   */
   const relog = useCallback(
-    async (source: Meal, at: { eatenAt: string; localDate: string }) => {
+    async (source: Meal, at: { eatenAt: string; localDate: string }, course?: CourseTarget) => {
       const entry: OutboxEntry = {
         id: shortId(),
         kind: 'duplicate',
         createdAt: Date.now(),
         eatenAt: uniqueEatenAt(at.eatenAt, takenTimes(queryClient, at.localDate)),
         localDate: at.localDate,
+        course,
         label: source.title,
         emoji: source.items.find((i) => i.emoji)?.emoji ?? '🍽️',
         error: null,
@@ -213,11 +279,22 @@ export function useMealLogger() {
       keep(entry);
       if (useOutbox.getState().online === false) return park(entry.id);
       try {
-        const copy = await api.duplicateMeal(source.id, { eatenAt: entry.eatenAt, localDate: entry.localDate });
+        const copy = await api.duplicateMeal(source.id, { eatenAt: entry.eatenAt, localDate: entry.localDate, ...(course ? { course } : null) });
         void dropEntry(entry.id);
         feedback.mealRelogged(copy);
         refresh(copy);
-        showToast({ message: `${t('detail.relogged')} · ${copy.title}` });
+        const added = joinedCourse(copy, entry.eatenAt);
+        // Joined as one course: « Séparer » undoes the guess. A whole meal joined stays joined.
+        const single = added && mealCourses(source).length === 1;
+        showToast(
+          added
+            ? {
+                message: t('courses.added', { meal: yourMeal(t, copy.mealType) }),
+                onPress: () => router.push({ pathname: '/meal/[id]', params: { id: copy.id } }),
+                ...(single ? { action: { label: t('courses.separate'), onPress: () => void separate(copy, added) } } : null),
+              }
+            : { message: `${t('detail.relogged')} · ${copy.title}` },
+        );
         return copy;
       } catch (error) {
         if (isNetworkError(error)) return park(entry.id, error);
@@ -225,15 +302,15 @@ export function useMealLogger() {
         throw error;
       }
     },
-    [api, keep, park, queryClient, refresh, showToast, t],
+    [api, keep, park, queryClient, refresh, separate, showToast, t],
   );
 
-  /** A product scanned without network: looked up, then logged at its standard portion, once back online. */
+  /** A product scanned without network: looked up, then logged at its standard portion (into its meal, with `course`), once back online. */
   const queueBarcode = useCallback(
-    (code: string, at: { eatenAt: string; localDate: string }) => {
+    (code: string, at: { eatenAt: string; localDate: string }, course?: CourseTarget) => {
       const id = shortId();
       const eatenAt = uniqueEatenAt(at.eatenAt, takenTimes(queryClient, at.localDate));
-      keep({ id, kind: 'barcode', createdAt: Date.now(), eatenAt, localDate: at.localDate, label: t('outbox.barcodeLabel', { code }), emoji: '🏷️', error: null, code });
+      keep({ id, kind: 'barcode', createdAt: Date.now(), eatenAt, localDate: at.localDate, course, label: t('outbox.barcodeLabel', { code }), emoji: '🏷️', error: null, code });
       park(id);
     },
     [keep, park, queryClient, t],

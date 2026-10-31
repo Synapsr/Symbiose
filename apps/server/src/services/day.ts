@@ -3,12 +3,15 @@ import {
   addDays,
   computeProgress,
   computeTargets,
+  courseItems,
   dateRange,
   focusNutrients,
   foodKey,
   goalNutrient,
   itemNutrients,
   localHour,
+  mealCourses,
+  mealTotals,
   NUTRIENT_KEYS,
   roundNutrients,
   sumNutrients,
@@ -29,7 +32,7 @@ import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 
 import type { Db } from '../db';
 import { activity, cravings, meals, type ActivityRow, type CravingRow } from '../db/schema';
-import { toMeal } from './meals';
+import { stripItem, toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
 import { visibleTrend } from './blood-pressure';
 import { adaptiveEnergyHistory } from './expenditure';
@@ -240,7 +243,10 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
   // When during the day the headline nutrient is eaten.
   const primary = hero;
   const hours = Array.from({ length: 24 }, () => 0);
-  for (const meal of rangeMeals) hours[localHour(meal.eatenAt)]! += meal.totals[primary];
+  // Each course at its own hour: dessert at 21:00 counts at 21:00, not when dinner started.
+  for (const meal of rangeMeals) {
+    for (const course of mealCourses(meal)) hours[localHour(course.eatenAt)]! += mealTotals(courseItems(meal, course.id))[primary];
+  }
 
   const whatCounts = new Map<string, { label: string; count: number }>();
   for (const c of rangeCravings) {
@@ -326,7 +332,8 @@ export function library(db: Db, userId: string, today: string): LibraryResponse 
       const key = foodKey(item.name);
       const existing = groups.get(key);
       if (existing) existing.count++;
-      else groups.set(key, { key, item, count: 1, lastUsed: meal.eatenAt });
+      // Without its course: it goes back into any meal.
+      else groups.set(key, { key, item: { ...stripItem(item), id: item.id }, count: 1, lastUsed: meal.eatenAt });
     }
   }
   const favorites = db

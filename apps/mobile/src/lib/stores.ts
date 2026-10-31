@@ -117,6 +117,8 @@ export interface PendingMeal {
   input: CreateMealInput;
   photoUri: string | null;
   label: string;
+  /** Joining a meal as its next course: « ton déjeuner ». */
+  joining?: string | null;
   status: 'analyzing' | 'error';
   error: string | null;
   startedAt: number;
