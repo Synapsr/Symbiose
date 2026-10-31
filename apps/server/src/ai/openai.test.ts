@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createOpenAiCompatibleAi, type OpenAiCompatibleOptions } from './openai';
 import { AI_PROVIDERS } from './providers';
-import { coachInput, cravingInput, mealInput, mealOutput, morningInput, nudgesInput, planInput, planOutput, reviewInput, reviewOutput } from './test-fixtures';
+import { coachInput, cravingInput, mealCorrectionInput, mealInput, mealOutput, morningInput, nudgesInput, planInput, planOutput, reviewInput, reviewOutput } from './test-fixtures';
 import type { AiUsage } from './types';
 
 /** The OpenAI-compatible adapter against a fake Chat Completions API: no network, no key. */
@@ -99,6 +99,16 @@ describe('structured answers', () => {
     expect(format.json_schema.strict).toBe(true);
     expect(format.json_schema.schema.additionalProperties).toBe(false);
     expect(format.json_schema.schema.required).toContain('clarification');
+    expect(format.json_schema.schema.required).toEqual(expect.arrayContaining(['courses', 'reusedMeal']));
+  });
+
+  it('labels each course’s photo on a whole-meal correction, with the last days’ meals', async () => {
+    respond = () => completion(JSON.stringify(mealOutput));
+    await ai().analyzeMeal(mealCorrectionInput);
+    const content = (requests[0]!.body.messages[1]!.content as { type: string; text?: string }[]).map((p) => p.text ?? p.type);
+    expect(content.slice(0, 4)).toEqual(['Photo of course 1:', 'image_url', 'Photo of course 3:', 'image_url']);
+    expect(content[4]).toContain('"history"');
+    expect(content[4]).toContain('Correction to apply: le gratin c’était le reste d’hier soir');
   });
 
   it('drafts plans, reviews and nudges the same way', async () => {
@@ -223,7 +233,7 @@ describe('photos', () => {
     await expect(openai.analyzeMeal(mealInput)).rejects.toMatchObject({ status: 424, code: 'ai_no_vision' });
     expect(requests).toHaveLength(0);
 
-    expect(await openai.analyzeMeal({ ...mealInput, photo: null })).toEqual(mealOutput);
+    expect(await openai.analyzeMeal({ ...mealInput, photos: [] })).toEqual(mealOutput);
     // A correction goes on from the previous analysis, without the photo.
     await openai.analyzeMeal({ ...mealInput, previous: { title: 'Pâtes', items: [] }, correction: 'sans coca' });
     expect(requests.map((r) => (r.body.messages[1]!.content as { type: string }[]).map((p) => p.type))).toEqual([['text'], ['text']]);

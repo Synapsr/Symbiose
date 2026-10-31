@@ -5,7 +5,7 @@ import { count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import { hashPassword, issueToken, rateLimit, requireAuth, verifyPassword, type AuthEnv } from '../auth';
-import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, sleepNights, users, vitals, waterLogs, weights, workouts } from '../db/schema';
+import { activity, bloodPressure, coachMessages, cravings, journalEntries, meals, moods, photos as photosTable, sleepNights, users, vitals, waterLogs, weights, workouts } from '../db/schema';
 import { HttpError } from '../errors';
 import { signupMode } from '../env';
 import { nowIso, validate, type Deps } from '../http';
@@ -121,8 +121,8 @@ export function meRoutes({ db, config, photos }: Deps) {
 
   app.delete('/', async (c) => {
     const userId = c.get('userId');
-    const photoIds = db.select({ id: meals.photoId }).from(meals).where(eq(meals.userId, userId)).all();
-    for (const { id } of photoIds) if (id) await photos.remove(userId, id);
+    // Every photo the account stored, the courses' included.
+    for (const photo of db.select({ id: photosTable.id }).from(photosTable).where(eq(photosTable.userId, userId)).all()) await photos.remove(userId, photo.id);
     db.delete(users).where(eq(users.id, userId)).run();
     return c.body(null, 204);
   });

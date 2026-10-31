@@ -42,11 +42,13 @@ export async function runMealAction(deps: Pick<Deps, 'db' | 'ai' | 'photos'>, us
     const today = now.slice(0, 10);
     const localDate = action.localDate ?? today;
     const time = action.time ?? (localDate === today ? localTime(now) : TYPICAL_TIME[action.mealType ?? 'lunch']);
+    // A dessert or a coffee added at a meal's time joins it as a course, like a capture.
     return createMeal(deps, userId, {
       eatenAt: `${localDate}T${time}:00${offsetOf(now)}`,
       localDate,
       mealType: action.mealType ?? undefined,
       text: action.description,
+      course: 'auto',
     });
   }
 
@@ -61,7 +63,7 @@ export async function runMealAction(deps: Pick<Deps, 'db' | 'ai' | 'photos'>, us
   if (action.mealType || action.localDate || action.time) {
     const localDate = action.localDate ?? existing.localDate;
     const moved = Boolean(action.localDate || action.time);
-    meal = updateMeal(deps.db, userId, existing.id, {
+    meal = await updateMeal(deps, userId, existing.id, {
       mealType: action.mealType ?? undefined,
       ...(moved ? { localDate, eatenAt: `${localDate}T${action.time ?? localTime(existing.eatenAt)}:00${offsetOf(existing.eatenAt)}` } : {}),
     });

@@ -1,6 +1,6 @@
 import { BloodPressureCategorySchema, type BloodPressureCategory, type CoachMealProposal } from '@symbiose/shared';
 
-import type { Ai, AnalyzedItem, CoachInput, MealAnalysis } from './types';
+import type { Ai, AnalyzedItem, CoachInput, HistoryMeal, MealAnalysis, MealAnalysisInput } from './types';
 import { heuristicPlan } from '../services/goals';
 import { FALLBACK_NUDGES, templateMorning } from '../services/proactive';
 
@@ -19,6 +19,8 @@ const FOODS: { match: RegExp; item: AnalyzedItem }[] = [
   { match: /salade|salad/i, item: { name: 'Salade composée', emoji: '🥗', portion: '1 grand bol', grams: 300, confidence: 0.6, per100g: { kcal: 95, protein: 5, carbs: 6, sugar: 2.5, addedSugar: 0.5, fat: 5.5, satFat: 1, fiber: 2.6, sodium: 210 } } },
   { match: /pomme|apple/i, item: { name: 'Pomme', emoji: '🍎', portion: '1 moyenne', grams: 150, confidence: 0.95, per100g: { kcal: 53, protein: 0.3, carbs: 11.6, sugar: 10.4, addedSugar: 0, fat: 0.2, satFat: 0, fiber: 2.4, sodium: 1 } } },
   { match: /yaourt|yogurt/i, item: { name: 'Yaourt aux fruits', emoji: '🥛', portion: '1 pot', grams: 125, confidence: 0.85, per100g: { kcal: 97, protein: 3.4, carbs: 14.5, sugar: 13.5, addedSugar: 9, fat: 2.6, satFat: 1.7, fiber: 0.2, sodium: 50 } } },
+  { match: /tarte|dessert|g[âa]teau|cake/i, item: { name: 'Tarte aux pommes', emoji: '🥧', portion: '1 part', grams: 120, confidence: 0.75, per100g: { kcal: 255, protein: 2.6, carbs: 34, sugar: 17, addedSugar: 11, fat: 11.5, satFat: 6.8, fiber: 1.6, sodium: 160 } } },
+  { match: /gratin/i, item: { name: 'Gratin dauphinois', emoji: '🥔', portion: '1 belle part', grams: 300, confidence: 0.7, per100g: { kcal: 145, protein: 3.6, carbs: 12.5, sugar: 1.8, addedSugar: 0, fat: 8.8, satFat: 5.6, fiber: 1.3, sodium: 260 } } },
 ];
 
 const DEFAULT_PLATE: AnalyzedItem[] = [
@@ -26,6 +28,64 @@ const DEFAULT_PLATE: AnalyzedItem[] = [
   { name: 'Riz basmati', emoji: '🍚', portion: '1 portion', grams: 180, confidence: 0.65, per100g: { kcal: 130, protein: 2.7, carbs: 28, sugar: 0.1, addedSugar: 0, fat: 0.3, satFat: 0.1, fiber: 0.4, sodium: 1 } },
   { name: 'Haricots verts', emoji: '🫛', portion: '1 poignée', grams: 100, confidence: 0.8, per100g: { kcal: 31, protein: 1.8, carbs: 4.3, sugar: 1.4, addedSugar: 0, fat: 0.2, satFat: 0, fiber: 3.4, sodium: 6 } },
 ];
+
+/** A photo with no words, by its place in the meal: a starter, the main, then dessert. */
+const COURSE_PLATES: AnalyzedItem[][] = [[FOODS[4]!.item], DEFAULT_PLATE, [FOODS[7]!.item]];
+
+const plain = (text: string) =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+/** "Gratin dauphinois 350 g · Salade verte 80 g" → names and grams (the server puts back the values per 100 g it logged). */
+const parseItems = (line: string) =>
+  line
+    .split(' · ')
+    .map((part) => /^(.*) (\d+) g$/.exec(part))
+    .flatMap((m) => (m ? [{ name: m[1]!, grams: Number(m[2]) }] : []));
+
+const IGNORED = ['reste', 'restes', 'hier', 'comme', 'meme', 'chose', 'soir', 'midi'];
+
+/** The past meal the words point to: one sharing a word with them, else yesterday's latest, else the latest. */
+function pastMeal(history: NonNullable<MealAnalysisInput['history']>, text: string): HistoryMeal | null {
+  const words = plain(text)
+    .split(/[^a-z]+/)
+    .filter((w) => w.length >= 4 && !IGNORED.includes(w));
+  const named = history.meals.find((m) => words.some((w) => plain(`${m.title} ${m.items}`).includes(w)));
+  if (named) return named;
+  const yesterday = new Date(Date.parse(`${history.today.slice(4)}T12:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  return (/hier|yesterday/.test(plain(text)) ? history.meals.find((m) => m.when.includes(yesterday)) : null) ?? history.meals[0] ?? null;
+}
+
+/** "Entrée", "Plat", "Dessert" or "Café", from what a course holds. */
+function courseName(names: string): string {
+  const text = plain(names);
+  if (/tarte|yaourt|gateau|mousse|glace|pomme|dessert/.test(text)) return 'Dessert';
+  if (/^cafe|^the |tisane/.test(text)) return 'Café';
+  if (/salade|soupe|veloute|carottes/.test(text)) return 'Entrée';
+  return 'Plat';
+}
+
+const addedSugarOf = (items: { grams: number; per100g: { addedSugar: number } }[]) => items.reduce((sum, i) => sum + (i.per100g.addedSugar * i.grams) / 100, 0);
+
+/** One verdict for the whole meal, saying which course brings the sugar. */
+function wholeMealWords(courses: { label: string; addedSugar: number }[]): Pick<MealAnalysis, 'verdict' | 'headline'> {
+  const total = courses.reduce((sum, c) => sum + c.addedSugar, 0);
+  const top = courses.reduce((a, b) => (b.addedSugar > a.addedSugar ? b : a), courses[0]!);
+  const who = top.label === 'Dessert' ? 'le dessert apporte' : top.label === 'Café' ? 'le café apporte' : 'un plat apporte';
+  if (total <= 5) return { verdict: 'great', headline: 'Repas équilibré, presque sans sucre ajouté. Bien joué.' };
+  if (total <= 15) return { verdict: 'good', headline: `Repas équilibré, ${who} l’essentiel du sucre ajouté (≈${Math.round(total)} g).` };
+  return { verdict: 'watch', headline: `≈${Math.round(total)} g de sucres ajoutés sur le repas, ${who} le plus gros.` };
+}
+
+/** "Salade composée, poulet et tarte". */
+function mealTitle(names: string[]): string {
+  const parts = names.filter(Boolean).map((n, i) => (i ? n.split(' ')[0]!.toLowerCase() : n.split(' ').slice(0, 2).join(' ')));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} et ${parts.at(-1)}` : (parts[0] ?? 'Repas');
+}
+
+const firstName = (line: string) => line.split(' · ')[0]!.replace(/ \d+ g$/, '');
 
 /** "à 16h30" → "16:30". */
 function mockTime(text: string): string | null {
@@ -71,21 +131,74 @@ export function createMockAi(): Ai {
     async analyzeMeal(input) {
       await new Promise((r) => setTimeout(r, 1200));
       const text = `${input.text ?? ''} ${input.correction ?? ''}`;
-      let items = FOODS.filter((f) => f.match.test(text)).map((f) => f.item);
-      if (!items.length) items = input.previous ? input.previous.items.map(({ name, emoji, portion, grams, confidence, per100g }) => ({ name, emoji, portion, grams, confidence: confidence ?? 0.7, per100g })) : DEFAULT_PLATE;
-      if (/sans sucre|no sugar|pas de sucre/i.test(text)) items = items.map((i) => ({ ...i, per100g: { ...i.per100g, sugar: i.per100g.sugar - i.per100g.addedSugar, addedSugar: 0, kcal: i.per100g.kcal - i.per100g.addedSugar * 4 } }));
-      const added = items.reduce((sum, i) => sum + (i.per100g.addedSugar * i.grams) / 100, 0);
+      const earlier = input.meal?.courses ?? [];
+
+      // A meal whose items are final: words only, for the whole of it.
+      if (input.assessOnly) {
+        const courses = earlier.map((c) => ({ label: c.label || courseName(c.items), addedSugar: c.nutrients.addedSugar }));
+        return {
+          isFood: true,
+          reusedMeal: null,
+          title: mealTitle(earlier.map((c) => firstName(c.items))),
+          mealType: input.mealTypeHint,
+          courses: courses.length > 1 ? courses.map((c) => c.label) : [],
+          items: [],
+          ...wholeMealWords(courses),
+          tips: [],
+          clarification: null,
+        };
+      }
+
+      // « Le reste du gratin d'hier soir »: what was logged then, by name and grams.
+      const past = input.history ? pastMeal(input.history, text) : null;
+      let items: AnalyzedItem[];
+      if (past) {
+        const logged = parseItems(past.items);
+        const words = plain(text);
+        const picked = logged.filter((i) => plain(i.name).split(' ').some((w) => w.length >= 4 && words.includes(w)));
+        const half = /moitie|half|demi/.test(words);
+        items = (picked.length ? picked : logged).map((i) => ({ name: i.name, emoji: '', portion: half ? '½ portion' : '1 portion', grams: half ? Math.round(i.grams / 2) : i.grams, confidence: 0.9, per100g: DEFAULT_PLATE[0]!.per100g }));
+      } else if (input.previous?.courses?.length) {
+        // A correction of a meal in courses: every course comes back, the one it names changed.
+        const last = input.previous.courses.length;
+        items = input.previous.courses.flatMap((c) => c.items.map(({ name, emoji, portion, grams, confidence, per100g }) => ({ name, emoji, portion, grams, confidence: confidence ?? 0.7, per100g, course: c.course })));
+        if (/dessert/i.test(text) && /demi|moiti|half/i.test(text)) items = items.map((i) => (i.course === last ? { ...i, grams: Math.round(i.grams / 2), portion: '½ part' } : i));
+      } else {
+        items = FOODS.filter((f) => f.match.test(text)).map((f) => f.item);
+        if (!items.length && input.previous) items = input.previous.items.map(({ name, emoji, portion, grams, confidence, per100g }) => ({ name, emoji, portion, grams, confidence: confidence ?? 0.7, per100g }));
+        if (!items.length) items = input.meal ? COURSE_PLATES[Math.min(earlier.length, 2)]! : DEFAULT_PLATE;
+      }
+      if (/sans sucre|no sugar|pas de sucre/i.test(text)) {
+        // « Pas de sucre dans le café »: only the coffee, when it names it.
+        const only = /caf[ée]|coffee/i.test(text) ? /caf[ée]|coffee/i : /./;
+        items = items.map((i) => (only.test(i.name) ? { ...i, name: i.name.replace(/ sucré$/, ''), per100g: { ...i.per100g, sugar: i.per100g.sugar - i.per100g.addedSugar, addedSugar: 0, kcal: i.per100g.kcal - i.per100g.addedSugar * 4 } } : i));
+      }
+      items = items.map((i) => ({ ...i, course: i.course ?? 1 }));
+      const added = addedSugarOf(items);
       const sodium = items.reduce((sum, i) => sum + (i.per100g.sodium * i.grams) / 100, 0);
+
+      // The whole meal's courses: those logged, then this one; or those corrected.
+      const corrected = input.previous?.courses ?? [];
+      const courses = input.meal
+        ? [...earlier.map((c) => ({ label: c.label || courseName(c.items), addedSugar: c.nutrients.addedSugar })), { label: courseName(items.map((i) => i.name).join(' ')), addedSugar: added }]
+        : corrected.map((c) => ({ label: c.label || courseName(c.items.map((i) => i.name).join(' ')), addedSugar: addedSugarOf(items.filter((i) => i.course === c.course)) }));
+      const whole = courses.length > 1 ? wholeMealWords(courses) : null;
+      const title = input.meal
+        ? mealTitle([...earlier.map((c) => firstName(c.items)), items[0]!.name])
+        : corrected.length
+          ? mealTitle(corrected.map((c) => c.items[0]?.name ?? ''))
+          : items.length === 1
+            ? items[0]!.name
+            : items.slice(0, 2).map((i) => i.name).join(' & ');
       const analysis: MealAnalysis = {
         isFood: true,
-        title: items.length === 1 ? items[0]!.name : items.slice(0, 2).map((i) => i.name).join(' & '),
+        reusedMeal: past?.ref ?? null,
+        title,
         mealType: input.mealTypeHint,
+        courses: courses.length > 1 ? courses.map((c) => c.label) : [],
         items,
-        verdict: added > 15 ? 'watch' : added > 5 ? 'ok' : 'great',
-        headline:
-          added > 5
-            ? `≈${Math.round(added)} g de sucres ajoutés dans ce repas.`
-            : 'Repas équilibré, presque sans sucre ajouté. Bien joué.',
+        verdict: whole?.verdict ?? (added > 15 ? 'watch' : added > 5 ? 'ok' : 'great'),
+        headline: whole?.headline ?? (added > 5 ? `≈${Math.round(added)} g de sucres ajoutés dans ce repas.` : 'Repas équilibré, presque sans sucre ajouté. Bien joué.'),
         tips: [
           ...(added > 15 ? ['Remplace la boisson sucrée par de l’eau pétillante citronnée.'] : []),
           ...(input.recentWorkout ? ['Après ta séance, vise 20 à 30 g de protéines dans ce repas pour la récupération.'] : []),

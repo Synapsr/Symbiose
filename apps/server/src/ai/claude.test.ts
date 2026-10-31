@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createClaudeAi } from './claude';
 import { COACH, CRAVING, GOAL_PLANNER, MEAL_ANALYST, MORNING, NUDGES, REVIEWER } from './prompts';
-import { coachInput, cravingInput, mealInput, mealOutput, morningInput, nudgesInput, planInput, planOutput, reviewInput, reviewOutput } from './test-fixtures';
+import { coachInput, courseInput, cravingInput, mealCorrectionInput, mealInput, mealOutput, morningInput, nudgesInput, planInput, planOutput, reviewInput, reviewOutput } from './test-fixtures';
 import type { AiUsage } from './types';
 
 /**
@@ -115,6 +115,9 @@ describe('Claude adapter', () => {
     const deltas: string[] = [];
 
     expect(await claude.analyzeMeal(mealInput)).toEqual(mealOutput);
+    // A course joining a meal, then a whole-meal correction: each photo labelled with its course, the last days' meals.
+    expect(await claude.analyzeMeal(courseInput)).toEqual(mealOutput);
+    expect(await claude.analyzeMeal(mealCorrectionInput)).toEqual(mealOutput);
     expect(await claude.draftPlan(planInput)).toEqual(planOutput);
     expect(await claude.review(reviewInput)).toEqual(reviewOutput);
     expect(await claude.cravingNudges(nudgesInput)).toEqual({ lines: ['Un fruit ?', 'Un verre d’eau ?'] });

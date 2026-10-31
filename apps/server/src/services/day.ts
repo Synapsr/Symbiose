@@ -29,7 +29,7 @@ import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 
 import type { Db } from '../db';
 import { activity, cravings, meals, type ActivityRow, type CravingRow } from '../db/schema';
-import { toMeal } from './meals';
+import { stripItem, toMeal } from './meals';
 import { requireProfile, resolveUser } from './users';
 import { visibleTrend } from './blood-pressure';
 import { adaptiveEnergyHistory } from './expenditure';
@@ -326,7 +326,8 @@ export function library(db: Db, userId: string, today: string): LibraryResponse 
       const key = foodKey(item.name);
       const existing = groups.get(key);
       if (existing) existing.count++;
-      else groups.set(key, { key, item, count: 1, lastUsed: meal.eatenAt });
+      // Without its course: it goes back into any meal.
+      else groups.set(key, { key, item: { ...stripItem(item), id: item.id }, count: 1, lastUsed: meal.eatenAt });
     }
   }
   const favorites = db

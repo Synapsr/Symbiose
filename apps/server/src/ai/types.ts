@@ -140,8 +140,47 @@ export interface ActivityToday {
   workouts: number;
 }
 
+export interface MealPhoto {
+  base64: string;
+  mime: 'image/jpeg' | 'image/png' | 'image/webp';
+  /** On a correction of a meal in courses: the course it shows (1-based), said before the image. */
+  course?: number;
+}
+
+/** A course already logged, compact: its items as one line, its nutrients summed. */
+export interface CourseBrief {
+  course: number;
+  label: string;
+  time: string;
+  /** "Salade composée 300 g · Vinaigrette 15 g". */
+  items: string;
+  nutrients: Nutrients;
+}
+
+/** A course of the meal being corrected: its words and items, as the AI gave them. */
+export interface PreviousCourse {
+  course: number;
+  label: string;
+  time: string;
+  text: string | null;
+  items: FoodItem[];
+}
+
+/** A meal of the last days, for words that refer to one (« le reste d'hier soir »). */
+export interface HistoryMeal {
+  /** What the AI answers in `reusedMeal`. */
+  ref: string;
+  /** "Fri 2026-10-30 19:45". */
+  when: string;
+  type: MealType;
+  title: string;
+  /** "Gratin dauphinois 350 g · Salade verte 80 g". */
+  items: string;
+}
+
 export interface MealAnalysisInput extends UserContext {
-  photo: { base64: string; mime: 'image/jpeg' | 'image/png' | 'image/webp' } | null;
+  /** Usually one (the new photo); on a correction, every course's (at most 4). */
+  photos: MealPhoto[];
   text: string | null;
   localTime: string;
   mealTypeHint: MealType;
@@ -151,9 +190,15 @@ export interface MealAnalysisInput extends UserContext {
   recentWorkout: { type: WorkoutType; durationMin: number; activeKcal: number | null; endedMinutesAgo: number } | null;
   activityToday: ActivityToday | null;
   bloodPressureCategory: BloodPressureCategory | null;
-  /** For refinements: the previous analysis and the user's correction. */
-  previous?: { title: string; items: FoodItem[] };
+  /** For refinements: the previous analysis and the user's correction; `courses` when the meal has several. */
+  previous?: { title: string; items: FoodItem[]; courses?: PreviousCourse[] };
   correction?: string;
+  /** A course joining a meal: the courses already logged (the photo or text is the next one). With `assessOnly`, every course, final. */
+  meal?: { title: string; courses: CourseBrief[] };
+  /** The meal's items are final (a scanned dessert, a course moved out): only judge the whole meal. */
+  assessOnly?: boolean;
+  /** Only when the words refer to the past: the meals of the last days, newest first, and the meal's day. */
+  history?: { today: string; meals: HistoryMeal[] };
 }
 
 export interface AnalyzedItem {
@@ -163,6 +208,8 @@ export interface AnalyzedItem {
   grams: number;
   confidence: number;
   per100g: Nutrients;
+  /** 1-based; only read on a correction of a meal in courses. */
+  course?: number;
 }
 
 export interface MealAnalysis {
@@ -170,10 +217,14 @@ export interface MealAnalysis {
   title: string;
   mealType: MealType;
   items: AnalyzedItem[];
+  /** Each course's name, in order ("Entrée", "Plat", "Dessert"; "" when unclear); [] for a meal of one course. */
+  courses?: string[];
   verdict: Verdict;
   headline: string;
   tips: string[];
   clarification: { question: string; options: string[] } | null;
+  /** The `ref` of the past meal reused from `history`, else null. */
+  reusedMeal?: string | null;
 }
 
 export interface PlanDraftInput {
@@ -213,8 +264,8 @@ export interface CoachInput extends UserContext {
   };
 }
 
-/** A logged meal as the coach sees it: kcal plus the nutrients the plan focuses on. */
-export type CoachMealBrief = { id: string; date: string; time: string; type: MealType; title: string; kcal: number } & Partial<Record<NutrientKey, number>>;
+/** A logged meal as the coach sees it: kcal plus the nutrients the plan focuses on, and its courses' names when it has several. */
+export type CoachMealBrief = { id: string; date: string; time: string; type: MealType; title: string; kcal: number; courses?: string[] } & Partial<Record<NutrientKey, number>>;
 
 export interface CoachOutput {
   reply: string;

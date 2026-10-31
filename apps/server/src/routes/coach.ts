@@ -53,6 +53,8 @@ function recentMeals(db: Db, userId: string, localDate: string, focus: NutrientK
     .all()
     .map((row) => {
       const totals = mealTotals(row.items);
+      // A meal in courses says so: its courses' names (« Plat 2 » when unnamed).
+      const courses = row.courses && row.courses.length > 1 ? row.courses.map((c, i) => c.label || `#${i + 1}`) : null;
       return {
         id: row.id,
         date: row.localDate,
@@ -60,6 +62,7 @@ function recentMeals(db: Db, userId: string, localDate: string, focus: NutrientK
         type: row.mealType,
         title: row.title,
         kcal: Math.round(totals.kcal),
+        ...(courses ? { courses } : {}),
         ...Object.fromEntries(focus.map((key) => [key, Math.round(totals[key])])),
       };
     });

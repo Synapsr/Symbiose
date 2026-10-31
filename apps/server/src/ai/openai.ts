@@ -27,6 +27,7 @@ import {
   morningText,
   NudgesOut,
   nudgesText,
+  photoCaption,
   PlanOut,
   planText,
   refused,
@@ -279,14 +280,18 @@ export function createOpenAiCompatibleAi(options: OpenAiCompatibleOptions, onUsa
     provider,
 
     async analyzeMeal(input) {
-      let photo = input.photo;
-      if (photo && !vision) {
+      let photos = input.photos;
+      if (photos.length && !vision) {
         // A refinement can go on from the previous analysis; a new photo can't.
         if (!input.previous) throw noVision();
-        photo = null;
+        photos = [];
       }
       const content: ChatCompletionContentPart[] = [];
-      if (photo) content.push({ type: 'image_url', image_url: { url: `data:${photo.mime};base64,${photo.base64}` } });
+      for (const photo of photos) {
+        const caption = photoCaption(photo);
+        if (caption) content.push({ type: 'text', text: caption });
+        content.push({ type: 'image_url', image_url: { url: `data:${photo.mime};base64,${photo.base64}` } });
+      }
       content.push({ type: 'text', text: mealText(input) });
       return structured('meal', MEAL_ANALYST, content, MealAnalysisOut, 'meal_analysis', 'medium');
     },
