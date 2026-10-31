@@ -33,6 +33,7 @@ import { signed } from '@/components/insights/adaptive-energy-card';
 import { CoachSettings } from '@/components/settings/coach-settings';
 import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
+import { ApiError } from '@/lib/api';
 import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules } from '@/lib/health';
@@ -187,6 +188,8 @@ export default function Me() {
   // Admins see how many people wait to get in (sign-up on request), right on the row.
   const requests = useQuery({ queryKey: ['admin-requests'], queryFn: () => api.adminRequests(), enabled: user.isAdmin });
   const waitingRequests = requests.data?.requests.length ?? 0;
+  // A server from before the admin view flags its first account as admin: no row there.
+  const showAdmin = user.isAdmin && !(requests.error instanceof ApiError && requests.error.status === 404);
 
   return (
     <ScrollView
@@ -317,7 +320,7 @@ export default function Me() {
       <Card padded={false} style={{ marginTop: -Space.sm }}>
         <Item icon={<Server size={20} color={colors.text} />} title={api.baseUrl.replace(/^https?:\/\//, '')} subtitle={user.email} />
         {/* Only for the emails listed in ADMIN_EMAILS on the server. */}
-        {user.isAdmin ? (
+        {showAdmin ? (
           <>
             <Divider />
             <Item
