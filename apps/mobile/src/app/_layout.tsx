@@ -87,6 +87,7 @@ function AppNavigator() {
             <Stack.Screen name="log" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
             <Stack.Screen name="journal" options={{ presentation: 'modal' }} />
             <Stack.Screen name="coach-settings" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="admin" options={{ presentation: 'modal' }} />
             <Stack.Screen name="note" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
           </Stack.Protected>
         </Stack>

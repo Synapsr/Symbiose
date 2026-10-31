@@ -7,6 +7,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoalComposer } from '@/components/goal-composer';
+import { PendingPanel } from '@/components/pending-panel';
 import { PlanPreview } from '@/components/plan-preview';
 import { ActivityPicker, BodyFields, parseBody, SexPicker, type BodyValues } from '@/components/profile-fields';
 import { Button, Field, IconButton, Reveal, Row, Txt } from '@/components/ui';
@@ -19,7 +20,8 @@ import { useApi, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
-type Step = 'name' | 'health' | 'sex' | 'body' | 'activity' | 'goals' | 'plan';
+/** `waiting`: sign-up on request, after the goals, until an admin approves the account. */
+type Step = 'name' | 'health' | 'sex' | 'body' | 'activity' | 'goals' | 'plan' | 'waiting';
 
 const BENEFITS = [
   { icon: Ruler, key: 'onb.health.b1' },
@@ -35,6 +37,7 @@ export default function Onboarding() {
   const user = useUser();
   const setUser = useSetUser();
   const setSettings = useSettings((s) => s.set);
+  const waitingIntentions = useSettings((s) => s.waitingIntentions);
 
   const [healthAvailable, setHealthAvailable] = useState(false);
   useEffect(() => {
@@ -45,7 +48,8 @@ export default function Onboarding() {
   const [bodyFromHealth, setBodyFromHealth] = useState(false);
   const steps: Step[] = ['name', ...(healthAvailable ? (['health'] as const) : []), ...(sexFromHealth ? [] : (['sex'] as const)), 'body', 'activity', 'goals', 'plan'];
 
-  const [step, setStep] = useState<Step>(user.profile ? 'goals' : 'name');
+  // Goals written while waiting: back at the plan step, approved or not yet.
+  const [step, setStep] = useState<Step>(user.profile ? (waitingIntentions ? 'waiting' : 'goals') : 'name');
   const [name, setName] = useState(user.profile?.name ?? user.name);
   const [sex, setSex] = useState<Sex | null>(user.profile?.sex ?? null);
   const [body, setBody] = useState<BodyValues>({
@@ -54,11 +58,14 @@ export default function Onboarding() {
     weightKg: user.profile ? String(user.profile.weightKg) : '',
   });
   const [activity, setActivity] = useState<ActivityLevel | null>(user.profile?.activityLevel ?? null);
-  const [intentions, setIntentions] = useState(user.plan?.intentions ?? '');
+  const [intentions, setIntentions] = useState(user.plan?.intentions ?? waitingIntentions);
   const [draft, setDraft] = useState<(GoalsResponse & { aiGenerated: boolean }) | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const index = steps.indexOf(step);
+  // A waiting account goes through the whole onboarding, but the AI only writes its plan once approved.
+  const pending = user.pending === true;
+  const resuming = step === 'waiting' && !pending;
+  const index = steps.indexOf(step === 'waiting' ? 'goals' : step);
   const go = (next: Step) => {
     haptics.tap();
     setError(null);
@@ -119,6 +126,13 @@ export default function Onboarding() {
     onError: (e) => setError(errorMessage(e, t('common.error'), t('common.offline'))),
   });
 
+  // Approved (just now, or since the last visit): the AI drafts the plan from the saved words, as usual.
+  const draftPlan = makePlan.mutate;
+  const draftIdle = makePlan.isIdle;
+  useEffect(() => {
+    if (resuming && draftIdle && intentions.trim().length >= 3) draftPlan();
+  }, [resuming, draftIdle, draftPlan, intentions]);
+
   const finish = useMutation({
     mutationFn: async () => {
       await api.saveGoals(draft!.plan!);
@@ -126,6 +140,7 @@ export default function Onboarding() {
     },
     onSuccess: (saved) => {
       haptics.success();
+      setSettings({ waitingIntentions: '' });
       setUser(saved);
     },
     onError: (e) => setError(errorMessage(e, t('common.error'), t('common.offline'))),
@@ -149,6 +164,18 @@ export default function Onboarding() {
       case 'activity':
         return { title: t('common.continue'), onPress: () => activity && saveProfile.mutate(activity), disabled: !activity, loading: saveProfile.isPending };
       case 'goals':
+      case 'waiting':
+        if (pending) {
+          return {
+            title: t('admin.pending.send'),
+            onPress: () => {
+              haptics.success();
+              setSettings({ waitingIntentions: intentions.trim() });
+              go('waiting');
+            },
+            disabled: intentions.trim().length < 3,
+          };
+        }
         return {
           title: makePlan.isPending ? t('onb.goals.generating') : t('onb.goals.generate'),
           onPress: () => makePlan.mutate(),
@@ -162,6 +189,9 @@ export default function Onboarding() {
   })();
 
   const back = index > 0 ? () => go(steps[index - 1]!) : undefined;
+  const thinking = makePlan.isPending || (resuming && draftIdle);
+
+  if (step === 'waiting' && pending) return <PendingPanel />;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -250,9 +280,9 @@ export default function Onboarding() {
               />
             </>
           ) : null}
-          {step === 'goals' && makePlan.isPending ? (
+          {(step === 'goals' || step === 'waiting') && thinking ? (
             <Thinking />
-          ) : step === 'goals' ? (
+          ) : step === 'goals' || step === 'waiting' ? (
             <>
               <Txt variant="title">{t('onb.goals.title')}</Txt>
               <GoalComposer value={intentions} onChange={setIntentions} />
@@ -270,7 +300,7 @@ export default function Onboarding() {
             {error}
           </Txt>
         ) : null}
-        {step !== 'sex' && !(step === 'goals' && makePlan.isPending) ? <Button {...primary} /> : null}
+        {step !== 'sex' && !((step === 'goals' || step === 'waiting') && thinking) ? <Button {...primary} /> : null}
         {step === 'plan' ? <Button title={t('onb.plan.adjust')} variant="ghost" onPress={() => go('goals')} /> : null}
         {step === 'health' ? <Button title={t('common.later')} variant="ghost" onPress={() => go(sexFromHealth ? 'body' : 'sex')} disabled={connectHealth.isPending} /> : null}
       </View>

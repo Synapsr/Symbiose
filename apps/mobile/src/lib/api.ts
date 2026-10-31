@@ -1,5 +1,8 @@
 import type {
   ActivityInput,
+  AdminOverview,
+  AdminPeriod,
+  AdminRequest,
   AuthResponse,
   BloodPressureInput,
   BloodPressureReading,
@@ -169,6 +172,12 @@ export function createApi(baseUrl: string, token: string) {
     saveProfile: (profile: Profile) => call<User>('PUT', '/api/me/profile', profile),
     deleteAccount: () => call<void>('DELETE', '/api/me'),
     exportUrl: () => `${baseUrl}/api/me/export`,
+    /** The whole server at a glance, for the accounts listed in ADMIN_EMAILS. */
+    adminOverview: (days: AdminPeriod) => call<AdminOverview>('GET', `/api/admin/overview?days=${days}`),
+    /** Sign-up on request: who waits, and the admin's answer (refusing deletes the waiting account). */
+    adminRequests: () => call<{ requests: AdminRequest[] }>('GET', '/api/admin/requests'),
+    approveRequest: (id: string) => call<void>('POST', `/api/admin/requests/${id}/approve`),
+    refuseRequest: (id: string) => call<void>('DELETE', `/api/admin/requests/${id}`),
 
     goals: (date?: string) => call<GoalsResponse>('GET', `/api/goals${date ? `?date=${date}` : ''}`),
     draftGoals: (intentions: string) => call<GoalsResponse & { aiGenerated: boolean }>('POST', '/api/goals/draft', { intentions }, AI_TIMEOUT),

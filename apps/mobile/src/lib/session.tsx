@@ -2,8 +2,11 @@ import type { User } from '@symbiose/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { deviceLocale, translate } from '@/i18n';
+
 import { ApiError, createApi, type Api } from './api';
 import { storage } from './storage';
+import { useToast } from './stores';
 
 const KEY = 'symbiose.session';
 /** The last known user, so the app opens without network (metro, plane) and its waiting meals stay in reach. */
@@ -64,6 +67,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         // A revoked token or a deleted account: forget the stored session.
         if (isAuthError(error)) await Promise.all([storage.remove(KEY), storage.remove(USER_KEY)]);
+        // Gone from the server (a refused request, or deleted elsewhere): say it plainly, nothing more.
+        if (error instanceof ApiError && error.status === 404) useToast.getState().show({ message: translate(deviceLocale(), 'admin.accountGone') });
         throw error;
       }
     },
