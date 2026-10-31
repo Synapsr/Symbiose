@@ -61,12 +61,7 @@
 .footer-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  font-size: 19px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
+  gap: 7px;
 }
 
 .footer-links {

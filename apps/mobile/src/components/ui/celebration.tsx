@@ -6,7 +6,7 @@ import { NUTRIENT_COLORS, useTheme } from '@/theme';
 
 import { Txt } from './index';
 
-const PALETTE = [NUTRIENT_COLORS.fiber, NUTRIENT_COLORS.protein, NUTRIENT_COLORS.carbs, NUTRIENT_COLORS.fat, NUTRIENT_COLORS.sugar, '#3DD68C'];
+const PALETTE = [NUTRIENT_COLORS.fiber, NUTRIENT_COLORS.protein, NUTRIENT_COLORS.carbs, NUTRIENT_COLORS.fat, NUTRIENT_COLORS.sugar, '#2EE68A'];
 const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
   angle: (i / 18) * Math.PI * 2 + (i % 2 ? 0.12 : -0.08),
   distance: 110 + (i % 3) * 34,

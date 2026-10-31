@@ -56,7 +56,7 @@ export function HowItWorks() {
         </span>
       </div>
       <p className="how-status">
-        <Logo size={22} className="logo--breathe" />
+        <Logo size={22} breathe />
         {x.status}
       </p>
     </div>,

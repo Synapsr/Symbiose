@@ -74,7 +74,7 @@ export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boo
           {question ? (
             // The AI's pending question, said in words: the row's one tap opens it with its answers.
             <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3, height: 24, paddingHorizontal: 9, borderRadius: Radius.pill, backgroundColor: colors.accentSoft }}>
-              <Sparkles size={12} color={colors.accent} />
+              <Sparkles size={12} color={colors.accentText} />
               <Txt variant="caption" tone="accent" style={{ fontSize: 12, fontWeight: '700' }}>
                 {t('today.question')}
               </Txt>

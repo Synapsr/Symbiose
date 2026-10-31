@@ -260,7 +260,7 @@ export default function Onboarding() {
                 <Txt variant="title">{t('onb.body.title')}</Txt>
                 {bodyFromHealth ? (
                   <Row gap={6}>
-                    <HeartPulse size={14} color={colors.accent} />
+                    <HeartPulse size={14} color={colors.accentText} />
                     <Txt variant="caption" tone="accent">
                       {t('onb.body.fromHealth', { store: health.storeName[locale] })}
                     </Txt>

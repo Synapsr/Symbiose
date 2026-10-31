@@ -176,7 +176,7 @@ function Spark({ writing }: { writing: boolean }) {
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
   return (
     <Animated.View style={style}>
-      <Sparkle size={15} color={colors.accent} fill={colors.accent} />
+      <Sparkle size={15} color={colors.accentText} fill={colors.accentText} />
     </Animated.View>
   );
 }

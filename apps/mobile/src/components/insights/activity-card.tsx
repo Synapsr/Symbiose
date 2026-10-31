@@ -54,7 +54,7 @@ export function ActivityCard({ activity }: { activity: InsightsActivity }) {
         label={t('insights.activity')}
         value={value}
         caption={caption}
-        captionColor={(hasSessions && reached) || (!hasSessions && stepsReached) ? colors.accent : undefined}
+        captionColor={(hasSessions && reached) || (!hasSessions && stepsReached) ? colors.accentText : undefined}
         chart={<MiniBars values={activity.days.map((d) => (hasSessions ? d.activeMinutes || null : d.steps))} color={colors.accent} />}>
         {hasSessions ? (
           <DayBars
@@ -68,7 +68,7 @@ export function ActivityCard({ activity }: { activity: InsightsActivity }) {
 
         {hasSessions && avgSteps !== null ? (
           <Row gap={6}>
-            <Footprints size={14} color={stepsReached ? colors.accent : colors.text2} />
+            <Footprints size={14} color={stepsReached ? colors.accentText : colors.text2} />
             <Txt variant="caption" tone="secondary">
               {goals.dailySteps
                 ? t('insights.activityStepsGoal', { count: formatNumber(avgSteps, locale), goal: formatNumber(goals.dailySteps, locale) })

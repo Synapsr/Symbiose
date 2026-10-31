@@ -379,20 +379,46 @@ struct CaptureButton: View {
   }
 }
 
-/// The app's logo: two living things that meet.
+/// The app's logo (« Bourgeon »): a cell and the bud that grows out of it. Its emerald-to-lime
+/// gradient in full colour; one accent tint on the Lock Screen and in tinted modes.
 struct SymbioseMark: View {
   var size: CGFloat = 30
+  @Environment(\.widgetRenderingMode) private var renderingMode
 
   var body: some View {
-    let d = size * 0.55
-    ZStack {
-      Circle().fill(Palette.accent).frame(width: d, height: d).offset(x: -size * 0.125).widgetAccentable()
-      Circle().fill(Color.primary.opacity(0.88)).frame(width: d, height: d).offset(x: size * 0.125)
-      // The core is a hole, so the mark sits on any background.
-      Circle().frame(width: size * 0.26, height: size * 0.26).blendMode(.destinationOut)
+    Group {
+      if renderingMode == .fullColor {
+        LogoMark().fill(Palette.bourgeon)
+      } else {
+        LogoMark().fill(Palette.accent).widgetAccentable()
+      }
     }
-    .compositingGroup()
     .frame(width: size, height: size)
+  }
+}
+
+/// The Symbiose mark: one single-colour path (68.5-unit box), the same outline as the app's Logo.
+struct LogoMark: Shape {
+  func path(in rect: CGRect) -> Path {
+    let s = min(rect.width, rect.height) / 68.5
+    let ox = rect.midX - 34.25 * s
+    let oy = rect.midY - 34.25 * s
+    func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * s, y: oy + y * s) }
+    var p = Path()
+    p.move(to: pt(49.20, 37.23))
+    p.addCurve(to: pt(50.01, 33.01), control1: pt(48.82, 35.77), control2: pt(49.12, 34.23))
+    p.addCurve(to: pt(53.79, 30.98), control1: pt(50.90, 31.80), control2: pt(52.29, 31.06))
+    p.addCurve(to: pt(68.50, 15.24), control1: pt(62.13, 30.56), control2: pt(68.64, 23.59))
+    p.addCurve(to: pt(53.26, 0.00), control1: pt(68.36, 6.88), control2: pt(61.62, 0.14))
+    p.addCurve(to: pt(37.52, 14.71), control1: pt(44.91, -0.14), control2: pt(37.94, 6.37))
+    p.addCurve(to: pt(35.49, 18.49), control1: pt(37.44, 16.21), control2: pt(36.70, 17.60))
+    p.addCurve(to: pt(31.27, 19.30), control1: pt(34.27, 19.38), control2: pt(32.73, 19.68))
+    p.addCurve(to: pt(3.30, 31.09), control1: pt(20.36, 16.47), control2: pt(8.90, 21.30))
+    p.addCurve(to: pt(7.32, 61.18), control1: pt(-2.30, 40.88), control2: pt(-0.65, 53.20))
+    p.addCurve(to: pt(37.41, 65.20), control1: pt(15.30, 69.15), control2: pt(27.62, 70.80))
+    p.addCurve(to: pt(49.20, 37.23), control1: pt(47.20, 59.60), control2: pt(52.03, 48.14))
+    p.closeSubpath()
+    return p
   }
 }
 

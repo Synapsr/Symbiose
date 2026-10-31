@@ -259,7 +259,7 @@ export default function Capture() {
                   {busy ? <ActivityIndicator color="#000" /> : null}
                 </View>
               </Pressy>
-              <IconButton label={t('capture.note')} variant="glass" size={52} icon={<PenLine size={22} color={note ? '#3DD68C' : WHITE} />} onPress={() => setNoteOpen(!noteOpen)} />
+              <IconButton label={t('capture.note')} variant="glass" size={52} icon={<PenLine size={22} color={note ? '#2EE68A' : WHITE} />} onPress={() => setNoteOpen(!noteOpen)} />
             </Row>
           ) : null}
 

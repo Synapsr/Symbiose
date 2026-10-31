@@ -56,7 +56,7 @@ function WeightRow({ weight, plan, from, to }: { weight: WeightTrend; plan: Goal
   const change = first && last && last.date > first.date ? Math.round((last.kg - first.kg) * 10) / 10 : null;
   // Green when it goes the way the plan wants, neutral otherwise.
   const wanted = plan?.calorieMode === 'deficit' ? -1 : plan?.calorieMode === 'surplus' ? 1 : 0;
-  const changeColor = change === null || Math.abs(change) < 0.2 || wanted === 0 ? colors.text2 : Math.sign(change) === wanted ? colors.accent : colors.warning;
+  const changeColor = change === null || Math.abs(change) < 0.2 || wanted === 0 ? colors.text2 : Math.sign(change) === wanted ? colors.accentText : colors.warning;
   const latest = last ?? weight.latest;
   const date = (localDate: string) => {
     const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];

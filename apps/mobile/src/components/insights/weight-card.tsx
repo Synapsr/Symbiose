@@ -84,7 +84,7 @@ export function WeightCard({ weight, plan }: { weight: WeightTrend; plan: GoalPl
   const change = weight.changeKg;
   // Green when the trend goes the way the plan wants, neutral otherwise.
   const wanted = plan?.calorieMode === 'deficit' ? -1 : plan?.calorieMode === 'surplus' ? 1 : 0;
-  const changeColor = change === null || Math.abs(change) < 0.2 || wanted === 0 ? colors.text2 : Math.sign(change) === wanted ? colors.accent : colors.warning;
+  const changeColor = change === null || Math.abs(change) < 0.2 || wanted === 0 ? colors.text2 : Math.sign(change) === wanted ? colors.accentText : colors.warning;
 
   return (
     <Card style={{ gap: Space.lg }}>

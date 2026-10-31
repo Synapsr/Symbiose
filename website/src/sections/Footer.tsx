@@ -1,5 +1,6 @@
 import { ArrowRight, GitHub } from '../components/Icons';
 import { Logo } from '../components/Logo';
+import { Wordmark } from '../components/Wordmark';
 import { REPO } from '../i18n';
 import { useLang } from '../lang';
 import './Footer.css';
@@ -36,7 +37,7 @@ export function Footer() {
         <div className="footer-bottom">
           <div className="footer-brand">
             <Logo size={24} />
-            <span>Symbiose</span>
+            <Wordmark height={21} />
           </div>
           <nav className="footer-links" aria-label="Symbiose">
             {links.map(([href, label]) => (
