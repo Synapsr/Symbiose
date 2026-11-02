@@ -6,7 +6,7 @@ export const DOCKER_RUN = `docker run -d --name symbiose \\
   -p 3000:3000 \\
   -e ANTHROPIC_API_KEY=sk-ant-... \\
   -v symbiose-data:/data \\
-  ghcr.io/synapsr/symbiose:latest`;
+  synapsr/symbiose:latest`;
 
 export type GoalId = 'sugar' | 'weight' | 'muscle' | 'fiber';
 

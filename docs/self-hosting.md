@@ -1,6 +1,6 @@
 # Self-hosting
 
-The Symbiose server is one small Docker image (amd64 and arm64) and one volume. It needs no database server, no mail server and no account anywhere, except at the AI provider you choose.
+The Symbiose server is one small Docker image (amd64 and arm64) and one volume. Releases are published on Docker Hub as `synapsr/symbiose` and on GitHub as `ghcr.io/synapsr/symbiose`: use either. It needs no database server, no mail server and no account anywhere, except at the AI provider you choose.
 
 ## Start
 
@@ -8,7 +8,7 @@ The Symbiose server is one small Docker image (amd64 and arm64) and one volume. 
 docker run -d --name symbiose -p 3000:3000 \
   -e ANTHROPIC_API_KEY=sk-ant-... \
   -v symbiose-data:/data \
-  ghcr.io/synapsr/symbiose:latest
+  synapsr/symbiose:latest
 ```
 
 Or with Compose, from a copy of [`docker-compose.yml`](../docker-compose.yml):
@@ -80,27 +80,27 @@ Claude is the default, and the reference: Symbiose's prompts were written and tu
 ```bash
 # OpenAI
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=openai -e AI_API_KEY=sk-... ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=openai -e AI_API_KEY=sk-... synapsr/symbiose:latest
 
 # Mistral
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=mistral -e AI_API_KEY=... ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=mistral -e AI_API_KEY=... synapsr/symbiose:latest
 
 # Google Gemini
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=gemini -e AI_API_KEY=... ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=gemini -e AI_API_KEY=... synapsr/symbiose:latest
 
 # OpenRouter, here with another model than the default
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=openrouter -e AI_API_KEY=sk-or-... -e AI_MODEL=openai/gpt-6.1-sol ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=openrouter -e AI_API_KEY=sk-or-... -e AI_MODEL=openai/gpt-6.1-sol synapsr/symbiose:latest
 
 # Ollama on the same machine: `ollama pull gemma4` first (on Linux, start Ollama with OLLAMA_HOST=0.0.0.0)
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data --add-host=host.docker.internal:host-gateway \
-  -e AI_PROVIDER=ollama -e AI_BASE_URL=http://host.docker.internal:11434/v1 -e AI_MODEL=gemma4 ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=ollama -e AI_BASE_URL=http://host.docker.internal:11434/v1 -e AI_MODEL=gemma4 synapsr/symbiose:latest
 
 # Any OpenAI-compatible server: LM Studio, vLLM, llama.cpp…
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=openai-compatible -e AI_BASE_URL=http://192.168.1.20:1234/v1 -e AI_MODEL=my-model ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=openai-compatible -e AI_BASE_URL=http://192.168.1.20:1234/v1 -e AI_MODEL=my-model synapsr/symbiose:latest
 ```
 
 ## Accounts and the admin view
@@ -142,7 +142,7 @@ Each person can also export all their data as JSON from the app (*Me* → *Expor
 ## Updating
 
 ```bash
-docker pull ghcr.io/synapsr/symbiose:latest
+docker pull synapsr/symbiose:latest
 docker rm -f symbiose
 docker run -d --name symbiose ...        # the same command as before
 ```

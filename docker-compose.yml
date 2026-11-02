@@ -3,7 +3,7 @@
 services:
   symbiose:
     # `latest` is the latest release. Each release is also published by version (`:0.1`, `:0.1.0`) if you'd rather pin one.
-    image: ghcr.io/synapsr/symbiose:latest
+    image: synapsr/symbiose:latest
     restart: unless-stopped
     ports:
       - "3000:3000"

@@ -36,7 +36,7 @@ export function Privacy() {
                   {'  '}-e <span className="c-key">ANTHROPIC_API_KEY</span>=<span className="c-val">sk-ant-...</span> \{'\n'}
                   {'  '}-v symbiose-data:/data \{'\n'}
                   {'  '}
-                  <span className="c-img">ghcr.io/synapsr/symbiose:latest</span>
+                  <span className="c-img">synapsr/symbiose:latest</span>
                 </code>
               </pre>
               <p className="terminal-foot">

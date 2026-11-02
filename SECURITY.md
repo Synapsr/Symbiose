@@ -39,7 +39,7 @@ publicly.
 ## Supported versions
 
 Security fixes go into the `main` branch and the `latest` image
-(`ghcr.io/synapsr/symbiose:latest`), then into the next tagged release.
+(`synapsr/symbiose:latest`), then into the next tagged release.
 Update with `docker pull` and a restart.
 
 ## Scope

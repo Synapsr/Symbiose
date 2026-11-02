@@ -86,7 +86,7 @@ It runs on your own server: one Docker container, one SQLite file, with Claude o
 docker run -d --name symbiose -p 3000:3000 \
   -e ANTHROPIC_API_KEY=sk-ant-... \
   -v symbiose-data:/data \
-  ghcr.io/synapsr/symbiose:latest
+  synapsr/symbiose:latest
 ```
 
 Or with Compose: `curl -O https://raw.githubusercontent.com/Synapsr/Symbiose/main/docker-compose.yml`, then `ANTHROPIC_API_KEY=sk-ant-... docker compose up -d`.
@@ -130,7 +130,7 @@ Claude is the default and the reference: Symbiose's prompts were tuned on it. Ot
 
 ```bash
 docker run -d --name symbiose -p 3000:3000 -v symbiose-data:/data \
-  -e AI_PROVIDER=openai -e AI_API_KEY=sk-... ghcr.io/synapsr/symbiose:latest
+  -e AI_PROVIDER=openai -e AI_API_KEY=sk-... synapsr/symbiose:latest
 ```
 
 Ollama, LM Studio and other local servers: see [docs/self-hosting.md](docs/self-hosting.md#ai-providers).

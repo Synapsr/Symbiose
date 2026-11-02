@@ -64,7 +64,7 @@ body:
     attributes:
       label: Server version and setup
       description: The version shown on the server's home page, and how you run it.
-      placeholder: "0.1.0, ghcr.io/synapsr/symbiose:latest with docker compose"
+      placeholder: "0.1.0, synapsr/symbiose:latest with docker compose"
 
   - type: dropdown
     id: ai
