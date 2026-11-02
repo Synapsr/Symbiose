@@ -92,7 +92,8 @@ describe('structured answers', () => {
     expect(body.messages[0]).toMatchObject({ role: 'system', content: expect.stringContaining('nutrition analyst') });
     const content = body.messages[1]!.content as { type: string; image_url?: { url: string }; text?: string }[];
     expect(content[0]).toEqual({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,aGVsbG8=' } });
-    expect(content[1]!.text).toContain('What I ate: Pâtes carbonara et un coca');
+    // With the photo, the words are about it (they win where the two disagree).
+    expect(content[1]!.text).toContain('About the photo: Pâtes carbonara et un coca');
     const format = body.response_format as { type: string; json_schema: { name: string; strict: boolean; schema: { required: string[]; additionalProperties: boolean } } };
     expect(format.type).toBe('json_schema');
     expect(format.json_schema.name).toBe('meal_analysis');
@@ -237,6 +238,8 @@ describe('photos', () => {
     // A correction goes on from the previous analysis, without the photo.
     await openai.analyzeMeal({ ...mealInput, previous: { title: 'Pâtes', items: [] }, correction: 'sans coca' });
     expect(requests.map((r) => (r.body.messages[1]!.content as { type: string }[]).map((p) => p.type))).toEqual([['text'], ['text']]);
+    // No photo sent: the words are the meal's own.
+    expect((requests[1]!.body.messages[1]!.content as { text: string }[])[0]!.text).toContain('What I ate: Pâtes carbonara et un coca');
   });
 
   it('learns it when the server says so', async () => {
