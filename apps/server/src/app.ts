@@ -9,7 +9,7 @@ import { blockPending } from './auth';
 import { users } from './db/schema';
 import { signupMode, VERSION } from './env';
 import { HttpError } from './errors';
-import type { Deps } from './http';
+import { JSON_BODY_LIMIT, limitBody, type Deps } from './http';
 import { landingPage } from './landing';
 import { authRoutes, meRoutes } from './routes/account';
 import { adminRoutes } from './routes/admin';
@@ -33,6 +33,9 @@ export function createApp(deps: Deps, options: { log?: boolean } = {}) {
 
   if (options.log) app.use(logger());
   app.use('/api/*', cors({ origin: config.corsOrigins.includes('*') ? '*' : config.corsOrigins }));
+  // An oversized body is refused before it is read. A new meal sets its own, larger limit for the photo (routes/meals.ts).
+  const jsonLimit = limitBody(JSON_BODY_LIMIT);
+  app.use('/api/*', (c, next) => (c.req.method === 'POST' && c.req.path === '/api/meals' ? next() : jsonLimit(c, next)));
   app.use('/api/*', blockPending(db, config.jwtSecret));
 
   app.onError((error, c) => {
