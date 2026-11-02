@@ -10,12 +10,11 @@ import {
 } from '@symbiose/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 
 import { requireAuth, type AuthEnv } from '../auth';
 import { meals } from '../db/schema';
-import { validate, type Deps } from '../http';
+import { limitBody, MEAL_BODY_LIMIT, validate, type Deps } from '../http';
 import { createMeal, deleteCourse, deleteMeal, duplicateMeal, getMealRow, mergeMeal, refineMeal, separateCourse, toMeal, updateMeal } from '../services/meals';
 
 export function mealRoutes({ db, ai, photos, config }: Deps) {
@@ -36,7 +35,7 @@ export function mealRoutes({ db, ai, photos, config }: Deps) {
   app.get('/:id', (c) => c.json<Meal>(toMeal(getMealRow(db, c.get('userId'), c.req.param('id')))));
 
   /** A new meal, or with `course` the next course of the meal it follows (same response: the whole meal). */
-  app.post('/', bodyLimit({ maxSize: 12 * 1024 * 1024 }), validate('json', CreateMealInputSchema), async (c) =>
+  app.post('/', limitBody(MEAL_BODY_LIMIT), validate('json', CreateMealInputSchema), async (c) =>
     c.json<Meal>(await createMeal(deps, c.get('userId'), c.req.valid('json')), 201),
   );
 

@@ -37,6 +37,7 @@ import { createApp } from './app';
 import { openDb } from './db';
 import { coachMessages, journalEntries, moods, sleepNights, waterLogs } from './db/schema';
 import type { Config } from './env';
+import { JSON_BODY_LIMIT, MEAL_BODY_LIMIT } from './http';
 import { heuristicPlan, planFromDraft } from './services/goals';
 import { PhotoStore } from './services/photos';
 
@@ -293,6 +294,23 @@ describe('Symbiose API', () => {
 
     const png = await request('POST', '/api/meals', { eatenAt: now, localDate: today, photoBase64: Buffer.from('hello').toString('base64') });
     expect(png.status).toBe(415);
+  });
+
+  it('caps request bodies, with room for a meal photo', async () => {
+    // The biggest body the app sends, a full drinks import with the longest ids, stays well under the limit.
+    const entries = Array.from({ length: 5000 }, (_, i) => ({ externalId: String(i).padStart(120, 'x'), at: now, localDate: today, ml: 3000 }));
+    expect(JSON.stringify({ source: 'healthkit', entries }).length).toBeLessThan(JSON_BODY_LIMIT / 1.5);
+
+    const oversized = await request<{ error: { code: string } }>('PUT', '/api/hydration', { source: 'healthkit', pad: 'x'.repeat(JSON_BODY_LIMIT) });
+    expect(oversized.status).toBe(413);
+    expect(oversized.body.error.code).toBe('too_large');
+
+    // A photo bigger than any other body gets through to the photo checks (not a JPEG here).
+    const photo = await request('POST', '/api/meals', { eatenAt: now, localDate: today, photoBase64: Buffer.alloc(3 * 1024 * 1024, 1).toString('base64') });
+    expect(photo.status).toBe(415);
+    const tooBig = await request<{ error: { code: string } }>('POST', '/api/meals', { eatenAt: now, localDate: today, photoBase64: 'A'.repeat(MEAL_BODY_LIMIT) });
+    expect(tooBig.status).toBe(413);
+    expect(tooBig.body.error.code).toBe('too_large');
   });
 
   it('rescales portions exactly when items are edited', async () => {
