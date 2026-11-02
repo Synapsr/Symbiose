@@ -2,7 +2,7 @@
 # Every variable is described in docs/self-hosting.md.
 services:
   symbiose:
-    # `latest` follows main. Each tagged release is also published by version (`:0.1`, `:0.1.0`) if you'd rather pin one.
+    # `latest` is the latest release. Each release is also published by version (`:0.1`, `:0.1.0`) if you'd rather pin one.
     image: ghcr.io/synapsr/symbiose:latest
     restart: unless-stopped
     ports:
