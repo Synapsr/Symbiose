@@ -72,7 +72,8 @@ export function usePhotoWords(): PhotoWords {
   return {
     text,
     dictation,
-    open: asked || typing || Boolean(text.trim()),
+    // Listening always shows: a field closing as the mic opens (its blur) can't hide what is heard.
+    open: asked || typing || dictation.listening || Boolean(text.trim()),
     typing,
     talk: () => {
       learnt();
