@@ -91,14 +91,15 @@ export function EnergyCard({
     set({ heroPage: heroChoice(pages, next), heroHinted: true });
   };
 
-  // Once ever, a moment after Today appears: the card leans towards the next page and settles back.
+  // Once ever, a moment after Today appears (and the arrival has left): the card leans towards the
+  // next page and settles back.
   const peek = hint && !hinted && saved === null && count > 1 && !reduced;
   useEffect(() => {
     if (!peek) return;
     const timer = setTimeout(() => {
       position.set(withSequence(withTiming(0.1, { duration: 460, easing: Easing.out(Easing.cubic) }), withSpring(0, Motion.settle)));
       set({ heroHinted: true });
-    }, 1400);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [peek, position, set]);
 
