@@ -292,7 +292,8 @@ export function createOpenAiCompatibleAi(options: OpenAiCompatibleOptions, onUsa
         if (caption) content.push({ type: 'text', text: caption });
         content.push({ type: 'image_url', image_url: { url: `data:${photo.mime};base64,${photo.base64}` } });
       }
-      content.push({ type: 'text', text: mealText(input) });
+      // The photos actually sent: a text-only model refining a photo meal reads the words as the meal's own.
+      content.push({ type: 'text', text: mealText({ ...input, photos }) });
       return structured('meal', MEAL_ANALYST, content, MealAnalysisOut, 'meal_analysis', 'medium');
     },
 

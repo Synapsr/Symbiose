@@ -249,7 +249,12 @@ export function mealText(input: MealAnalysisInput): string {
     extra.history = input.history.meals;
   }
   const lines = [contextBlock(input, extra)];
-  if (input.text) lines.push(`${input.meal ? 'Next course' : 'What I ate'}: ${input.text}`);
+  if (input.text) {
+    // With a photo, the words are about it: they describe or correct what it shows (MEAL_ANALYST, rule 7).
+    const about = input.photos.length > 0;
+    const label = input.meal ? (about ? 'Next course, about its photo' : 'Next course') : about ? 'About the photo' : 'What I ate';
+    lines.push(`${label}: ${input.text}`);
+  }
   if (input.correction) lines.push(`Correction to apply: ${input.correction}`);
   if (input.assessOnly) lines.push('Assess this meal as a whole.');
   else if (!input.text && !input.correction) lines.push(input.meal ? 'Analyse this next course.' : 'Analyse this meal.');

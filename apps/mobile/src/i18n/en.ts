@@ -162,7 +162,6 @@ export const en: Record<TranslationKey, string> = {
   'capture.photo': 'Photo',
   'capture.barcode': 'Barcode',
   'capture.text': 'Text',
-  'capture.note': 'Add a detail (optional)',
   'capture.textPlaceholder': 'E.g. a bowl of carbonara and a coke',
   'capture.send': 'Analyze',
   'capture.recent': 'Recent',
@@ -777,4 +776,13 @@ export const en: Record<TranslationKey, string> = {
   'courses.when.yesterday': ' yesterday',
   'courses.when.weekday': ' on {day}',
   'courses.when.date': ' on {date}',
+
+  // Photo words: say or write what the photo shows, before the shot
+  'photoWords.describe': 'Describe it out loud',
+  'photoWords.write': 'Describe it in writing',
+  'photoWords.hint': 'Say what it is, if you like',
+  'photoWords.example': 'E.g. brown rice, no sugar',
+  'photoWords.edit': 'Tap to edit',
+  'photoWords.type': 'Type instead',
+  'photoWords.clear': 'Clear',
 };
