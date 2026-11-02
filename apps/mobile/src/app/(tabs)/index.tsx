@@ -34,6 +34,8 @@ import { Radius, Space, useTheme } from '@/theme';
 
 /** Today opens many times a day: its entrance plays once per session, then it simply appears. */
 let entrancePlayed = false;
+/** The touch under way started on the hero card: its sideways moves turn the card's pages, not the day. */
+let touchOnCard = false;
 
 type DayRow =
   | TimelineRow<Meal, OutboxEntry>
@@ -95,11 +97,12 @@ export default function Today() {
   const hero = data ? heroNutrient(data, user.plan, hideCalories) : 'kcal';
   const name = user.profile?.name ?? user.name;
 
-  // Horizontal swipe on the header moves between days.
+  // Horizontal swipe on the header moves between days. A swipe that starts on the hero card turns
+  // its pages instead: the card's own gesture starts sooner, and this one leaves such touches alone.
   const pan = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onMoveShouldSetPanResponder: (_, g) => !touchOnCard && Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
         onPanResponderRelease: (_, g) => {
           const next = addDays(date, g.dx < 0 ? 1 : -1);
           if (next > today) return;
@@ -143,7 +146,7 @@ export default function Today() {
             }}
           />
         }>
-        <View {...pan.panHandlers} style={{ gap: Space.lg }}>
+        <View {...pan.panHandlers} onTouchStartCapture={() => (touchOnCard = false)} style={{ gap: Space.lg }}>
           <Reveal index={0} instant={!animate} style={{ gap: Space.lg }}>
             <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 4 }}>
               <View style={{ flex: 1, gap: 2 }}>
@@ -173,13 +176,16 @@ export default function Today() {
           <Reveal index={1} instant={!animate} style={{ gap: Space.md }}>
             {data ? (
               <>
+                {/* The day line speaks about the goal, whatever page the card below is turned to. */}
                 <CoachLine
                   date={date}
                   fallback={good ? t(`reward.goodDay.${good.kind}`, { nutrient: nutrient(good.nutrient).toLowerCase() }) : dayVoice(data, hero, t, nutrient, locale, !isToday)}
                   celebrate={Boolean(good)}
                 />
                 <View>
-                  <EnergyCard day={data} plan={user.plan} hero={hero} hideCalories={hideCalories} glow={isToday ? glow : undefined} />
+                  <View onTouchStart={() => (touchOnCard = true)}>
+                    <EnergyCard day={data} plan={user.plan} hideCalories={hideCalories} glow={isToday ? glow : undefined} hint={isToday} />
+                  </View>
                   {queued.length ? <WaitingNote count={queued.length} /> : null}
                 </View>
                 {/* Day 1, or a new morning: the invitation comes right under the hero. */}

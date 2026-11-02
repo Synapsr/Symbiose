@@ -785,4 +785,7 @@ export const en: Record<TranslationKey, string> = {
   'photoWords.edit': 'Tap to edit',
   'photoWords.type': 'Type instead',
   'photoWords.clear': 'Clear',
+  // Hero swipe: Today's card turns like pages
+  'hero.a11y': 'Your day',
+  'hero.page': '{n} of {count}',
 };

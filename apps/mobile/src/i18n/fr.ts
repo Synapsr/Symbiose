@@ -798,6 +798,9 @@ export const fr = {
   'photoWords.edit': 'Touche pour modifier',
   'photoWords.type': 'Écrire plutôt',
   'photoWords.clear': 'Effacer',
+  // Hero swipe: Today's card turns like pages
+  'hero.a11y': 'Ta journée',
+  'hero.page': '{n} sur {count}',
 } as const;
 
 export type TranslationKey = keyof typeof fr;
