@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { create } from 'zustand';
 
 import type { RewardLog } from './feedback-logic';
+import type { HeroChoice } from './hero-logic';
 import { storage } from './storage';
 
 // ---------------------------------------------------------------- Settings (per device)
@@ -42,6 +43,9 @@ interface SettingsState {
   /** Feedback: the reward sounds (the silent switch still mutes them), and the rewards already given today (`rewardsDue`). */
   sounds: boolean;
   rewards: RewardLog;
+  /** Today's hero card: the page swiped to (null: the goal's own), and whether its one-time swipe hint has played. */
+  heroPage: HeroChoice | null;
+  heroHinted: boolean;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -72,6 +76,8 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   waitingIntentions: '',
   sounds: true,
   rewards: { date: '', keys: [] },
+  heroPage: null,
+  heroHinted: false,
   set: (patch) => {
     set(patch);
     const s = get();
@@ -97,6 +103,8 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       waitingIntentions: s.waitingIntentions,
       sounds: s.sounds,
       rewards: s.rewards,
+      heroPage: s.heroPage,
+      heroHinted: s.heroHinted,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

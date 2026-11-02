@@ -790,6 +790,10 @@ export const fr = {
   'courses.when.yesterday': ' d’hier',
   'courses.when.weekday': ' de {day}',
   'courses.when.date': ' du {date}',
+
+  // Hero swipe: Today's card turns like pages
+  'hero.a11y': 'Ta journée',
+  'hero.page': '{n} sur {count}',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

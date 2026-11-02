@@ -777,4 +777,8 @@ export const en: Record<TranslationKey, string> = {
   'courses.when.yesterday': ' yesterday',
   'courses.when.weekday': ' on {day}',
   'courses.when.date': ' on {date}',
+
+  // Hero swipe: Today's card turns like pages
+  'hero.a11y': 'Your day',
+  'hero.page': '{n} of {count}',
 };
