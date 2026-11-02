@@ -45,8 +45,10 @@ export function heroBars(pages: readonly NutrientKey[], current: NutrientKey, ma
   return pages.filter((key) => key !== current).slice(0, max);
 }
 
-/** A release faster than this (in pages per second) turns the page even short of half way. */
+/** A release faster than this (in pages per second) is a flick: its direction decides. */
 export const FLICK = 0.6;
+/** A slower release turns the page once the card has followed the finger this far (a small card asks for less than half). */
+export const COMMIT = 0.35;
 
 /**
  * Where a released swipe settles. `position` is the strip's place in pages
@@ -56,7 +58,10 @@ export const FLICK = 0.6;
  */
 export function snapPage(position: number, velocity: number, from: number, count: number): number {
   'worklet';
-  let target = Math.abs(velocity) > FLICK ? (velocity > 0 ? Math.ceil(position) : Math.floor(position)) : Math.round(position);
+  const delta = position - from;
+  let target = from;
+  if (Math.abs(velocity) > FLICK) target = velocity > 0 ? Math.ceil(position) : Math.floor(position);
+  else if (Math.abs(delta) > COMMIT) target = from + Math.sign(delta);
   target = Math.min(Math.max(target, from - 1), from + 1);
   return Math.min(Math.max(target, 0), count - 1);
 }

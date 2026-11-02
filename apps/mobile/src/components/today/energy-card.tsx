@@ -78,7 +78,6 @@ export function EnergyCard({
   /** The page it rests on, or is heading to. */
   const target = useSharedValue(index);
   const start = useSharedValue(0);
-  const grab = useSharedValue(0);
 
   // The pages changed under the choice (a new plan, calories hidden): the card simply shows it.
   useEffect(() => {
@@ -107,13 +106,12 @@ export function EnergyCard({
     .enabled(count > 1)
     .activeOffsetX([-10, 10])
     .failOffsetY([-12, 12])
-    .onStart((e) => {
-      // From where it is (even mid-landing), without the jump of the 10 pt it took to start.
+    .onStart(() => {
+      // From where it is, even mid-landing: the finger catches the page.
       start.set(position.value);
-      grab.set(e.translationX);
     })
     .onUpdate((e) => {
-      position.set(dragPosition(start.value, -(e.translationX - grab.value) / width, count));
+      position.set(dragPosition(start.value, -e.translationX / width, count));
     })
     .onEnd((e) => {
       const velocity = Math.max(-6, Math.min(6, -e.velocityX / width));

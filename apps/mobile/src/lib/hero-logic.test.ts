@@ -86,9 +86,14 @@ describe('heroBars', () => {
 });
 
 describe('snapPage', () => {
-  it('settles on the nearest page after a slow release', () => {
-    expect(snapPage(1.4, 0, 1, 5)).toBe(1);
-    expect(snapPage(1.6, 0.2, 1, 5)).toBe(2);
+  it('comes back after a short, slow drag', () => {
+    expect(snapPage(1.3, 0, 1, 5)).toBe(1);
+    expect(snapPage(0.75, -0.2, 1, 5)).toBe(1);
+  });
+
+  it('turns the page after a slow drag past a third of it', () => {
+    expect(snapPage(1.4, 0, 1, 5)).toBe(2);
+    expect(snapPage(0.6, 0.2, 1, 5)).toBe(0);
   });
 
   it('turns the page on a flick, even short of half way', () => {
