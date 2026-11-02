@@ -14,7 +14,7 @@ import Animated, {
 
 import { useI18n } from '@/i18n';
 import type { Dictation } from '@/lib/dictation';
-import { useTheme } from '@/theme';
+import { useTheme, type Palette } from '@/theme';
 
 import { Pressy } from './index';
 
@@ -29,10 +29,31 @@ const fill = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, align
  * swells as the person speaks and a ring that keeps breathing out, so it
  * looks alive before the first word. Hidden where dictation isn't available.
  */
-/** `tint` colours the resting icon, for fields on a dark camera screen. */
-export function MicButton({ dictation, size = 40, tint, style }: { dictation: Dictation; size?: number; tint?: string; style?: StyleProp<ViewStyle> }) {
+/**
+ * `tint` colours the resting icon, for fields on a dark camera screen, and `palette` the accent
+ * (`NIGHT` on the always-dark camera). `glyph`: the icon's size, half the button's by default.
+ */
+export function MicButton({
+  dictation,
+  size = 40,
+  glyph,
+  tint,
+  palette,
+  label,
+  style,
+}: {
+  dictation: Dictation;
+  size?: number;
+  glyph?: number;
+  tint?: string;
+  palette?: Palette;
+  /** What a screen reader says at rest, « Dicter » by default. */
+  label?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { t } = useI18n();
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const colors = palette ?? theme.colors;
   const reduced = useReducedMotion();
   const { listening, level } = dictation;
   const on = useSharedValue(listening ? 1 : 0);
@@ -73,7 +94,7 @@ export function MicButton({ dictation, size = 40, tint, style }: { dictation: Di
       haptic={false}
       onPress={dictation.toggle}
       accessibilityRole="button"
-      accessibilityLabel={listening ? t('dictation.stop') : t('dictation.start')}
+      accessibilityLabel={listening ? t('dictation.stop') : (label ?? t('dictation.start'))}
       accessibilityState={{ selected: listening }}
       hitSlop={6}
       style={[round, style]}>
@@ -81,7 +102,7 @@ export function MicButton({ dictation, size = 40, tint, style }: { dictation: Di
       <Animated.View pointerEvents="none" style={[fill, round, { borderWidth: 1.5, borderColor: colors.accent }, ring]} />
       <Animated.View pointerEvents="none" style={[fill, round, { backgroundColor: colors.accent }, disc]} />
       <Animated.View pointerEvents="none" style={[fill, idle]}>
-        <Mic size={Math.round(size * 0.5)} color={tint ?? colors.text2} strokeWidth={2} />
+        <Mic size={glyph ?? Math.round(size * 0.5)} color={tint ?? colors.text2} strokeWidth={2} />
       </Animated.View>
       <Animated.View pointerEvents="none" style={[fill, { flexDirection: 'row', gap: 2.5 }, live]}>
         {BARS.map((share, i) => (

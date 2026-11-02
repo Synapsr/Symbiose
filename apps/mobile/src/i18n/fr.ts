@@ -168,7 +168,6 @@ export const fr = {
   'capture.photo': 'Photo',
   'capture.barcode': 'Code-barres',
   'capture.text': 'Texte',
-  'capture.note': 'Ajouter une précision (optionnel)',
   'capture.textPlaceholder': 'Ex : un bol de pâtes carbonara et un coca',
   'capture.send': 'Analyser',
   'capture.recent': 'Récents',
@@ -790,6 +789,15 @@ export const fr = {
   'courses.when.yesterday': ' d’hier',
   'courses.when.weekday': ' de {day}',
   'courses.when.date': ' du {date}',
+
+  // Photo words: say or write what the photo shows, before the shot
+  'photoWords.describe': 'Décrire à voix haute',
+  'photoWords.write': 'Décrire par écrit',
+  'photoWords.hint': 'Dis ce que c’est, si tu veux',
+  'photoWords.example': 'Ex : riz complet, sans sucre',
+  'photoWords.edit': 'Touche pour modifier',
+  'photoWords.type': 'Écrire plutôt',
+  'photoWords.clear': 'Effacer',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

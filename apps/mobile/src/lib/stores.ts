@@ -42,6 +42,8 @@ interface SettingsState {
   /** Feedback: the reward sounds (the silent switch still mutes them), and the rewards already given today (`rewardsDue`). */
   sounds: boolean;
   rewards: RewardLog;
+  /** Photo words: times the camera said, beside its mic, that words can go with the photo (`DESCRIBE_HINTS` at most). */
+  describeHints: number;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -72,6 +74,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   waitingIntentions: '',
   sounds: true,
   rewards: { date: '', keys: [] },
+  describeHints: 0,
   set: (patch) => {
     set(patch);
     const s = get();
@@ -97,6 +100,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       waitingIntentions: s.waitingIntentions,
       sounds: s.sounds,
       rewards: s.rewards,
+      describeHints: s.describeHints,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

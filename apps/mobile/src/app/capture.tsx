@@ -4,13 +4,15 @@ import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowUp, CloudOff, Images, PenLine, Star, X, Zap, ZapOff } from 'lucide-react-native';
+import { ArrowUp, CloudOff, Images, Star, X, Zap, ZapOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CourseChip } from '@/components/meal/course-chip';
+import { DescribeButton, DescribeHint, usePhotoWords, WordsCaption } from '@/components/meal/photo-words';
 import { PortionStepper } from '@/components/meal/portion-stepper';
 import { Button, IconButton, Pressy, Row, Txt, webInput } from '@/components/ui';
 import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
@@ -73,9 +75,8 @@ export default function Capture() {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
   const [torch, setTorch] = useState(false);
-  const [note, setNote] = useState('');
-  const [noteOpen, setNoteOpen] = useState(false);
-  const noteDictation = useDictation(note, setNote);
+  // Said or typed before the shot, the words go with the photo.
+  const words = usePhotoWords();
   const [busy, setBusy] = useState(false);
   const leftHanded = useSettings((s) => s.leftHanded);
   // A quick white flash confirms the shot, like a real shutter.
@@ -96,7 +97,9 @@ export default function Capture() {
     setBusy(true);
     try {
       const photo = await preparePhoto(uri, width, height);
-      void log({ ...destination.at(), photoBase64: photo.base64, text: note.trim() || undefined, ...into }, { photoUri: photo.uri, label: note.trim() || t('capture.photo'), joining: destination.joining });
+      // Read now: words still being heard while the photo was prepared are in.
+      const said = words.latest();
+      void log({ ...destination.at(), photoBase64: photo.base64, text: said || undefined, ...into }, { photoUri: photo.uri, label: said || t('capture.photo'), joining: destination.joining });
       close();
     } catch {
       setBusy(false);
@@ -113,6 +116,7 @@ export default function Capture() {
   };
 
   const pickFromGallery = async () => {
+    words.hush();
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.9 });
     const asset = result.canceled ? null : result.assets[0];
     if (asset) await submitPhoto(asset.uri, asset.width, asset.height);
@@ -151,6 +155,11 @@ export default function Capture() {
   };
 
   const cameraNeeded = mode !== 'text';
+  // Typing the photo's words: the shutter rides above the keyboard, ready to shoot.
+  const { height: keyboard } = useReanimatedKeyboardAnimation();
+  const photoMode = mode === 'photo';
+  const rest = insets.bottom;
+  const lift = useAnimatedStyle(() => ({ paddingBottom: (photoMode ? Math.max(-keyboard.value, rest) : rest) + Space.lg }));
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -183,7 +192,7 @@ export default function Capture() {
         </View>
       ) : null}
 
-      {mode === 'text' ? <TextMode date={date} destination={destination} onDone={close} /> : null}
+      {mode === 'text' ? <TextMode date={date} destination={destination} initial={words.text.trim()} onDone={close} /> : null}
 
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: WHITE }, flashStyle]} />
 
@@ -260,25 +269,12 @@ export default function Capture() {
 
       {/* Bottom controls */}
       {!product && !offlineCode ? (
-        <View style={{ position: 'absolute', left: 0, right: 0, bottom: insets.bottom + Space.lg, gap: Space.xl, alignItems: 'center' }}>
-          {mode === 'photo' && noteOpen ? (
-            <Animated.View entering={FadeIn} style={{ width: '100%', paddingHorizontal: Space.lg }}>
-              <Row gap={0} style={{ height: 48, borderRadius: Radius.pill, backgroundColor: 'rgba(0,0,0,0.55)', paddingRight: 4 }}>
-                <TextInput
-                  value={note}
-                  onChangeText={setNote}
-                  placeholder={noteDictation.listening ? t('dictation.listening') : t('capture.note')}
-                  placeholderTextColor={DIM}
-                  autoFocus
-                  style={[{ flex: 1, height: 48, color: WHITE, paddingHorizontal: Space.xl, fontSize: 16 }, webInput]}
-                />
-                <MicButton dictation={noteDictation} tint={DIM} />
-              </Row>
-            </Animated.View>
-          ) : null}
+        <Animated.View style={[{ position: 'absolute', left: 0, right: 0, bottom: 0, gap: Space.xl, alignItems: 'center' }, lift]}>
+          {mode === 'photo' ? <WordsCaption words={words} /> : null}
+          {mode === 'photo' && !words.open && words.dictation.available && permission?.granted ? <DescribeHint side={leftHanded ? 'left' : 'right'} /> : null}
 
           {mode === 'photo' ? (
-            // Left-handed: the note (used most) moves under the left thumb, the gallery to the right.
+            // Left-handed: the words (used most) move under the left thumb, the gallery to the right.
             <Row style={{ width: '100%', paddingHorizontal: Space.xxxl, justifyContent: 'space-between', flexDirection: leftHanded ? 'row-reverse' : 'row' }}>
               <IconButton label={t('capture.gallery')} variant="glass" size={52} icon={<Images size={22} color={WHITE} />} onPress={pickFromGallery} />
               <Pressy
@@ -291,26 +287,30 @@ export default function Capture() {
                   {busy ? <ActivityIndicator color="#000" /> : null}
                 </View>
               </Pressy>
-              <IconButton label={t('capture.note')} variant="glass" size={52} icon={<PenLine size={22} color={note ? '#5FD6B4' : WHITE} />} onPress={() => setNoteOpen(!noteOpen)} />
+              <DescribeButton words={words} />
             </Row>
           ) : null}
 
-          <Row gap={Space.xl}>
-            {(['text', 'photo', 'barcode'] as const).map((m) => (
-              <Pressy
-                key={m}
-                onPress={() => {
-                  setMode(m);
-                  setScanError(null);
-                }}
-                style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: Radius.pill, backgroundColor: mode === m ? 'rgba(255,255,255,0.18)' : 'transparent' }}>
-                <Txt variant="label" style={{ color: mode === m ? '#FFD60A' : WHITE, letterSpacing: 0.5 }}>
-                  {t(`capture.${m}`).toUpperCase()}
-                </Txt>
-              </Pressy>
-            ))}
-          </Row>
-        </View>
+          {/* While typing, the keyboard takes the modes' place. */}
+          {!(photoMode && words.typing) ? (
+            <Row gap={Space.xl}>
+              {(['text', 'photo', 'barcode'] as const).map((m) => (
+                <Pressy
+                  key={m}
+                  onPress={() => {
+                    words.hush();
+                    setMode(m);
+                    setScanError(null);
+                  }}
+                  style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: Radius.pill, backgroundColor: mode === m ? 'rgba(255,255,255,0.18)' : 'transparent' }}>
+                  <Txt variant="label" style={{ color: mode === m ? '#FFD60A' : WHITE, letterSpacing: 0.5 }}>
+                    {t(`capture.${m}`).toUpperCase()}
+                  </Txt>
+                </Pressy>
+              ))}
+            </Row>
+          ) : null}
+        </Animated.View>
       ) : null}
     </View>
   );
@@ -330,13 +330,14 @@ function ProductPortion({ product, grams, onChange }: { product: FoodItem; grams
 }
 
 /** Describe the meal in words (keyboard dictation works great), or re-log a recent food in one tap. */
-function TextMode({ date, destination, onDone }: { date: string; destination: Destination; onDone: () => void }) {
+function TextMode({ date, destination, initial, onDone }: { date: string; destination: Destination; initial: string; onDone: () => void }) {
   const { t, locale } = useI18n();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { log, relog } = useMealLogger();
   const showToast = useToast((s) => s.show);
-  const [text, setText] = useState('');
+  // Words said in photo mode come along.
+  const [text, setText] = useState(initial);
   const dictation = useDictation(text, setText);
   const library = useQuery({ queryKey: ['library', date], queryFn: () => api.library(toLocalDate()) });
 
