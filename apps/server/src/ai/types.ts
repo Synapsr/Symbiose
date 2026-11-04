@@ -1,10 +1,12 @@
 import type {
   ActivityWeek,
   BloodPressureCategory,
+  CarbLoadLevel,
   CoachMealProposal,
   DaySummary,
   ExpenditureConfidence,
   FoodItem,
+  FruitSugar,
   GoalPlan,
   InsightsResponse,
   JournalKind,
@@ -132,6 +134,16 @@ export interface RecoveryBrief {
   reasons: RecoveryReason[];
 }
 
+/** Sugars beyond added sugar, for the coach; each key only when there is something to say. */
+export interface SugarsBrief {
+  /** Today: sugars from juice, smoothies or dried fruit outweigh added sugars (`fruitSugarSignal`). */
+  fruitSugarToday?: FruitSugar;
+  /** Days of the last 7 with that signal. */
+  fruitSugarDays7?: number;
+  /** Blood-sugar mode: today's meals, their carbs against the per-meal guide (smaller for snacks). */
+  carbsByMeal?: { time: string; type: MealType; title: string; carbs: number; guide: number; level: CarbLoadLevel; fiber: number; protein: number }[];
+}
+
 /** Movement so far on a given day. */
 export interface ActivityToday {
   steps: number | null;
@@ -253,6 +265,8 @@ export interface CoachInput extends UserContext {
   journal: JournalBrief | null;
   /** Last night's vitals, when the morning check-in imports them and there is enough history. */
   recovery: RecoveryBrief | null;
+  /** Total sugars and carbs: the juice signal, carbs per meal in blood-sugar mode. */
+  sugars?: SugarsBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
     workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
   };

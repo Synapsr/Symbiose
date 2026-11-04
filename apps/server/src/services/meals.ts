@@ -4,6 +4,7 @@ import {
   COURSE_WINDOW,
   courseTarget,
   CreateMealInputSchema,
+  fruitSugarSignal,
   DuplicateMealInputSchema,
   FIRST_COURSE_ID,
   localHour,
@@ -93,18 +94,22 @@ export function itemsFromAnalysis(analysis: MealAnalysis, courseFor?: (course: n
     }));
 }
 
-/** Combines the AI's qualitative assessment with deterministic, goal-aware flags. */
+/**
+ * Combines the AI's qualitative assessment with deterministic, goal-aware flags
+ * and the « juice » signal (`fruitSugarSignal`), both recomputed from the items.
+ */
 export function buildInsight(
-  totals: Nutrients,
+  items: FoodItem[],
   targets: Targets | null,
   plan: GoalPlan | null,
   ai?: Pick<MealAnalysis, 'verdict' | 'headline' | 'tips' | 'clarification'>,
 ): MealInsight | null {
-  const flags = targets ? mealFlags(totals, targets, plan) : [];
+  const flags = targets ? mealFlags(mealTotals(items), targets, plan) : [];
+  const fruitSugar = fruitSugarSignal(items, 'meal');
   if (!ai) {
-    if (!flags.length) return null;
+    if (!flags.length && !fruitSugar) return null;
     const worst = flags.find((f) => f.kind === 'max' && f.share >= 0.5);
-    return { verdict: worst ? 'watch' : 'ok', headline: '', tips: [], flags, clarification: null };
+    return { verdict: worst ? 'watch' : 'ok', headline: '', tips: [], flags, clarification: null, fruitSugar };
   }
   return {
     verdict: ai.verdict,
@@ -118,13 +123,14 @@ export function buildInsight(
             options: ai.clarification.options.slice(0, 4).map((o) => o.slice(0, 40)),
           }
         : null,
+    fruitSugar,
   };
 }
 
 /** Keeps the AI's words but recomputes the numbers; the question is moot once edited. */
 function refreshedInsight(previous: MealInsight | null, items: FoodItem[], resolved: Resolved): MealInsight | null {
-  const fresh = buildInsight(mealTotals(items), resolved.targets, resolved.context.plan);
-  return previous ? { ...previous, flags: fresh?.flags ?? [], clarification: null } : fresh;
+  const fresh = buildInsight(items, resolved.targets, resolved.context.plan);
+  return previous ? { ...previous, flags: fresh?.flags ?? [], clarification: null, fruitSugar: fresh?.fruitSugar ?? null } : fresh;
 }
 
 /** Removes the per-request item ids (and courses) so foods can be grouped across meals. */
@@ -209,7 +215,7 @@ async function judge({ db, ai }: MealDeps, userId: string, resolved: Resolved, m
 /** The insight and names a judged meal gets, or what it keeps when the AI didn't answer. */
 function judgedFields(analysis: MealAnalysis | undefined, previous: Pick<MealRow, 'insight' | 'title'>, items: FoodItem[], resolved: Resolved) {
   return {
-    insight: analysis ? buildInsight(mealTotals(items), resolved.targets, resolved.context.plan, { ...analysis, clarification: null }) : refreshedInsight(previous.insight, items, resolved),
+    insight: analysis ? buildInsight(items, resolved.targets, resolved.context.plan, { ...analysis, clarification: null }) : refreshedInsight(previous.insight, items, resolved),
     title: analysis?.title.trim().slice(0, 120) || previous.title,
   };
 }
@@ -286,7 +292,7 @@ export async function createMeal(deps: MealDeps, userId: string, input: CreateIn
       photoId,
       inputText: input.text ?? null,
       note: null,
-      insight: buildInsight(mealTotals(items), resolved.targets, plan, analysis),
+      insight: buildInsight(items, resolved.targets, plan, analysis),
       favorite: false,
       // One course: its photo and words stay in the columns; only a reused past meal needs saying.
       courses: basedOn ? [{ id: FIRST_COURSE_ID, label: '', eatenAt: input.eatenAt, photoId, text: input.text ?? null, basedOn }] : null,
@@ -351,7 +357,7 @@ async function addCourse(deps: MealDeps, userId: string, row: MealRow, input: Cr
       ...courseColumns(next, items),
       title: analysis?.title.trim().slice(0, 120) || current.title,
       // The AI may ask about the new course: its question stays.
-      insight: words ? buildInsight(mealTotals(items), resolved.targets, resolved.context.plan, words) : refreshedInsight(current.insight, items, resolved),
+      insight: words ? buildInsight(items, resolved.targets, resolved.context.plan, words) : refreshedInsight(current.insight, items, resolved),
       mealType: input.mealType ?? analysis?.mealType ?? current.mealType,
       updatedAt: nowIso(),
     })
@@ -384,7 +390,7 @@ function aloneAfterAll(
       photoId: course.photoId,
       inputText: course.text,
       note: null,
-      insight: buildInsight(mealTotals(own), resolved.targets, resolved.context.plan, analysis && (input.photoBase64 || input.text) ? analysis : undefined),
+      insight: buildInsight(own, resolved.targets, resolved.context.plan, analysis && (input.photoBase64 || input.text) ? analysis : undefined),
       favorite: false,
       courses: course.basedOn ? [{ ...course, id: FIRST_COURSE_ID }] : null,
       createdAt: now,
@@ -488,7 +494,7 @@ export async function refineMeal({ db, ai, photos }: MealDeps, userId: string, i
     .set({
       ...(keepColumns ? { items } : courseColumns(next, items)),
       title: analysis.title.slice(0, 120) || existing.title,
-      insight: buildInsight(mealTotals(items), resolved.targets, resolved.context.plan, { ...analysis, clarification: null }),
+      insight: buildInsight(items, resolved.targets, resolved.context.plan, { ...analysis, clarification: null }),
       updatedAt: nowIso(),
     })
     .where(eq(meals.id, existing.id))

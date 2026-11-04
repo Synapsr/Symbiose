@@ -112,6 +112,7 @@ export const planOutput = {
   coachTone: 'gentle',
   adjustForActivity: true,
   activity: { weeklyActiveMinutes: 150, dailySteps: 8000, weeklyStrengthSessions: 2 },
+  carbsPerMeal: null,
 };
 
 export const coachInput: CoachInput = {

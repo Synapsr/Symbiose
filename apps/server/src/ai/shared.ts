@@ -1,4 +1,4 @@
-import { GoalTagSchema, NUTRIENT_KEYS, roundNutrients, type FoodItem } from '@symbiose/shared';
+import { carbsPerMeal, GoalTagSchema, NUTRIENT_KEYS, roundNutrients, type FoodItem } from '@symbiose/shared';
 import { z } from 'zod';
 
 import { HttpError } from '../errors';
@@ -96,6 +96,7 @@ export const PlanOut = z.object({
     dailySteps: z.number().nullable(),
     weeklyStrengthSessions: z.number().nullable(),
   }),
+  carbsPerMeal: z.number().nullable(),
 });
 
 export const NudgesOut = z.object({ lines: z.array(z.string()) });
@@ -207,6 +208,7 @@ function contextBlock(ctx: UserContext, extra: Record<string, unknown> = {}): st
           rules: ctx.plan.rules,
           habits: ctx.plan.habits.map((h) => h.label),
           coachTone: ctx.plan.coachTone,
+          ...(carbsPerMeal(ctx.plan) !== null ? { carbsPerMeal: carbsPerMeal(ctx.plan) } : {}),
         }
       : null,
     dailyTargets: ctx.targets
@@ -278,6 +280,7 @@ export function coachText(input: CoachInput): string {
     ...input.life,
     ...journalExtra(input.journal),
     ...recoveryExtra(input.recovery),
+    ...(input.sugars ? { sugars: input.sugars } : {}),
   };
   return `${contextBlock(input, extra)}\n\n${input.message}`;
 }

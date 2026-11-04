@@ -1,5 +1,6 @@
 import { PAL_MIN } from './expenditure';
 import { NUTRIENT_KEYS, type NutrientKey, type Nutrients } from './nutrients';
+import { carbsPerMeal, sugarGoal } from './sugars';
 import type {
   ActivityLevel,
   EnergyBreakdown,
@@ -102,7 +103,7 @@ export function computeTargets(profile: Profile, plan: GoalPlan | null, options:
   const targets: Targets = {
     kcal: { value: kcal, kind: 'target' },
     protein: { value: protein, kind: 'min' },
-    carbs: { value: carbs, kind: 'target' },
+    carbs: carbsTarget(kcal, carbs, plan),
     fat: { value: fat, kind: 'target' },
     // EFSA: ≥25 g/day; US DGA: 14 g per 1000 kcal.
     fiber: { value: Math.max(25, Math.round((kcal / 1000) * 14)), kind: 'min' },
@@ -125,6 +126,21 @@ export function computeTargets(profile: Profile, plan: GoalPlan | null, options:
     if (override !== undefined && key !== 'kcal') targets[key] = { ...targets[key], value: override };
   }
   return { targets, energy };
+}
+
+/**
+ * Carbohydrates fill the energy left by protein and fat. When the plan is about
+ * sugar they become a « repère » instead, within reference intakes:
+ * - sugar goal: the energy left, kept within EFSA's 45–60 % of energy (the EU
+ *   label's reference intake, 260 g at 2000 kcal, is 52 %);
+ * - blood-sugar mode: at most 45 % of energy, the low end of EFSA's range and
+ *   within ANSES' 40–55 %; the rest of the budget can come from protein, fat and fibre.
+ */
+function carbsTarget(kcal: number, residual: number, plan: GoalPlan | null): Target {
+  const share = (pct: number) => Math.round((kcal * pct) / 4);
+  if (carbsPerMeal(plan) !== null) return { value: Math.max(50, Math.min(residual, share(0.45))), kind: 'max' };
+  if (sugarGoal(plan)) return { value: Math.min(Math.max(residual, share(0.45)), share(0.6)), kind: 'max' };
+  return { value: residual, kind: 'target' };
 }
 
 export function progressFor(nutrient: NutrientKey, consumed: number, target: Target): NutrientProgress {

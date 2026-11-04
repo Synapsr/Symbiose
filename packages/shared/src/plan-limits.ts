@@ -1,5 +1,6 @@
 import type { NutrientKey } from './nutrients';
 import type { ActivityGoals, GoalPlan } from './schemas';
+import { clampCarbsPerMeal } from './sugars';
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(Number.isFinite(value) ? value : min, min), max);
 
@@ -53,7 +54,7 @@ const KCAL_OVERRIDE_BOUNDS = [1200, 6000] as const;
 
 /**
  * A plan edited by hand, made safe: rule values and manual targets within realistic bounds, energy
- * never set by a rule (`calorieMode` drives it), activity guardrails within bounds. The energy
+ * never set by a rule (`calorieMode` drives it), activity guardrails and the carbs-per-meal guide within bounds. The energy
  * safety floors themselves live in `computeEnergy`.
  */
 export function sanitizePlan(plan: GoalPlan): GoalPlan {
@@ -67,5 +68,6 @@ export function sanitizePlan(plan: GoalPlan): GoalPlan {
     rules: plan.rules.filter((rule) => rule.nutrient !== 'kcal').map((rule) => ({ ...rule, value: clampRuleValue(rule.nutrient as Exclude<NutrientKey, 'kcal'>, rule.value) })),
     overrides,
     activity: clampActivityGoals(plan.activity),
+    ...(typeof plan.carbsPerMeal === 'number' ? { carbsPerMeal: clampCarbsPerMeal(plan.carbsPerMeal) } : {}),
   };
 }

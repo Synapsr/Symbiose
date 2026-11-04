@@ -1,4 +1,4 @@
-import { BloodPressureCategorySchema, type BloodPressureCategory, type CoachMealProposal } from '@symbiose/shared';
+import { BloodPressureCategorySchema, carbsGuideFor, carbsPerMeal, type BloodPressureCategory, type CoachMealProposal } from '@symbiose/shared';
 
 import type { Ai, AnalyzedItem, CoachInput, HistoryMeal, MealAnalysis, MealAnalysisInput } from './types';
 import { heuristicPlan } from '../services/goals';
@@ -20,6 +20,9 @@ const FOODS: { match: RegExp; item: AnalyzedItem }[] = [
   { match: /pomme|apple/i, item: { name: 'Pomme', emoji: '🍎', portion: '1 moyenne', grams: 150, confidence: 0.95, per100g: { kcal: 53, protein: 0.3, carbs: 11.6, sugar: 10.4, addedSugar: 0, fat: 0.2, satFat: 0, fiber: 2.4, sodium: 1 } } },
   { match: /yaourt|yogurt/i, item: { name: 'Yaourt aux fruits', emoji: '🥛', portion: '1 pot', grams: 125, confidence: 0.85, per100g: { kcal: 97, protein: 3.4, carbs: 14.5, sugar: 13.5, addedSugar: 9, fat: 2.6, satFat: 1.7, fiber: 0.2, sodium: 50 } } },
   { match: /tarte|dessert|g[âa]teau|cake/i, item: { name: 'Tarte aux pommes', emoji: '🥧', portion: '1 part', grams: 120, confidence: 0.75, per100g: { kcal: 255, protein: 2.6, carbs: 34, sugar: 17, addedSugar: 11, fat: 11.5, satFat: 6.8, fiber: 1.6, sodium: 160 } } },
+  { match: /jus|juice/i, item: { name: 'Jus d’orange', emoji: '🧃', portion: '1 grand verre', grams: 250, confidence: 0.9, per100g: { kcal: 45, protein: 0.7, carbs: 10.4, sugar: 8.4, addedSugar: 0, fat: 0.2, satFat: 0, fiber: 0.2, sodium: 1 } } },
+  { match: /smoothie/i, item: { name: 'Smoothie mangue-banane', emoji: '🥤', portion: '1 bouteille 25 cl', grams: 250, confidence: 0.85, per100g: { kcal: 60, protein: 0.6, carbs: 13.5, sugar: 11, addedSugar: 0, fat: 0.2, satFat: 0, fiber: 1.1, sodium: 3 } } },
+  { match: /tartine|pain|toast/i, item: { name: 'Tartines beurre', emoji: '🍞', portion: '2 tranches', grams: 80, confidence: 0.75, per100g: { kcal: 300, protein: 8.5, carbs: 48, sugar: 3.5, addedSugar: 1.5, fat: 8.5, satFat: 5, fiber: 3, sodium: 450 } } },
   { match: /gratin/i, item: { name: 'Gratin dauphinois', emoji: '🥔', portion: '1 belle part', grams: 300, confidence: 0.7, per100g: { kcal: 145, protein: 3.6, carbs: 12.5, sugar: 1.8, addedSugar: 0, fat: 8.8, satFat: 5.6, fiber: 1.3, sodium: 260 } } },
 ];
 
@@ -176,6 +179,9 @@ export function createMockAi(): Ai {
       }
       items = items.map((i) => ({ ...i, course: i.course ?? 1 }));
       const added = addedSugarOf(items);
+      const carbs = items.reduce((sum, i) => sum + (i.per100g.carbs * i.grams) / 100, 0);
+      const perMeal = carbsPerMeal(input.plan);
+      const guide = perMeal === null ? null : carbsGuideFor(input.mealTypeHint, perMeal);
       const sodium = items.reduce((sum, i) => sum + (i.per100g.sodium * i.grams) / 100, 0);
 
       // The whole meal's courses: those logged, then this one; or those corrected.
@@ -198,9 +204,18 @@ export function createMockAi(): Ai {
         mealType: input.mealTypeHint,
         courses: courses.length > 1 ? courses.map((c) => c.label) : [],
         items,
-        verdict: whole?.verdict ?? (added > 15 ? 'watch' : added > 5 ? 'ok' : 'great'),
-        headline: whole?.headline ?? (added > 5 ? `≈${Math.round(added)} g de sucres ajoutés dans ce repas.` : 'Repas équilibré, presque sans sucre ajouté. Bien joué.'),
+        verdict: whole?.verdict ?? (guide !== null ? (carbs > guide * 1.5 ? 'watch' : carbs > guide + 5 ? 'ok' : 'great') : added > 15 ? 'watch' : added > 5 ? 'ok' : 'great'),
+        headline:
+          whole?.headline ??
+          (guide !== null
+            ? carbs > guide + 5
+              ? `≈${Math.round(carbs)} g de glucides, au-dessus de ton repère de ${guide} g par repas.`
+              : `${Math.round(carbs)} g de glucides, pile dans ton repère de ${guide} g.`
+            : added > 5
+              ? `≈${Math.round(added)} g de sucres ajoutés dans ce repas.`
+              : 'Repas équilibré, presque sans sucre ajouté. Bien joué.'),
         tips: [
+          ...(guide !== null && carbs > guide * 1.5 ? ['Commence par les légumes ou les protéines, et une marche de 10 minutes après le repas aide à lisser la glycémie.'] : []),
           ...(added > 15 ? ['Remplace la boisson sucrée par de l’eau pétillante citronnée.'] : []),
           ...(input.recentWorkout ? ['Après ta séance, vise 20 à 30 g de protéines dans ce repas pour la récupération.'] : []),
           ...(elevated(input.bloodPressureCategory) && sodium >= 800 ? ['Repas assez salé : la prochaine fois, goûte avant de saler et préfère les herbes.'] : []),
@@ -214,6 +229,13 @@ export function createMockAi(): Ai {
       const { intentions: _i, overrides: _o, ...plan } = heuristicPlan(input.intentions, input.locale);
       if (elevated(input.bloodPressure?.category) && !plan.rules.some((r) => r.nutrient === 'sodium')) {
         plan.rules.push({ nutrient: 'sodium', kind: 'max', value: 2000, reason: 'OMS : moins de 5 g de sel par jour' });
+      }
+      if (plan.carbsPerMeal) {
+        return {
+          ...plan,
+          title: 'Une glycémie plus stable',
+          summary: `On répartit les glucides, environ ${plan.carbsPerMeal} g par repas, avec plus de fibres et moins de sucres rapides. Ça ne remplace pas l’avis de ton médecin.`,
+        };
       }
       return { ...plan, title: 'Moins de sucre, plus d’énergie', summary: 'On vise moins de 25 g de sucres ajoutés par jour, en s’attaquant aux réflexes de l’après-midi. Les calories restent au maintien.' };
     },
@@ -238,9 +260,17 @@ export function createMockAi(): Ai {
           ? `Oui, c'est un bon petit-déj 👍\n\n- **Sucre ajouté** : ${sugar} g sur 25, chocolat compris. C'est top pour ta glycémie.\n- **Protéines** : 29 g grâce aux œufs, une *bonne* base.\n- **Calories** : ${kcal} kcal, il te reste largement de quoi faire.\n\nDeux petites pistes pour la prochaine fois :\n1. **Plus de protéines** : un 3e œuf ou un skyr nature à côté, tu arrives vers 40 g.\n2. **Plus de fibres** : du pain complet, des tomates ou un fruit font vite monter ce chiffre.\n\nPour le déjeuner, vise environ 45 g de protéines et beaucoup de légumes.`
           : `Yes, that's a good breakfast 👍\n\n- **Added sugar**: ${sugar} g out of 25, chocolate included.\n- **Protein**: 29 g thanks to the eggs, a *good* base.\n- **Calories**: ${kcal} kcal, plenty left for the day.\n\nTwo small ideas for next time:\n1. **More protein**: a 3rd egg or a plain skyr on the side gets you near 40 g.\n2. **More fibre**: wholegrain bread, tomatoes or a fruit add up fast.\n\nFor lunch, aim for about 45 g of protein and lots of vegetables.`
         : null;
+      const juice = input.sugars?.fruitSugarToday;
+      const fruit =
+        juice && /sucre|sugar|jus|juice|glyc|fruit/i.test(input.message)
+          ? input.locale === 'fr'
+            ? `Peu de sucres ajoutés aujourd’hui, bravo. Par contre, ≈${juice.grams} g de sucres viennent de ${juice.sources.join(' et ').toLowerCase()} : un fruit entier, c’est top, avec ses fibres ; le jus, c’est surtout son sucre, plus proche d’une boisson sucrée. Demain, essaie une orange entière et un grand verre d’eau ?`
+            : `Very little added sugar today, well done. About ${juice.grams} g of sugars come from ${juice.sources.join(' and ').toLowerCase()} though: whole fruit is great, with its fibre; juice is mostly its sugar, closer to a sweet drink. Tomorrow, maybe a whole orange and a big glass of water?`
+          : null;
       const reply =
         meal?.reply ??
         why ??
+        fruit ??
         detailed ??
         (transit && /transit|ventre|selles|digest|bowel|gut/i.test(input.message)
           ? `D'après ton carnet, c'est environ ${String(transit.perDay).replace('.', ',')} passage par jour sur ${transit.days} jours. Pour un transit régulier, vise une trentaine de grammes de fibres et 1,5 L d'eau par jour, et bouge un peu après les repas.`

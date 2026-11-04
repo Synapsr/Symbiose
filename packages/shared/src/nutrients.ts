@@ -64,7 +64,7 @@ export const NUTRIENT_META: Record<NutrientKey, NutrientMeta> = {
   },
   sugar: {
     unit: 'g',
-    label: { fr: 'Sucres', en: 'Sugars' },
+    label: { fr: 'Sucres totaux', en: 'Total sugars' },
     short: { fr: 'Sucres', en: 'Sugars' },
     maxPer100g: 100,
   },
