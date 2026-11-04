@@ -38,6 +38,13 @@ describe('plan limits', () => {
     expect(safe.rules.map((r) => r.nutrient)).toEqual(['addedSugar']);
     expect(safe.overrides).toEqual({ kcal: 1200, protein: 30 });
   });
+
+  it('keeps the carbs-per-meal guide within the advice, and leaves it out when the plan has none', () => {
+    expect(sanitizePlan({ ...plan, carbsPerMeal: 140 }).carbsPerMeal).toBe(60);
+    expect(sanitizePlan({ ...plan, carbsPerMeal: 47 }).carbsPerMeal).toBe(45);
+    expect(sanitizePlan({ ...plan, carbsPerMeal: null }).carbsPerMeal).toBeNull();
+    expect('carbsPerMeal' in sanitizePlan(plan)).toBe(false);
+  });
 });
 
 describe('the goal metric', () => {

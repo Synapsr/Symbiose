@@ -35,6 +35,7 @@ import { proactiveTurn, toCoachMessage } from '../services/coach-messages';
 import { acceptMealActions, runMealAction } from '../services/meal-actions';
 import { toMeal } from '../services/meals';
 import { nightOf } from '../services/sleep';
+import { sugarsBrief } from '../services/sugars';
 import { resolveUser } from '../services/users';
 import { recoveryBrief, recoveryFor } from '../services/vitals';
 import { workoutsBetween } from '../services/workouts';
@@ -100,6 +101,7 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
     // The last week's moods are in `life.mood`, with their words: the older « Ressenti » notes they come from aren't repeated.
     journal: journalBrief(db, userId, addDays(localDate, -(TRANSIT_WINDOW_DAYS - 1)), localDate, moodNoteIds(db, userId, addDays(localDate, -6), localDate)),
     recovery: recoveryBrief(recoveryFor(db, userId, localDate, resolved.row.profile?.trackSleep ? nightOf(db, userId, localDate) : null)),
+    sugars: sugarsBrief(db, userId, resolved.context.plan, localDate),
     today: {
       date: day.date,
       totals: day.totals,

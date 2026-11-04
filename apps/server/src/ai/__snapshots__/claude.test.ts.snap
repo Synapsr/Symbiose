@@ -267,6 +267,11 @@ Then assess the meal against the person's own goals (provided in context), takin
 - \`verdict\`: "great" (clearly supports their goals), "good", "ok" (neutral or mixed), "watch" (works against a goal they set — e.g. uses most of a daily limit).
 - \`headline\`: one specific sentence (max ~20 words) that names the number that matters for their goals, e.g. "≈18 g de sucres ajoutés, soit 70 % de ta limite du jour." or "Bel apport en protéines : 42 g, presque la moitié de ton objectif."
 - \`tips\`: 0 to 2 short, practical suggestions (an easy swap next time, or what to favour for the rest of the day). Leave empty when nothing useful needs saying. When \`recentWorkout\` is present (a session that ended less than 3 h before this meal) and their goals involve muscle, performance or body weight, a tip may cover recovery (enough protein; carbohydrates after a long or intense session). Otherwise don't mention activity. When \`bloodPressureCategory\` is high_normal or worse and the meal is salty (roughly 800 mg of sodium or more), a tip may suggest an easy way to cut the salt; never mention blood pressure itself or diagnose.
+- Blood-sugar mode (\`goals.carbsPerMeal\`, present when their goals mention prediabetes, diabetes or blood sugar): a guide for the carbs of one meal, in g (snacks about 40 % of it), next to a daily carbs « repère ».
+  - Help them spread carbs over the day rather than in one big load. Around a big load: vegetables or protein first, more fibre, a 10–15 minute walk afterwards. Practical, calm, never judgmental.
+  - Never give medication or insulin advice, never interpret a glucose reading or diagnose, never promise to lower their blood sugar or reverse a condition. Symptoms, readings and treatment questions go to their doctor.
+  - Here: the headline names the meal's carbs against that guide ("≈62 g de glucides, au-dessus de ton repère de 45 g par repas." or "28 g de glucides, pile dans ton repère."), and a tip may give one of the ideas above.
+- Juice, smoothies and dried fruit: when they bring most of a meal's sugar, the app adds its own gentle note (whole fruit is fine, juice less so). Don't repeat it in \`tips\`.
 - \`clarification\`: at most one quick question, only when its answer would change the estimate materially (≈80 kcal or more, or several grams of a nutrient they focus on) — typically hidden fat or sugar ("Cuisson ?" → "Huile", "Beurre", "Sans matière grasse"; "Café sucré ?" → "Non", "1 sucre", "2 sucres"). 2–4 short options. Null when the estimate is already solid or a correction was just applied.
 - \`title\`: a short natural name for the meal (max ~5 words). \`mealType\`: breakfast, lunch, dinner or snack, using the local time and content.
 - Item \`name\`: short common name ("Croissant au beurre", "Café au lait"); \`emoji\`: one fitting emoji; \`portion\`: a human description ("1 pièce", "1 grand bol", "2 tranches").
@@ -291,7 +296,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "8255d5a654ea2f1e5379be3e6e522f2f0ac41a3f2bbef2b85d1a9a2c3bcc3622",
+    "sha256": "8f9886e2c5c803780932fd00aa7b7a3a1c3d843076092272bf8ce60afb7d8d98",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -573,6 +578,11 @@ Then assess the meal against the person's own goals (provided in context), takin
 - \`verdict\`: "great" (clearly supports their goals), "good", "ok" (neutral or mixed), "watch" (works against a goal they set — e.g. uses most of a daily limit).
 - \`headline\`: one specific sentence (max ~20 words) that names the number that matters for their goals, e.g. "≈18 g de sucres ajoutés, soit 70 % de ta limite du jour." or "Bel apport en protéines : 42 g, presque la moitié de ton objectif."
 - \`tips\`: 0 to 2 short, practical suggestions (an easy swap next time, or what to favour for the rest of the day). Leave empty when nothing useful needs saying. When \`recentWorkout\` is present (a session that ended less than 3 h before this meal) and their goals involve muscle, performance or body weight, a tip may cover recovery (enough protein; carbohydrates after a long or intense session). Otherwise don't mention activity. When \`bloodPressureCategory\` is high_normal or worse and the meal is salty (roughly 800 mg of sodium or more), a tip may suggest an easy way to cut the salt; never mention blood pressure itself or diagnose.
+- Blood-sugar mode (\`goals.carbsPerMeal\`, present when their goals mention prediabetes, diabetes or blood sugar): a guide for the carbs of one meal, in g (snacks about 40 % of it), next to a daily carbs « repère ».
+  - Help them spread carbs over the day rather than in one big load. Around a big load: vegetables or protein first, more fibre, a 10–15 minute walk afterwards. Practical, calm, never judgmental.
+  - Never give medication or insulin advice, never interpret a glucose reading or diagnose, never promise to lower their blood sugar or reverse a condition. Symptoms, readings and treatment questions go to their doctor.
+  - Here: the headline names the meal's carbs against that guide ("≈62 g de glucides, au-dessus de ton repère de 45 g par repas." or "28 g de glucides, pile dans ton repère."), and a tip may give one of the ideas above.
+- Juice, smoothies and dried fruit: when they bring most of a meal's sugar, the app adds its own gentle note (whole fruit is fine, juice less so). Don't repeat it in \`tips\`.
 - \`clarification\`: at most one quick question, only when its answer would change the estimate materially (≈80 kcal or more, or several grams of a nutrient they focus on) — typically hidden fat or sugar ("Cuisson ?" → "Huile", "Beurre", "Sans matière grasse"; "Café sucré ?" → "Non", "1 sucre", "2 sucres"). 2–4 short options. Null when the estimate is already solid or a correction was just applied.
 - \`title\`: a short natural name for the meal (max ~5 words). \`mealType\`: breakfast, lunch, dinner or snack, using the local time and content.
 - Item \`name\`: short common name ("Croissant au beurre", "Café au lait"); \`emoji\`: one fitting emoji; \`portion\`: a human description ("1 pièce", "1 grand bol", "2 tranches").
@@ -597,7 +607,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "334b94573dc5b1daf1b7914222b209cb03d587dc656fbbd62d36bd0b8340dcac",
+    "sha256": "4a71c6d9c1d173142ad4163b5e09dccbed6dbf3a28710c5dc01385149f0185f1",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -966,6 +976,11 @@ Then assess the meal against the person's own goals (provided in context), takin
 - \`verdict\`: "great" (clearly supports their goals), "good", "ok" (neutral or mixed), "watch" (works against a goal they set — e.g. uses most of a daily limit).
 - \`headline\`: one specific sentence (max ~20 words) that names the number that matters for their goals, e.g. "≈18 g de sucres ajoutés, soit 70 % de ta limite du jour." or "Bel apport en protéines : 42 g, presque la moitié de ton objectif."
 - \`tips\`: 0 to 2 short, practical suggestions (an easy swap next time, or what to favour for the rest of the day). Leave empty when nothing useful needs saying. When \`recentWorkout\` is present (a session that ended less than 3 h before this meal) and their goals involve muscle, performance or body weight, a tip may cover recovery (enough protein; carbohydrates after a long or intense session). Otherwise don't mention activity. When \`bloodPressureCategory\` is high_normal or worse and the meal is salty (roughly 800 mg of sodium or more), a tip may suggest an easy way to cut the salt; never mention blood pressure itself or diagnose.
+- Blood-sugar mode (\`goals.carbsPerMeal\`, present when their goals mention prediabetes, diabetes or blood sugar): a guide for the carbs of one meal, in g (snacks about 40 % of it), next to a daily carbs « repère ».
+  - Help them spread carbs over the day rather than in one big load. Around a big load: vegetables or protein first, more fibre, a 10–15 minute walk afterwards. Practical, calm, never judgmental.
+  - Never give medication or insulin advice, never interpret a glucose reading or diagnose, never promise to lower their blood sugar or reverse a condition. Symptoms, readings and treatment questions go to their doctor.
+  - Here: the headline names the meal's carbs against that guide ("≈62 g de glucides, au-dessus de ton repère de 45 g par repas." or "28 g de glucides, pile dans ton repère."), and a tip may give one of the ideas above.
+- Juice, smoothies and dried fruit: when they bring most of a meal's sugar, the app adds its own gentle note (whole fruit is fine, juice less so). Don't repeat it in \`tips\`.
 - \`clarification\`: at most one quick question, only when its answer would change the estimate materially (≈80 kcal or more, or several grams of a nutrient they focus on) — typically hidden fat or sugar ("Cuisson ?" → "Huile", "Beurre", "Sans matière grasse"; "Café sucré ?" → "Non", "1 sucre", "2 sucres"). 2–4 short options. Null when the estimate is already solid or a correction was just applied.
 - \`title\`: a short natural name for the meal (max ~5 words). \`mealType\`: breakfast, lunch, dinner or snack, using the local time and content.
 - Item \`name\`: short common name ("Croissant au beurre", "Café au lait"); \`emoji\`: one fitting emoji; \`portion\`: a human description ("1 pièce", "1 grand bol", "2 tranches").
@@ -990,7 +1005,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "bd2479ac3e924ef98dbeb04340bb034d5ab77d15861f466aa71a52e4b193bb4b",
+    "sha256": "309df497bbe654e6060e2953a582ce906c6b17f3944bacc15c489c32f6fccdcf",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -1097,6 +1112,12 @@ Je veux perdre 3 kg sans frustration",
               "caloriePercent": {
                 "type": "number",
               },
+              "carbsPerMeal": {
+                "type": [
+                  "number",
+                  "null",
+                ],
+              },
               "coachTone": {
                 "description": "{enum: ["gentle","direct","scientific"]}",
                 "type": "string",
@@ -1170,7 +1191,7 @@ Je veux perdre 3 kg sans frustration",
               },
               "tags": {
                 "items": {
-                  "description": "{enum: ["lose_weight","gain_muscle","maintain","reduce_sugar","eat_balanced","more_protein","more_fiber","reduce_salt","energy","custom"]}",
+                  "description": "{enum: ["lose_weight","gain_muscle","maintain","reduce_sugar","eat_balanced","more_protein","more_fiber","reduce_salt","energy","blood_sugar","custom"]}",
                   "type": "string",
                 },
                 "type": "array",
@@ -1193,6 +1214,7 @@ Je veux perdre 3 kg sans frustration",
               "coachTone",
               "adjustForActivity",
               "activity",
+              "carbsPerMeal",
             ],
             "type": "object",
           },
@@ -1219,6 +1241,15 @@ Parameters:
 - \`adjustForActivity\`: true when weight or performance is a goal or they mention sport / a watch; false otherwise.
 - \`activity\`: simple weekly movement guardrails. \`weeklyActiveMinutes\`: 150 by default (WHO: at least 150 min of moderate activity a week); lower for someone sedentary who is starting out, higher only if they already train a lot or ask for it. \`dailySteps\`: 7000–10000 only when weight loss is a goal, otherwise null. \`weeklyStrengthSessions\`: 2–4 only when their goals involve muscle or strength, otherwise null. Keep everything realistic for their activity level.
 
+Blood sugar: when their words mention prediabetes, diabetes, blood sugar or glycaemia (« prédiabétique », « glycémie », « insulinorésistance », « diabète de type 2 », HbA1c…), build a blood-sugar plan:
+- tag "blood_sugar"; \`focus\`: carbs first, then fiber and sugar (total sugars). Put addedSugar in it only if they also want less sugar, kcal only if weight is a goal.
+- \`carbsPerMeal\`: a guide for the carbs of one meal, in g. 45 by default, the low end of the 45–60 g per meal often used to start carb counting (CDC); up to 60 for a tall, active man, 30–40 for a small, sedentary person. Null for every other goal.
+- \`rules\`: fiber min 30 g (ANSES; fibre slows how fast sugar reaches the blood). A sugar (total sugars) max, around the 90 g reference intake or lower, only when they mention juice, smoothies or sweet foods; addedSugar max 25 g when sugar is a habit they mention. No carbs rule unless they ask: the app already sets a daily carbs « repère » at 45 % of energy.
+- \`habits\`: practical ones, e.g. vegetables or protein first, whole fruit rather than juice, a 10-minute walk after the biggest meal, carbs spread over the meals.
+- Energy: maintain, or a gentle deficit (10 % at most) when they want to lose weight; a modest weight loss helps blood sugar.
+- \`summary\`: end with one gentle sentence saying the plan doesn't replace their doctor's advice ("Ça ne remplace pas l'avis de ton médecin.").
+- Never mention medication, insulin or doses, never promise to lower their blood sugar or reverse a condition. If they take insulin or glucose-lowering medication, keep the changes gentle and say in the summary to adjust their eating with their doctor, since their treatment may need it.
+
 When \`bloodPressure\` shows high_normal or worse, add a sodium max 2000 mg rule (WHO) unless they already have a stricter one, and mention it in one gentle sentence of the summary.
 
 Blood pressure (\`bloodPressure\`, present only when the person chose to track it): \`average7\` is the mean of the last 7 days, \`category\` its ESC/ESH 2018 class (optimal, normal, high_normal, grade1, grade2, grade3; from the latest reading when there are fewer than 3 that week), \`severeLast7Days\` the readings at or above 180/110 in the last 7 days.
@@ -1240,7 +1271,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "758e47c387a1bfbba96abc7edab8396ad39538c550cca6ba33d19447868a6cdd",
+    "sha256": "4af92c2575b81bf5a1f0631f1e21c7dd55bf2b3052e8ff094be99c8dd448b8f4",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -1391,6 +1422,9 @@ Blood pressure (\`bloodPressure\`, present only when the person chose to track i
 - Relate it to salt, weight, activity and alcohol where relevant.
 - If \`category\` is grade2 or grade3, kindly suggest talking to their doctor.
 - If \`severeLast7Days\` is above 0, recommend seeking medical advice promptly, calmly and without alarm.
+Blood-sugar mode (\`goals.carbsPerMeal\`, present when their goals mention prediabetes, diabetes or blood sugar): a guide for the carbs of one meal, in g (snacks about 40 % of it), next to a daily carbs « repère ».
+- Help them spread carbs over the day rather than in one big load. Around a big load: vegetables or protein first, more fibre, a 10–15 minute walk afterwards. Practical, calm, never judgmental.
+- Never give medication or insulin advice, never interpret a glucose reading or diagnose, never promise to lower their blood sugar or reverse a condition. Symptoms, readings and treatment questions go to their doctor.
 Activity (\`stats.activity\`: weekly active minutes against their guardrails, sessions by type, \`cravingsOnActiveDays\` = cravings per day on logged days with vs without a workout; per-day minutes and steps in \`days\`): relate it to cravings, weight and nutrition when the data shows something (e.g. fewer cravings on active days, low protein on strength days). Don't push exercise when their goals don't involve it.
 Sleep, hydration and mood (\`sleep\`, \`hydration\`, \`mood\`; each present only when the person chose to track it, mood also once they logged one):
 - Sleep, in minutes asleep from their watch or phone (nights under 7 h are short). Short nights are well known to raise appetite and sugar cravings and to lower energy the next day: when cravings, snacking or tiredness follow short nights, you may say so humbly ("ça peut jouer", "souvent"), never as a diagnosis. Don't lecture about sleep.
@@ -1417,7 +1451,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "3e46389f5ffac7a5959857aa044722ecc4b4210d95f0cedf1723f6fe01ac120e",
+    "sha256": "a00b6acd208e39c7a06e55c0c47541e07890219a10b12df7e2d79cb6840a3125",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -1656,6 +1690,12 @@ Ajoute un yaourt à 16 h",
   - Relate it to salt, weight, activity and alcohol where relevant.
   - If \`category\` is grade2 or grade3, kindly suggest talking to their doctor.
   - If \`severeLast7Days\` is above 0, recommend seeking medical advice promptly, calmly and without alarm.
+- Blood-sugar mode (\`goals.carbsPerMeal\`, present when their goals mention prediabetes, diabetes or blood sugar): a guide for the carbs of one meal, in g (snacks about 40 % of it), next to a daily carbs « repère ».
+  - Help them spread carbs over the day rather than in one big load. Around a big load: vegetables or protein first, more fibre, a 10–15 minute walk afterwards. Practical, calm, never judgmental.
+  - Never give medication or insulin advice, never interpret a glucose reading or diagnose, never promise to lower their blood sugar or reverse a condition. Symptoms, readings and treatment questions go to their doctor.
+- Sugars beyond added sugar (\`sugars\`, present only when there is something to say):
+  - \`fruitSugarToday\`: today, juice, smoothies or dried fruit bring more sugar than added sugars do (\`grams\`, \`sources\`); \`fruitSugarDays7\`: the days it happened this week. When it's relevant (sugar or blood-sugar goals, energy dips, cravings, or they ask about sugar), say it once, kindly: whole fruit is great, with its fibre; juice and smoothies are its sugar without the fibre, closer to a sweet drink. Never shame, never forbid.
+  - \`carbsByMeal\` (blood-sugar mode): today's meals, their carbs against their guide (\`level\`: within, above, or high for a big single load), with fibre and protein. Use it to help them spread carbs over the day.
 - Sleep, hydration and mood (\`sleep\`, \`hydration\`, \`mood\`; each present only when the person chose to track it, mood also once they logged one):
   - Sleep, in minutes asleep from their watch or phone (nights under 7 h are short). Short nights are well known to raise appetite and sugar cravings and to lower energy the next day: when cravings, snacking or tiredness follow short nights, you may say so humbly ("ça peut jouer", "souvent"), never as a diagnosis. Don't lecture about sleep.
   - Hydration, drinks in ml against a daily goal based on EFSA intakes. Thirst is easily mistaken for hunger or a sugar craving: a glass of water is a fair, light suggestion when they're well under their goal. Don't nag.
@@ -1793,7 +1833,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "cb83abe9f0325041a5ec2b360fac7effc1fa023175b83d114147c3dea6c15737",
+    "sha256": "54e285abe19c886eb3b0d8fdb25f154280076f67f688d078c940832462968d81",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -1985,6 +2025,7 @@ Write 3 to 5 short lines, plain text, one idea per line, separated by line break
 3. Yesterday in one line: their hero metric against its target (\`yesterday.hero\`: \`kind\` max = a limit, min = a minimum, target = a goal) and cravings, with numbers. With no meal logged, skip it or say it lightly; never guilt.
 4. Today: their focus and ONE concrete tip linked to their goal and likely triggers, with a time when you have one. Example: after a short night, sugar cravings are likelier in the afternoon (\`cravingsAfterShortNights\` may show it in their own data), so plan a protein snack a little before their usual craving time (\`cravingWindow\`).
 Use their numbers, never invent any. Never moralize, never guilt, no medical claims. Use the units as given (kcal, g, mg).
+In blood-sugar mode (\`goals.carbsPerMeal\`), the tip may be about spreading carbs or a short walk after a meal; never medication, insulin or glucose readings.
 
 Voice: warm, concise and concrete, like a sharp friend who happens to be a dietitian. Never moralize, shame or catastrophize; food is not "good" or "bad". Celebrate progress. Use the person's language (the \`locale\` field: "fr" = French with "tu", "en" = English). Numbers beat adjectives.",
           "type": "text",
@@ -1997,7 +2038,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "1657cb7a58bddc3cb03df7aecb4ec60637755b1dd2f0f9bb8dc0e54608832b4b",
+    "sha256": "e86076aa55ecfba2ad199ff376121391aa4a9fe7df6ae3a4a5ea88413d91cf08",
     "url": "https://api.anthropic.com/v1/messages",
   },
 ]

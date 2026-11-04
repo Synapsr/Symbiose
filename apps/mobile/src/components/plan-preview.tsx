@@ -1,12 +1,22 @@
-import { activityGoalsFor, type EnergyBreakdown, type GoalPlan, type NutrientKey, type Targets } from '@symbiose/shared';
-import { Check, Dumbbell, Footprints, Gauge, Leaf, SportShoe, Watch } from 'lucide-react-native';
+import { activityGoalsFor, carbsGuideFor, carbsPerMeal, isReferenceTarget, type EnergyBreakdown, type GoalPlan, type NutrientKey, type Targets } from '@symbiose/shared';
+import { Check, Dumbbell, Footprints, Gauge, Leaf, SportShoe, Stethoscope, Watch } from 'lucide-react-native';
 import { View } from 'react-native';
 
 import { Card, Dot, Row, Txt } from '@/components/ui';
-import { useI18n } from '@/i18n';
+import { useI18n, type TranslationKey } from '@/i18n';
 import { formatAmount, formatNumber } from '@/lib/format';
 import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
+
+/**
+ * How a target reads: a limit the plan set is « À ne pas dépasser »; one the app
+ * derived from reference intakes (total sugars, carbs for a sugar goal) is a « Repère ».
+ */
+export function targetKindKey(plan: GoalPlan, targets: Targets | null, key: NutrientKey): TranslationKey {
+  const kind = plan.rules.find((r) => r.nutrient === key)?.kind ?? targets?.[key].kind ?? 'target';
+  if (kind === 'max' && isReferenceTarget(plan, key)) return 'sugars.reference';
+  return kind === 'max' ? 'plan.kind.max' : kind === 'min' ? 'plan.kind.min' : 'plan.kind.target';
+}
 
 /** The plan as a readable, editable "contract": numbers, guardrails and habits. */
 export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { plan: GoalPlan; targets: Targets; energy: EnergyBreakdown; aiGenerated?: boolean }) {
@@ -30,7 +40,10 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
     activity.weeklyStrengthSessions ? { key: 'strength', icon: Dumbbell, text: t('plan.activity.strength', { count: activity.weeklyStrengthSessions }) } : null,
   ].filter((m) => m !== null);
 
-  const kindLabel = (k: NutrientKey) => t(targets[k].kind === 'max' ? 'plan.kind.max' : targets[k].kind === 'min' ? 'plan.kind.min' : 'plan.kind.target');
+  const kindLabel = (k: NutrientKey) => t(targetKindKey(plan, targets, k));
+  const perMeal = carbsPerMeal(plan);
+  // The planner is asked to say it; said here too, unless its summary already does.
+  const doctorNote = perMeal !== null && !/m[ée]decin|doctor/i.test(plan.summary);
 
   return (
     <View style={{ gap: Space.lg }}>
@@ -41,6 +54,14 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
           <Txt variant="caption" tone="warning">
             {t('plan.noAi')}
           </Txt>
+        ) : null}
+        {doctorNote ? (
+          <Row gap={6}>
+            <Stethoscope size={14} color={colors.text2} />
+            <Txt variant="caption" tone="secondary" style={{ flexShrink: 1 }}>
+              {t('sugars.doctor')}
+            </Txt>
+          </Row>
         ) : null}
       </View>
 
@@ -95,6 +116,21 @@ export function PlanPreview({ plan, targets, energy, aiGenerated = true }: { pla
           </View>
         ))}
       </View>
+
+      {perMeal !== null ? (
+        <Card style={{ gap: 4 }}>
+          <Row gap={6}>
+            <Dot color={NUTRIENT_COLORS.carbs} />
+            <Txt variant="caption" tone="secondary">
+              {t('sugars.perMeal')}
+            </Txt>
+          </Row>
+          <Txt variant="number">{t('sugars.perMealValue', { amount: formatAmount('carbs', perMeal, locale) })}</Txt>
+          <Txt variant="caption" tone="tertiary">
+            {t('sugars.perMealHint', { snack: formatAmount('carbs', carbsGuideFor('snack', perMeal), locale) })}
+          </Txt>
+        </Card>
+      ) : null}
 
       {plan.rules.length ? (
         <Card style={{ gap: Space.md }}>

@@ -13,3 +13,4 @@ export * from './journal';
 export * from './plan-limits';
 export * from './proactive';
 export * from './admin';
+export * from './sugars';

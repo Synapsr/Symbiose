@@ -788,4 +788,20 @@ export const en: Record<TranslationKey, string> = {
   // Hero swipe: Today's card turns like pages
   'hero.a11y': 'Your day',
   'hero.page': '{n} of {count}',
+  // Sugars: total sugars, carbs and the blood-sugar mode
+  'sugars.carbs': 'Carbs {carbs}',
+  'sugars.line': 'Sugars {sugar}, {added} added',
+  'sugars.ofSugar': 'of which sugars',
+  'sugars.ofAdded': 'of which added',
+  'sugars.ofSatFat': 'of which saturated',
+  'sugars.fruit': 'About {grams} g of sugars come from: {sources}. Whole fruit, with its fibre, fills you up more and raises blood sugar more gently.',
+  'sugars.mealCarbs': 'Carbs {carbs} · guide {guide}',
+  'sugars.reference': 'Guide',
+  'sugars.perMeal': 'Carbs per meal',
+  'sugars.perMealValue': 'About {amount} per meal',
+  'sugars.perMealHint': 'A guide to spread your carbs, about {snack} for a snack',
+  'sugars.doctor': 'This doesn’t replace your doctor’s advice.',
+  'sugars.perMealShort': 'Per meal',
+  'sugars.perMealEdit': 'Carbs, about {snack} for a snack',
+  'sugars.yourReference': 'your guide',
 };

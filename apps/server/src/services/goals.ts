@@ -1,4 +1,17 @@
-import { clampActivityGoals, clampRuleValue, defaultActivityGoals, GoalPlanSchema, type GoalPlan, type GoalTag, type Locale, type NutrientKey, type NutrientRule } from '@symbiose/shared';
+import {
+  CARBS_PER_MEAL,
+  clampActivityGoals,
+  clampCarbsPerMeal,
+  clampRuleValue,
+  defaultActivityGoals,
+  GoalPlanSchema,
+  mentionsBloodSugar,
+  type GoalPlan,
+  type GoalTag,
+  type Locale,
+  type NutrientKey,
+  type NutrientRule,
+} from '@symbiose/shared';
 
 import type { PlanDraft } from '../ai/types';
 
@@ -15,6 +28,24 @@ const slug = (value: string) =>
     .replace(/^-|-$/g, '')
     .slice(0, 40);
 
+/** A deficit stays gentle in blood-sugar mode, as for any medical condition (GOAL_PLANNER, Safety). */
+const BLOOD_SUGAR_MAX_DEFICIT = 10;
+
+/**
+ * The blood-sugar mode, made sure of: on when their words or the planner say
+ * so, with a carbs-per-meal guide, carbs in focus and a gentle deficit at most.
+ */
+function bloodSugarMode(draft: PlanDraft, intentions: string): Pick<GoalPlan, 'tags' | 'focus' | 'caloriePercent'> & { carbsPerMeal: number | null } {
+  const on = mentionsBloodSugar(intentions) || draft.tags.includes('blood_sugar') || (typeof draft.carbsPerMeal === 'number' && draft.carbsPerMeal > 0);
+  if (!on) return { tags: draft.tags, focus: draft.focus, caloriePercent: draft.caloriePercent, carbsPerMeal: null };
+  return {
+    tags: unique<GoalTag>(['blood_sugar', ...draft.tags]),
+    focus: draft.focus.includes('carbs') ? draft.focus : ['carbs', ...draft.focus],
+    caloriePercent: draft.calorieMode === 'deficit' ? Math.min(draft.caloriePercent, BLOOD_SUGAR_MAX_DEFICIT) : draft.caloriePercent,
+    carbsPerMeal: clampCarbsPerMeal(draft.carbsPerMeal || CARBS_PER_MEAL.default),
+  };
+}
+
 /** Clamp and validate an AI-proposed plan into something safe and coherent. */
 export function planFromDraft(draft: PlanDraft, intentions: string, overrides: GoalPlan['overrides'] = {}): GoalPlan {
   const rulesByNutrient = new Map<NutrientKey, NutrientRule>();
@@ -27,14 +58,15 @@ export function planFromDraft(draft: PlanDraft, intentions: string, overrides: G
       reason: (rule.reason ?? '').slice(0, 240),
     });
   }
-  const focus = unique(draft.focus).slice(0, 3);
+  const bloodSugar = bloodSugarMode(draft, intentions);
+  const focus = unique(bloodSugar.focus).slice(0, 3);
   const plan: GoalPlan = {
     intentions: intentions.slice(0, 2000),
     title: draft.title.trim().slice(0, 80),
     summary: draft.summary.trim().slice(0, 500),
-    tags: unique(draft.tags).slice(0, 5),
+    tags: unique(bloodSugar.tags).slice(0, 5),
     calorieMode: draft.calorieMode,
-    caloriePercent: draft.calorieMode === 'maintain' ? 0 : Math.round(clamp(draft.caloriePercent, 0, draft.calorieMode === 'surplus' ? 20 : 25)),
+    caloriePercent: draft.calorieMode === 'maintain' ? 0 : Math.round(clamp(bloodSugar.caloriePercent, 0, draft.calorieMode === 'surplus' ? 20 : 25)),
     proteinPerKg: Math.round(clamp(draft.proteinPerKg, 0.8, 2.4) * 10) / 10,
     fatPercent: Math.round(clamp(draft.fatPercent, 20, 45)),
     rules: [...rulesByNutrient.values()].slice(0, 9),
@@ -48,6 +80,7 @@ export function planFromDraft(draft: PlanDraft, intentions: string, overrides: G
     adjustForActivity: draft.adjustForActivity,
     overrides,
     activity: clampActivityGoals(draft.activity),
+    ...(bloodSugar.carbsPerMeal !== null ? { carbsPerMeal: bloodSugar.carbsPerMeal } : {}),
   };
   return GoalPlanSchema.parse(plan);
 }
@@ -114,6 +147,19 @@ export function heuristicPlan(intentions: string, locale: Locale): GoalPlan {
     proteinPerKg = Math.max(proteinPerKg, 1.4);
     focus.push('protein');
   }
+  // Prediabetes, type 2 diabetes, glycaemia: carbs spread over the meals, fibre and total sugars come first.
+  const bloodSugar = mentionsBloodSugar(intentions);
+  if (bloodSugar) {
+    tags.unshift('blood_sugar');
+    focus.unshift('carbs', 'fiber', 'sugar');
+    if (!rules.some((r) => r.nutrient === 'fiber')) {
+      rules.push({ nutrient: 'fiber', kind: 'min', value: 30, reason: fr ? 'ANSES : 30 g par jour, les fibres freinent le passage du sucre dans le sang' : 'ANSES: 30 g a day, fibre slows how fast sugar reaches the blood' });
+    }
+    habits.unshift(
+      { id: 'veggies-first', label: fr ? 'Commencer le repas par les légumes ou les protéines' : 'Start meals with vegetables or protein', kind: 'do' },
+      { id: 'walk-after-meals', label: fr ? 'Marcher 10 minutes après le repas le plus copieux' : 'Walk 10 minutes after the biggest meal', kind: 'do' },
+    );
+  }
   if (!tags.length) {
     tags.push('eat_balanced');
     focus.push('kcal', 'protein');
@@ -136,6 +182,7 @@ export function heuristicPlan(intentions: string, locale: Locale): GoalPlan {
     coachTone: 'gentle',
     adjustForActivity: calorieMode !== 'maintain',
     activity: defaultActivityGoals({ tags }),
+    carbsPerMeal: bloodSugar ? CARBS_PER_MEAL.default : null,
   };
   return planFromDraft(draft, intentions);
 }

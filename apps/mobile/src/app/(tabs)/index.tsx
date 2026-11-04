@@ -1,4 +1,4 @@
-import { addDays, type Craving, type JournalEntry, type Meal, type MoodCheckIn, type Workout } from '@symbiose/shared';
+import { addDays, mealCarbLoad, type Craving, type JournalEntry, type Meal, type MoodCheckIn, type Workout } from '@symbiose/shared';
 import { router, useFocusEffect } from 'expo-router';
 import { Camera, ChevronRight, CloudOff, Flame } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -241,7 +241,7 @@ export default function Today() {
                 ))}
                 {rows.map((row) =>
                   row.type === 'meal' ? (
-                    <MealCard key={row.meal.id} meal={row.meal} hideCalories={hideCalories} />
+                    <MealCard key={row.meal.id} meal={row.meal} hideCalories={hideCalories} carbs={mealCarbLoad(row.meal, user.plan)} />
                   ) : row.type === 'note' ? (
                     <JournalRow key={row.note.id} entry={row.note} />
                   ) : row.type === 'workout' ? (

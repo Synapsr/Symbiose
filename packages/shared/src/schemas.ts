@@ -151,6 +151,8 @@ export const GoalTagSchema = z.enum([
   'more_fiber',
   'reduce_salt',
   'energy',
+  /** Prediabetes, type 2 diabetes, glycaemia: the blood-sugar mode (see `carbsPerMeal`). */
+  'blood_sugar',
   'custom',
 ]);
 export type GoalTag = z.infer<typeof GoalTagSchema>;
@@ -205,6 +207,11 @@ export const GoalPlanSchema = z.object({
    * trend (`estimateExpenditure`), from `since` on and by small weekly steps. Null or absent: off.
    */
   adaptiveEnergy: z.object({ since: isoDate }).nullable().optional(),
+  /**
+   * Blood-sugar mode: a guide for the carbohydrates of one meal, in g (see `CARBS_PER_MEAL`).
+   * Null or absent: off. A guide to spread carbs over the day, never a medical prescription.
+   */
+  carbsPerMeal: z.number().min(0).max(120).nullable().optional(),
 });
 export type GoalPlan = z.infer<typeof GoalPlanSchema>;
 
@@ -271,12 +278,23 @@ export const ClarificationSchema = z.object({
 });
 export type Clarification = z.infer<typeof ClarificationSchema>;
 
+/** Sugars that come mostly from fruit juice, smoothies or dried fruit (`fruitSugarSignal`). */
+export const FruitSugarSchema = z.object({
+  /** Total sugars of those foods, in g. */
+  grams: z.number().min(0),
+  /** Their names, as logged, three at most. */
+  sources: z.array(z.string().max(120)).max(3),
+});
+export type FruitSugar = z.infer<typeof FruitSugarSchema>;
+
 export const MealInsightSchema = z.object({
   verdict: VerdictSchema,
   headline: z.string().max(240),
   tips: z.array(z.string().max(240)).max(3),
   flags: z.array(MealFlagSchema).max(4),
   clarification: ClarificationSchema.nullable().default(null),
+  /** Deterministic: most of the meal's sugar comes from juice, smoothies or dried fruit. Absent on older meals. */
+  fruitSugar: FruitSugarSchema.nullable().optional(),
 });
 export type MealInsight = z.infer<typeof MealInsightSchema>;
 

@@ -1,4 +1,4 @@
-import { courseItems, localTime, mealCourses, type Meal } from '@symbiose/shared';
+import { courseItems, localTime, mealCourses, type CarbLoad, type Meal } from '@symbiose/shared';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { RotateCw, Sparkles, X } from 'lucide-react-native';
@@ -97,10 +97,14 @@ function Thumb({ meal }: { meal: Meal }) {
 
 const openMeal = (meal: Meal) => router.push({ pathname: '/meal/[id]', params: { id: meal.id } });
 
-export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boolean }) {
+/**
+ * One meal of the day. In blood-sugar mode (`carbs`) its line says its carbs
+ * against the per-meal guide, calmly: only a big single load turns warm.
+ */
+export function MealCard({ meal, hideCalories, carbs }: { meal: Meal; hideCalories: boolean; carbs?: CarbLoad | null }) {
   const { t, plural, locale, nutrient } = useI18n();
   const { colors, elevation } = useTheme();
-  const flag = meal.insight?.flags.find((f) => f.nutrient !== 'kcal' && f.share >= 0.15);
+  const flag = carbs ? null : meal.insight?.flags.find((f) => f.nutrient !== 'kcal' && f.share >= 0.15);
   const question = meal.insight?.clarification?.question;
   // « Déjeuner · 3 plats »: one row for the whole meal.
   const courses = mealCourses(meal).length;
@@ -121,6 +125,14 @@ export function MealCard({ meal, hideCalories }: { meal: Meal; hideCalories: boo
           <Txt variant="caption" tone="secondary">
             {localTime(meal.eatenAt)} · {kind}
           </Txt>
+          {carbs ? (
+            <Row gap={6}>
+              <Dot color={NUTRIENT_COLORS.carbs} size={6} />
+              <Txt variant="caption" tone={carbs.level === 'high' ? 'warning' : 'secondary'} style={{ fontVariant: ['tabular-nums'] }}>
+                {t('sugars.mealCarbs', { carbs: formatAmount('carbs', carbs.carbs, locale), guide: formatAmount('carbs', carbs.guide, locale) })}
+              </Txt>
+            </Row>
+          ) : null}
           {flag ? (
             <Row gap={6}>
               <Dot color={NUTRIENT_COLORS[flag.nutrient]} size={6} />

@@ -1,4 +1,21 @@
-import { courseItems, localTime, mealCourses, mealTotals, NUTRIENT_KEYS, toLocalDate, toLocalDateTime, withoutCourse, type FoodItem, type Meal, type MealCourse, type MealReference, type MealType } from '@symbiose/shared';
+import {
+  carbsPerMeal,
+  courseItems,
+  isReferenceTarget,
+  localTime,
+  mealCourses,
+  mealTotals,
+  NUTRIENT_KEYS,
+  toLocalDate,
+  toLocalDateTime,
+  withoutCourse,
+  type FoodItem,
+  type Meal,
+  type MealCourse,
+  type MealReference,
+  type MealType,
+  type NutrientKey,
+} from '@symbiose/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,23 +26,31 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ItemRow } from '@/components/meal/item-row';
+import { SugarLadder } from '@/components/meal/sugar-ladder';
 import { Bar, Card, Chip, Dot, IconButton, Pressy, Row, SectionTitle, SwapIcon, Txt, webInput, webSingleRow } from '@/components/ui';
 import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { MicButton } from '@/components/ui/mic-button';
 import { InlineProse } from '@/components/ui/prose';
 import { dismiss } from '@/lib/nav';
-import { useI18n } from '@/i18n';
+import { useI18n, type TranslationKey } from '@/i18n';
 import { useDictation } from '@/lib/dictation';
 import { formatAmount, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { basedOnLabel, courseName } from '@/lib/courses';
 import { errorMessage, useDeleteMeal, useMealLogger, useRefreshAfterMeal, useSeparateCourse } from '@/lib/hooks';
-import { useApi } from '@/lib/session';
+import { useApi, useUser } from '@/lib/session';
 import { usePending, useSettings } from '@/lib/stores';
 import { useUndoableDelete } from '@/lib/undo';
 import { NUTRIENT_COLORS, Radius, Space, useTheme, verdictColor } from '@/theme';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/** « Toutes les valeurs » reads like a food label: sugars inside carbs, added inside sugars, saturated inside fat. */
+const NESTED: Partial<Record<NutrientKey, { depth: number; label: TranslationKey }>> = {
+  sugar: { depth: 1, label: 'sugars.ofSugar' },
+  addedSugar: { depth: 2, label: 'sugars.ofAdded' },
+  satFat: { depth: 1, label: 'sugars.ofSatFat' },
+};
 
 export default function MealDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -53,6 +78,9 @@ function MealEditor({ meal }: { meal: Meal }) {
   const refresh = useRefreshAfterMeal();
   const logger = useMealLogger();
   const hideCalories = useSettings((s) => s.hideCalories);
+  const { plan } = useUser();
+  // In blood-sugar mode each food shows its carbs; added sugar otherwise.
+  const itemMetric = carbsPerMeal(plan) !== null ? 'carbs' : 'addedSugar';
 
   const [items, setItems] = useState<FoodItem[]>(meal.items);
   const [baseGrams] = useState(() => Object.fromEntries(meal.items.map((i) => [i.id, i.grams])));
@@ -142,6 +170,7 @@ function MealEditor({ meal }: { meal: Meal }) {
       baseGrams={baseGrams[item.id] ?? item.grams}
       expanded={expanded === item.id}
       hideCalories={hideCalories}
+      metric={itemMetric}
       onToggle={() => setExpanded(expanded === item.id ? null : item.id)}
       onChange={(grams) => setItems(items.map((i) => (i.id === item.id ? { ...i, grams } : i)))}
       onRemove={() => {
@@ -172,22 +201,35 @@ function MealEditor({ meal }: { meal: Meal }) {
             {courses.length === 1 && courses[0]!.basedOn ? <BasedOn basedOn={courses[0]!.basedOn} mealDate={meal.localDate} /> : null}
           </View>
 
-          {insight && (insight.headline || insight.tips.length) ? (
+          {insight && (insight.headline || insight.tips.length || insight.fruitSugar) ? (
             <Card style={{ gap: Space.md }}>
-              <Row gap={Space.sm} style={{ alignItems: 'flex-start' }}>
-                <View style={{ marginTop: 6 }}>
-                  <Dot color={verdictColor(insight.verdict, colors)} size={10} />
-                </View>
-                <Txt variant="label" style={{ flex: 1, fontSize: 16, lineHeight: 22 }}>
-                  <InlineProse text={insight.headline} />
-                </Txt>
-              </Row>
+              {insight.headline ? (
+                <Row gap={Space.sm} style={{ alignItems: 'flex-start' }}>
+                  <View style={{ marginTop: 6 }}>
+                    <Dot color={verdictColor(insight.verdict, colors)} size={10} />
+                  </View>
+                  <Txt variant="label" style={{ flex: 1, fontSize: 16, lineHeight: 22 }}>
+                    <InlineProse text={insight.headline} />
+                  </Txt>
+                </Row>
+              ) : null}
               {insight.tips.map((tip) => (
                 <Txt key={tip} tone="secondary" style={{ marginLeft: 18 }}>
                   {'→ '}
                   <InlineProse text={tip} />
                 </Txt>
               ))}
+              {/* Juice, smoothies, dried fruit: the app's own gentle note, never a warning. */}
+              {insight.fruitSugar ? (
+                <Row gap={Space.sm} style={{ alignItems: 'flex-start', marginLeft: insight.headline ? 18 : 0 }}>
+                  <View style={{ marginTop: 7 }}>
+                    <Dot color={NUTRIENT_COLORS.sugar} size={6} />
+                  </View>
+                  <Txt tone="secondary" style={{ flex: 1 }}>
+                    {t('sugars.fruit', { grams: Math.round(insight.fruitSugar.grams), sources: insight.fruitSugar.sources.map((s) => s.charAt(0).toLowerCase() + s.slice(1)).join(', ') })}
+                  </Txt>
+                </Row>
+              ) : null}
             </Card>
           ) : null}
 
@@ -227,7 +269,10 @@ function MealEditor({ meal }: { meal: Meal }) {
                       </Row>
                       <Bar progress={flag.share} color={heavy ? colors.warning : NUTRIENT_COLORS[flag.nutrient]} />
                       <Txt variant="caption" tone={heavy ? 'warning' : 'tertiary'}>
-                        {t('detail.ofDaily', { pct: Math.round(flag.share * 100), kind: t(flag.kind === 'max' ? 'detail.limit' : 'detail.goal') })}
+                        {t('detail.ofDaily', {
+                          pct: Math.round(flag.share * 100),
+                          kind: t(flag.kind !== 'max' ? 'detail.goal' : isReferenceTarget(plan, flag.nutrient) ? 'sugars.yourReference' : 'detail.limit'),
+                        })}
                       </Txt>
                     </View>
                   );
@@ -258,6 +303,7 @@ function MealEditor({ meal }: { meal: Meal }) {
                 </View>
               ) : null}
             </Row>
+            {totals.carbs >= 1 ? <SugarLadder nutrients={totals} /> : null}
             <Pressy onPress={() => setAllValues(!allValues)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <Txt variant="caption" tone="secondary">
                 {t('detail.allValues')}
@@ -266,17 +312,22 @@ function MealEditor({ meal }: { meal: Meal }) {
             </Pressy>
             {allValues ? (
               <View style={{ gap: Space.sm }}>
-                {NUTRIENT_KEYS.filter((k) => k !== 'kcal').map((key) => (
-                  <Row key={key} style={{ justifyContent: 'space-between' }}>
-                    <Row gap={8}>
-                      <Dot color={NUTRIENT_COLORS[key]} size={6} />
-                      <Txt variant="caption">{nutrient(key)}</Txt>
+                {NUTRIENT_KEYS.filter((k) => k !== 'kcal').map((key) => {
+                  const nested = NESTED[key];
+                  return (
+                    <Row key={key} style={{ justifyContent: 'space-between', paddingLeft: (nested?.depth ?? 0) * 14 }}>
+                      <Row gap={8}>
+                        <Dot color={NUTRIENT_COLORS[key]} size={6} />
+                        <Txt variant="caption" tone={nested ? 'secondary' : 'primary'}>
+                          {nested ? t(nested.label) : nutrient(key)}
+                        </Txt>
+                      </Row>
+                      <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
+                        {formatAmount(key, totals[key], locale)}
+                      </Txt>
                     </Row>
-                    <Txt variant="caption" tone="secondary">
-                      {formatAmount(key, totals[key], locale)}
-                    </Txt>
-                  </Row>
-                ))}
+                  );
+                })}
               </View>
             ) : null}
           </Card>
