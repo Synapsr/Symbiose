@@ -1422,6 +1422,9 @@ Blood pressure (\`bloodPressure\`, present only when the person chose to track i
 - Relate it to salt, weight, activity and alcohol where relevant.
 - If \`category\` is grade2 or grade3, kindly suggest talking to their doctor.
 - If \`severeLast7Days\` is above 0, recommend seeking medical advice promptly, calmly and without alarm.
+Blood-sugar mode (\`goals.carbsPerMeal\`, present when their goals mention prediabetes, diabetes or blood sugar): a guide for the carbs of one meal, in g (snacks about 40 % of it), next to a daily carbs « repère ».
+- Help them spread carbs over the day rather than in one big load. Around a big load: vegetables or protein first, more fibre, a 10–15 minute walk afterwards. Practical, calm, never judgmental.
+- Never give medication or insulin advice, never interpret a glucose reading or diagnose, never promise to lower their blood sugar or reverse a condition. Symptoms, readings and treatment questions go to their doctor.
 Activity (\`stats.activity\`: weekly active minutes against their guardrails, sessions by type, \`cravingsOnActiveDays\` = cravings per day on logged days with vs without a workout; per-day minutes and steps in \`days\`): relate it to cravings, weight and nutrition when the data shows something (e.g. fewer cravings on active days, low protein on strength days). Don't push exercise when their goals don't involve it.
 Sleep, hydration and mood (\`sleep\`, \`hydration\`, \`mood\`; each present only when the person chose to track it, mood also once they logged one):
 - Sleep, in minutes asleep from their watch or phone (nights under 7 h are short). Short nights are well known to raise appetite and sugar cravings and to lower energy the next day: when cravings, snacking or tiredness follow short nights, you may say so humbly ("ça peut jouer", "souvent"), never as a diagnosis. Don't lecture about sleep.
@@ -1448,7 +1451,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "3e46389f5ffac7a5959857aa044722ecc4b4210d95f0cedf1723f6fe01ac120e",
+    "sha256": "a00b6acd208e39c7a06e55c0c47541e07890219a10b12df7e2d79cb6840a3125",
     "url": "https://api.anthropic.com/v1/messages",
   },
   {
@@ -2022,6 +2025,7 @@ Write 3 to 5 short lines, plain text, one idea per line, separated by line break
 3. Yesterday in one line: their hero metric against its target (\`yesterday.hero\`: \`kind\` max = a limit, min = a minimum, target = a goal) and cravings, with numbers. With no meal logged, skip it or say it lightly; never guilt.
 4. Today: their focus and ONE concrete tip linked to their goal and likely triggers, with a time when you have one. Example: after a short night, sugar cravings are likelier in the afternoon (\`cravingsAfterShortNights\` may show it in their own data), so plan a protein snack a little before their usual craving time (\`cravingWindow\`).
 Use their numbers, never invent any. Never moralize, never guilt, no medical claims. Use the units as given (kcal, g, mg).
+In blood-sugar mode (\`goals.carbsPerMeal\`), the tip may be about spreading carbs or a short walk after a meal; never medication, insulin or glucose readings.
 
 Voice: warm, concise and concrete, like a sharp friend who happens to be a dietitian. Never moralize, shame or catastrophize; food is not "good" or "bad". Celebrate progress. Use the person's language (the \`locale\` field: "fr" = French with "tu", "en" = English). Numbers beat adjectives.",
           "type": "text",
@@ -2034,7 +2038,7 @@ Voice: warm, concise and concrete, like a sharp friend who happens to be a dieti
       "anthropic-workspace-id": "wrk_test",
       "x-api-key": null,
     },
-    "sha256": "1657cb7a58bddc3cb03df7aecb4ec60637755b1dd2f0f9bb8dc0e54608832b4b",
+    "sha256": "e86076aa55ecfba2ad199ff376121391aa4a9fe7df6ae3a4a5ea88413d91cf08",
     "url": "https://api.anthropic.com/v1/messages",
   },
 ]

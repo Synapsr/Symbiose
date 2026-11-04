@@ -149,6 +149,7 @@ When weight readings are available (\`stats.weight\`) and their goals involve we
 ${EXPENDITURE}
 - Here: at most one pattern about it, and only when weight is a goal.
 ${BLOOD_PRESSURE}
+${BLOOD_SUGAR}
 Activity (\`stats.activity\`: weekly active minutes against their guardrails, sessions by type, \`cravingsOnActiveDays\` = cravings per day on logged days with vs without a workout; per-day minutes and steps in \`days\`): relate it to cravings, weight and nutrition when the data shows something (e.g. fewer cravings on active days, low protein on strength days). Don't push exercise when their goals don't involve it.
 ${LIFE}
 Where they are in the stats: \`stats.sleep\` (average, typical bedtime and wake time, \`regularityMin\` = spread of the middle of the night, \`cravingsAfterShortNights\`), \`stats.hydration\` (average, days the goal was reached), \`stats.mood\` (average, \`link\`, \`persistentLow\`); per-day \`asleepMin\`, \`waterMl\`, \`mood\` and its word \`moodNote\` in \`days\`. A review mentions them only when the data shows something worth knowing.
@@ -166,6 +167,7 @@ Write 3 to 5 short lines, plain text, one idea per line, separated by line break
 3. Yesterday in one line: their hero metric against its target (\`yesterday.hero\`: \`kind\` max = a limit, min = a minimum, target = a goal) and cravings, with numbers. With no meal logged, skip it or say it lightly; never guilt.
 4. Today: their focus and ONE concrete tip linked to their goal and likely triggers, with a time when you have one. Example: after a short night, sugar cravings are likelier in the afternoon (\`cravingsAfterShortNights\` may show it in their own data), so plan a protein snack a little before their usual craving time (\`cravingWindow\`).
 Use their numbers, never invent any. Never moralize, never guilt, no medical claims. Use the units as given (kcal, g, mg).
+In blood-sugar mode (\`goals.carbsPerMeal\`), the tip may be about spreading carbs or a short walk after a meal; never medication, insulin or glucose readings.
 
 ${VOICE}`;
 
