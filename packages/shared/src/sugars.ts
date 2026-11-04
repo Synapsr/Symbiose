@@ -87,6 +87,14 @@ export function sugarGoal(plan: (Pick<GoalPlan, 'focus'> & BloodSugarPlan) | nul
   return plan.focus.some((key) => key === 'addedSugar' || key === 'sugar') || carbsPerMeal(plan) !== null;
 }
 
+/**
+ * A limit the app derived from reference intakes rather than one the plan set:
+ * total sugars, and carbs once they turn into a « repère ». Said « repère », never « limite ».
+ */
+export function isReferenceTarget(plan: Pick<GoalPlan, 'rules'> | null | undefined, key: NutrientKey): boolean {
+  return (key === 'sugar' || key === 'carbs') && !plan?.rules.some((r) => r.nutrient === key);
+}
+
 /** The nested order of the sugar family, inside out: added ⊂ total sugars ⊂ carbs. */
 export const SUGAR_FAMILY: readonly NutrientKey[] = ['addedSugar', 'sugar', 'carbs'];
 

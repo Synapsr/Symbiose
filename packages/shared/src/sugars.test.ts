@@ -12,6 +12,7 @@ import {
   fruitSugarSignal,
   mealCarbLoad,
   mentionsBloodSugar,
+  isReferenceTarget,
   sugarGoal,
 } from './sugars';
 import { computeTargets } from './targets';
@@ -98,6 +99,15 @@ describe('carbs per meal', () => {
     expect(sugarGoal({ focus: ['carbs', 'fiber'], tags: ['blood_sugar'] })).toBe(true);
     expect(sugarGoal({ focus: ['protein'] })).toBe(false);
     expect(sugarGoal(null)).toBe(false);
+  });
+});
+
+describe('isReferenceTarget', () => {
+  it('calls total sugars and carbs a « repère » unless the plan set a rule for them', () => {
+    expect(isReferenceTarget({ rules: [] }, 'sugar')).toBe(true);
+    expect(isReferenceTarget(null, 'carbs')).toBe(true);
+    expect(isReferenceTarget({ rules: [{ nutrient: 'carbs', kind: 'max', value: 180, reason: '' }] }, 'carbs')).toBe(false);
+    expect(isReferenceTarget({ rules: [] }, 'addedSugar')).toBe(false);
   });
 });
 

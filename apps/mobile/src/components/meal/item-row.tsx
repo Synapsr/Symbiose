@@ -9,6 +9,7 @@ import { formatAmount, formatNumber } from '@/lib/format';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
 import { PortionStepper } from './portion-stepper';
+import { sugarLine } from './sugar-ladder';
 
 export function ItemRow({
   item,
@@ -18,6 +19,7 @@ export function ItemRow({
   onChange,
   onRemove,
   hideCalories,
+  metric = 'addedSugar',
 }: {
   item: FoodItem;
   baseGrams: number;
@@ -26,6 +28,8 @@ export function ItemRow({
   onChange: (grams: number) => void;
   onRemove: () => void;
   hideCalories: boolean;
+  /** The amount under the calories: added sugar, or carbs in blood-sugar mode. */
+  metric?: 'addedSugar' | 'carbs';
 }) {
   const { t, locale, nutrientShort } = useI18n();
   const { colors } = useTheme();
@@ -52,9 +56,9 @@ export function ItemRow({
         <View style={{ alignItems: 'flex-end' }}>
           {!hideCalories ? <Txt variant="label">{formatNumber(n.kcal, locale)}</Txt> : null}
           <Row gap={5}>
-            <Dot color={NUTRIENT_COLORS.addedSugar} size={6} />
-            <Txt variant="caption" tone="tertiary">
-              {formatAmount('addedSugar', n.addedSugar, locale)}
+            <Dot color={NUTRIENT_COLORS[metric]} size={6} />
+            <Txt variant="caption" tone="tertiary" style={{ fontVariant: ['tabular-nums'] }}>
+              {formatAmount(metric, n[metric], locale)}
             </Txt>
           </Row>
         </View>
@@ -63,9 +67,16 @@ export function ItemRow({
         <Animated.View entering={FadeIn.duration(180)} style={{ paddingHorizontal: Space.lg, paddingBottom: Space.lg, gap: Space.md }}>
           <PortionStepper grams={item.grams} base={baseGrams} onChange={onChange} />
           <Row style={{ justifyContent: 'space-between' }}>
-            <Txt variant="caption" tone="secondary" style={{ flex: 1 }}>
-              {(['protein', 'carbs', 'fat', 'fiber'] as const).map((k) => `${nutrientShort(k)} ${formatAmount(k, n[k], locale)}`).join(' · ')}
-            </Txt>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Txt variant="caption" tone="secondary">
+                {(['protein', 'carbs', 'fat', 'fiber'] as const).map((k) => `${nutrientShort(k)} ${formatAmount(k, n[k], locale)}`).join(' · ')}
+              </Txt>
+              {n.carbs >= 1 ? (
+                <Txt variant="caption" tone="tertiary">
+                  {sugarLine(t, locale, n, false)}
+                </Txt>
+              ) : null}
+            </View>
             <IconButton label={t('common.delete')} size={38} icon={<Trash2 size={18} color={colors.danger} />} onPress={onRemove} />
           </Row>
         </Animated.View>

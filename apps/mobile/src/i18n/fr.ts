@@ -801,6 +801,22 @@ export const fr = {
   // Hero swipe: Today's card turns like pages
   'hero.a11y': 'Ta journée',
   'hero.page': '{n} sur {count}',
+  // Sugars: total sugars, carbs and the blood-sugar mode
+  'sugars.carbs': 'Glucides {carbs}',
+  'sugars.line': 'Sucres {sugar} dont ajoutés {added}',
+  'sugars.ofSugar': 'dont sucres',
+  'sugars.ofAdded': 'dont ajoutés',
+  'sugars.ofSatFat': 'dont saturés',
+  'sugars.fruit': '≈{grams} g de sucres viennent de : {sources}. Le fruit entier, avec ses fibres, rassasie mieux et fait monter la glycémie plus doucement.',
+  'sugars.mealCarbs': 'Glucides {carbs} · repère {guide}',
+  'sugars.reference': 'Repère',
+  'sugars.perMeal': 'Glucides par repas',
+  'sugars.perMealValue': '≈{amount} par repas',
+  'sugars.perMealHint': 'Repère pour répartir les glucides, plutôt {snack} pour une collation',
+  'sugars.doctor': 'Ça ne remplace pas l’avis de ton médecin.',
+  'sugars.perMealShort': 'Par repas',
+  'sugars.perMealEdit': 'Glucides, plutôt {snack} en collation',
+  'sugars.yourReference': 'ton repère',
 } as const;
 
 export type TranslationKey = keyof typeof fr;

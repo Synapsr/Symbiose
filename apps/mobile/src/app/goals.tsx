@@ -2,6 +2,10 @@ import {
   ACTIVITY_BOUNDS,
   ACTIVITY_STEPS,
   activityGoalsFor,
+  CARBS_PER_MEAL,
+  carbsGuideFor,
+  carbsPerMeal,
+  clampCarbsPerMeal,
   clampRuleValue,
   RULE_BOUNDS,
   ruleStep,
@@ -19,7 +23,7 @@ import { Platform, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoalComposer } from '@/components/goal-composer';
-import { PlanPreview } from '@/components/plan-preview';
+import { PlanPreview, targetKindKey } from '@/components/plan-preview';
 import { Button, Card, Dot, IconButton, Row, Skeleton, Txt } from '@/components/ui';
 import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
 import { useI18n, type TranslationKey } from '@/i18n';
@@ -162,10 +166,8 @@ function CurrentPlan({ plan, targets, goalKcal, onChange }: { plan: GoalPlan; ta
   const setActivity = (patch: Partial<ActivityGoals>) => onChange({ ...plan, activity: { ...activity, ...patch } });
   const mode =
     plan.calorieMode === 'deficit' ? t('plan.deficit', { pct: plan.caloriePercent }) : plan.calorieMode === 'surplus' ? t('plan.surplus', { pct: plan.caloriePercent }) : t('plan.maintain');
-  const kindKey = (key: Editable): TranslationKey => {
-    const kind = plan.rules.find((r) => r.nutrient === key)?.kind ?? targets?.[key].kind ?? 'target';
-    return kind === 'max' ? 'plan.kind.max' : kind === 'min' ? 'plan.kind.min' : 'plan.kind.target';
-  };
+  const kindKey = (key: Editable): TranslationKey => targetKindKey(plan, targets, key);
+  const perMeal = carbsPerMeal(plan);
   const activityRows: { key: keyof ActivityGoals; icon: ReactNode; label: string; unit: string; value: number | null }[] = [
     { key: 'weeklyActiveMinutes', icon: <SportShoe size={18} color={colors.accent} />, label: t('goals.activeTime'), unit: t('goals.unit.minutes'), value: activity.weeklyActiveMinutes },
     { key: 'dailySteps', icon: <Footprints size={18} color={colors.accent} />, label: t('goals.steps'), unit: t('goals.unit.steps'), value: activity.dailySteps },
@@ -224,6 +226,19 @@ function CurrentPlan({ plan, targets, goalKcal, onChange }: { plan: GoalPlan; ta
               />
             );
           })}
+          {perMeal !== null ? (
+            <EditRow
+              first={false}
+              icon={<Dot color={NUTRIENT_COLORS.carbs} />}
+              label={t('sugars.perMealShort')}
+              hint={t('sugars.perMealEdit', { snack: formatAmount('carbs', carbsGuideFor('snack', perMeal), locale) })}
+              value={formatAmount('carbs', perMeal, locale, false)}
+              unit={unitOf('carbs')}
+              canLower={perMeal > CARBS_PER_MEAL.min}
+              canRaise={perMeal < CARBS_PER_MEAL.max}
+              onStep={(direction) => onChange({ ...plan, carbsPerMeal: clampCarbsPerMeal(perMeal + direction * 5) })}
+            />
+          ) : null}
         </Card>
       ) : null}
 

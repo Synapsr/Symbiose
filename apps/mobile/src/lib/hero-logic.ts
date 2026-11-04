@@ -4,17 +4,34 @@
  * (`pnpm --filter @symbiose/mobile test`); the snapping helpers are worklets,
  * run on the UI thread by the card's swipe.
  */
-import { goalNutrient, type GoalPlan, type NutrientKey } from '@symbiose/shared';
+import { goalNutrient, SUGAR_FAMILY, sugarGoal, type GoalPlan, type NutrientKey } from '@symbiose/shared';
+
+type HeroPlan = Pick<GoalPlan, 'focus' | 'rules'> & Partial<Pick<GoalPlan, 'tags' | 'carbsPerMeal'>>;
 
 /**
  * The pages, in one order used everywhere on the card: the plan's focus (the
  * goal first), calories, the plan's other rules, then protein and fibre.
  * Hidden calories stay hidden.
+ * A sugar goal keeps the sugar family together where it first appears, nested
+ * order: added sugars, total sugars, then carbs (carbs, total, added when
+ * carbs lead, as in blood-sugar mode). Total sugars and carbs are always there.
  */
-export function heroPages(plan: Pick<GoalPlan, 'focus' | 'rules'> | null, hideCalories: boolean): NutrientKey[] {
+export function heroPages(plan: HeroPlan | null, hideCalories: boolean): NutrientKey[] {
   const goal = goalNutrient(plan, hideCalories);
-  const keys = new Set<NutrientKey>([goal, ...(plan?.focus ?? []), 'kcal', ...(plan?.rules.map((r) => r.nutrient) ?? []), 'protein', 'fiber']);
-  return [...keys].filter((key) => !(hideCalories && key === 'kcal'));
+  const keys = [...new Set<NutrientKey>([goal, ...(plan?.focus ?? []), 'kcal', ...(plan?.rules.map((r) => r.nutrient) ?? []), 'protein', 'fiber'])];
+  const pages = sugarGoal(plan) ? withSugarFamily(keys) : keys;
+  return pages.filter((key) => !(hideCalories && key === 'kcal'));
+}
+
+/** The sugar family gathered at its first page, inside out from there; added sugars only when the plan names them. */
+function withSugarFamily(keys: NutrientKey[]): NutrientKey[] {
+  const at = keys.findIndex((key) => SUGAR_FAMILY.includes(key));
+  const first = keys[at];
+  if (!first) return keys;
+  const order = first === 'carbs' ? [...SUGAR_FAMILY].reverse() : [...SUGAR_FAMILY.slice(SUGAR_FAMILY.indexOf(first)), ...SUGAR_FAMILY.slice(0, SUGAR_FAMILY.indexOf(first))];
+  const family = order.filter((key) => key !== 'addedSugar' || keys.includes(key));
+  const rest = keys.filter((key) => !SUGAR_FAMILY.includes(key));
+  return [...rest.slice(0, at), ...family, ...rest.slice(at)];
 }
 
 /**
