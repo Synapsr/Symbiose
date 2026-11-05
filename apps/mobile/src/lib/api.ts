@@ -55,8 +55,12 @@ import type {
   Workout,
   WorkoutInput,
 } from '@symbiose/shared';
+import type { LocalAiUsage } from '@symbiose/core';
 import { toLocalDateTime } from '@symbiose/shared';
 import { fetch as streamingFetch } from 'expo/fetch';
+
+import { isLocalUrl } from '@/local/constants';
+import { localFetch, localPhotoUri } from '@/local/transport';
 
 export class ApiError extends Error {
   constructor(
@@ -74,10 +78,12 @@ export function normalizeServerUrl(input: string): string {
   return url;
 }
 
-async function request<T>(baseUrl: string, token: string | null, method: string, path: string, body?: unknown, timeoutMs = 30_000): Promise<T> {
+type Fetch = (url: string, init: RequestInit) => Promise<Response>;
+
+async function request<T>(baseUrl: string, token: string | null, method: string, path: string, body?: unknown, timeoutMs = 30_000, send: Fetch = fetch): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${baseUrl}${path}`, {
+    res = await send(`${baseUrl}${path}`, {
       method,
       headers: {
         accept: 'application/json',
@@ -111,10 +117,10 @@ async function request<T>(baseUrl: string, token: string | null, method: string,
  * POSTs and reads Server-Sent Events: `delta` events go to `onDelta` as the
  * text is written, `done` resolves with its payload, `error` throws.
  */
-async function postStream<T>(url: string, token: string, body: unknown, onDelta: (text: string) => void, signal?: AbortSignal): Promise<T> {
+async function postStreamWith<T>(url: string, token: string, body: unknown, onDelta: (text: string) => void, signal?: AbortSignal, send: Fetch = streamingFetch as unknown as Fetch): Promise<T> {
   let res;
   try {
-    res = await streamingFetch(url, {
+    res = await send(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'text/event-stream', authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
@@ -162,15 +168,27 @@ export function authenticate(baseUrl: string, mode: 'login' | 'register', body: 
 /** AI calls can take a while (vision + reasoning). */
 const AI_TIMEOUT = 150_000;
 
+/**
+ * The API, on a server or on the phone itself (`local://phone`, see src/local):
+ * the same calls either way, only the transport differs.
+ */
 export function createApi(baseUrl: string, token: string) {
-  const call = <T,>(method: string, path: string, body?: unknown, timeout?: number) => request<T>(baseUrl, token, method, path, body, timeout);
+  const local = isLocalUrl(baseUrl);
+  const send: Fetch = local ? localFetch : fetch;
+  const call = <T,>(method: string, path: string, body?: unknown, timeout?: number) => request<T>(baseUrl, token, method, path, body, timeout, send);
+  const postStream = <T,>(url: string, _token: string, body: unknown, onDelta: (text: string) => void, signal?: AbortSignal) =>
+    postStreamWith<T>(url, token, body, onDelta, signal, local ? localFetch : (streamingFetch as unknown as Fetch));
   return {
     baseUrl,
     token,
-    photoUrl: (id: string) => `${baseUrl}/api/photos/${id}`,
-    authHeaders: { authorization: `Bearer ${token}` },
+    /** True when the data lives on this phone, without a server. */
+    local,
+    photoUrl: (id: string) => (local ? localPhotoUri(id) : `${baseUrl}/api/photos/${id}`),
+    authHeaders: local ? ({} as Record<string, string>) : { authorization: `Bearer ${token}` },
 
     me: () => call<User>('GET', '/api/me'),
+    /** On a phone without a server: this month's AI calls (« Ton IA »). */
+    localAiUsage: () => call<LocalAiUsage>('GET', '/api/local/ai-usage'),
     saveProfile: (profile: Profile) => call<User>('PUT', '/api/me/profile', profile),
     deleteAccount: () => call<void>('DELETE', '/api/me'),
     exportUrl: () => `${baseUrl}/api/me/export`,

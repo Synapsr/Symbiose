@@ -20,6 +20,8 @@ final class WatchModel {
 
   var copy: Copy { Copy(lang: lang) }
   var signedIn: Bool { credentials != nil }
+  /// Symbiose runs on the iPhone, without a server: the watch goes through it.
+  var onPhone: Bool { credentials.map { PhoneLink.isLocal($0.serverUrl) } ?? false }
 
   private init() { reload() }
 
@@ -50,6 +52,10 @@ final class WatchModel {
       return true
     } catch API.Failure.unauthorized {
       signOut()
+      return false
+    } catch API.Failure.offline where onPhone {
+      // The iPhone out of reach: its last glance stays, and comes again when it is.
+      problem = nil
       return false
     } catch {
       problem = message(for: error)
@@ -82,7 +88,8 @@ final class WatchModel {
   /// The words to show for a failed action.
   func message(for error: Error) -> String {
     switch error as? API.Failure {
-    case .offline: copy.offline
+    case .offline: onPhone ? copy.phoneAway : copy.offline
+    case .queued: copy.queued
     case let .server(message): message.isEmpty ? copy.failed : message
     default: copy.failed
     }

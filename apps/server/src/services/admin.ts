@@ -4,24 +4,18 @@ import { join } from 'node:path';
 import { addDays, MEAL_SOURCES, type AdminOverview, type AdminPeriod, type AdminRequest, type AiTotals, type MealSource } from '@symbiose/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 
-import type { Ai } from '../ai/types';
-import type { Db } from '../db';
-import { photos as photosTable, users } from '../db/schema';
+import type { Ai } from '@symbiose/core/ai/types';
+import type { Db } from '@symbiose/core';
+import { photos as photosTable, users } from '@symbiose/core/db/schema';
+import { costOf, LONG_PROMPT_TOKENS, priceOf } from '@symbiose/core/services/ai-prices';
+import type { PhotoStore } from '@symbiose/core/services/photos';
+import { isAdmin, isAdminEmail } from '@symbiose/core/services/users';
+
 import { signupMode, VERSION, type Config } from '../env';
-import { costOf, LONG_PROMPT_TOKENS, priceOf } from './ai-prices';
-import type { PhotoStore } from './photos';
 
 // ---------------------------------------------------------------- Who is an admin
 
-/** Whether an email is listed in ADMIN_EMAILS, as it is now. */
-export function isAdminEmail(config: Pick<Config, 'adminEmails'>, email: string): boolean {
-  return (config.adminEmails ?? []).includes(email.trim().toLowerCase());
-}
-
-/** Admins are the approved accounts whose email is listed: a pending one waits like anyone else. */
-export function isAdmin(config: Pick<Config, 'adminEmails'>, account: { email: string; pending: boolean }): boolean {
-  return !account.pending && isAdminEmail(config, account.email);
-}
+export { isAdmin, isAdminEmail };
 
 /**
  * The startup log about the admin view. There is no email verification, so
@@ -61,7 +55,7 @@ export function pendingRequests(db: Db): AdminRequest[] {
 
 /** Lets a waiting account in; false when there is no such request. */
 export function approveRequest(db: Db, id: string): boolean {
-  return db.update(users).set({ pending: false }).where(and(eq(users.id, id), eq(users.pending, true))).run().changes > 0;
+  return (db.update(users).set({ pending: false }).where(and(eq(users.id, id), eq(users.pending, true))).run() as { changes: number }).changes > 0;
 }
 
 /** Refuses a request: the waiting account and everything it saved go. Never touches an approved account. */

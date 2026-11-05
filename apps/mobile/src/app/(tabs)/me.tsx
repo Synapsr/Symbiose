@@ -1,12 +1,15 @@
-import { ageFromBirthYear, everydayWaterGoalMl, hydrationGoalMl, WATER_SIZES, type Locale, type Profile } from '@symbiose/shared';
+import { ageFromBirthYear, everydayWaterGoalMl, hydrationGoalMl, toLocalDate, WATER_SIZES, type Locale, type Profile } from '@symbiose/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import {
+  ArchiveRestore,
   ChevronDown,
   ChevronRight,
   CodeXml,
   Download,
+  Smartphone,
+  Sparkles,
   EyeOff,
   FaceSlightlySmiling,
   Gauge,
@@ -26,7 +29,7 @@ import {
   Activity,
 } from 'lucide-react-native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, Platform, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, ScrollView, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -34,7 +37,8 @@ import { signed } from '@/components/insights/adaptive-energy-card';
 import { CoachSettings } from '@/components/settings/coach-settings';
 import { Card, Dot, IconButton, Pressy, Row, SectionTitle, Segmented, Toggle, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
-import { ApiError } from '@/lib/api';
+import type { TranslationKey } from '@/i18n/fr';
+import { ApiError, getServerInfo } from '@/lib/api';
 import { formatAmount, formatLiters, formatNumber } from '@/lib/format';
 import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
@@ -42,7 +46,11 @@ import { grantedScopes, health, HEALTH_SCOPES, healthModules, type HealthModules
 import { useHealthSync, useToday } from '@/lib/hooks';
 import { clearOutbox, useOutbox } from '@/lib/outbox';
 import { useApi, useSession, useSetUser, useUser } from '@/lib/session';
-import { useSettings } from '@/lib/stores';
+import { useSettings, useToast } from '@/lib/stores';
+import { providerName, useAiSettings } from '@/local/ai-settings';
+import { ask, downloadFromServer, restoreBackupFromPicker, shareBackup } from '@/local/backup-actions';
+import { eraseAllPhoneData } from '@/local/erase';
+import { localModeAvailable } from '@/local/transport';
 import { LIFE_COLORS, NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
 /** The opt-in modules: a profile switch each, and the health-store types it needs (mood needs none). */
@@ -63,8 +71,12 @@ export default function Me() {
   const insets = useSafeAreaInsets();
   const user = useUser();
   const api = useApi();
-  const { signOut } = useSession();
+  const { signOut, onPhone, startOnPhone } = useSession();
   const settings = useSettings();
+  const showToast = useToast((s) => s.show);
+  const aiChoice = useAiSettings((s) => s.choice);
+  const [dataBusy, setDataBusy] = useState<'backup' | 'restore' | 'toPhone' | null>(null);
+  const serverInfo = useQuery({ queryKey: ['server-info', api.baseUrl], queryFn: () => getServerInfo(api.baseUrl), enabled: !onPhone, staleTime: 5 * 60_000 });
   const today = useToday();
   const syncHealth = useHealthSync(today);
   const [healthAvailable, setHealthAvailable] = useState(false);
@@ -183,6 +195,46 @@ export default function Me() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => void run() },
     ]);
+  };
+
+  // On a phone without a server: when the last backup was made, said kindly, and again after a month.
+  const backupDays = settings.lastBackupAt ? Math.round((Date.parse(today) - Date.parse(toLocalDate(new Date(settings.lastBackupAt)))) / 86_400_000) : null;
+  const lastBackupText =
+    backupDays === null
+      ? t('me.data.lastBackup', { when: t('me.data.never') })
+      : backupDays > 30
+        ? t('me.data.reminder', { days: backupDays })
+        : t('me.data.lastBackup', { when: new Date(settings.lastBackupAt).toLocaleDateString(locale, { day: 'numeric', month: 'long' }) });
+
+  const runData = async (what: 'backup' | 'restore' | 'toPhone', task: () => Promise<unknown>) => {
+    if (dataBusy) return;
+    setDataBusy(what);
+    try {
+      await task();
+    } finally {
+      setDataBusy(null);
+    }
+  };
+
+  /** « Effacer toutes mes données »: everything on this phone, then the welcome screen. */
+  const confirmErase = async () => {
+    if (!(await ask(t('me.data.erase'), t('me.data.eraseConfirm'), t('common.delete'), t('common.cancel')))) return;
+    await clearOutbox();
+    await eraseAllPhoneData();
+    await signOut();
+  };
+
+  /** « Ramener mes données sur ce téléphone »: the server's backup replaces the phone's data, then the app runs here. */
+  const bringToPhone = async () => {
+    if (waiting && !(await ask(t('outbox.signOutTitle'), waiting === 1 ? t('outbox.signOutOne') : t('outbox.signOutMany', { count: waiting }), t('common.continue'), t('common.cancel')))) return;
+    if (!(await downloadFromServer(t, api.baseUrl, api.token))) return;
+    const remove = await ask(t('move.deleteServerTitle'), t('move.deleteServerBody'), t('move.deleteAccount'), t('move.keepAccount'));
+    if (remove) await api.deleteAccount().catch(() => undefined);
+    await clearOutbox();
+    queryClient.clear();
+    await startOnPhone();
+    haptics.success();
+    showToast({ message: t('move.toPhoneDone') });
   };
 
   const pendingLocale = saveProfile.isPending ? saveProfile.variables.locale : undefined;
@@ -334,35 +386,102 @@ export default function Me() {
         />
       </Card>
 
-      <SectionTitle>{t('me.account')}</SectionTitle>
+      <SectionTitle>{t('me.ai')}</SectionTitle>
       <Card padded={false} style={{ marginTop: -Space.sm }}>
-        <Item icon={<Server size={20} color={colors.text} />} title={api.baseUrl.replace(/^https?:\/\//, '')} subtitle={user.email} />
-        {/* Only for the emails listed in ADMIN_EMAILS on the server. */}
-        {showAdmin ? (
-          <>
+        {onPhone ? (
+          <Item
+            icon={<Sparkles size={20} color={aiChoice ? colors.accentText : colors.text} />}
+            title={aiChoice ? (aiChoice.kind === 'chatgpt' ? 'ChatGPT' : aiChoice.kind === 'mock' ? 'Mock (dev)' : t(`provider.${aiChoice.provider}` as TranslationKey)) : t('me.ai.none')}
+            subtitle={aiChoice ? (aiChoice.kind === 'chatgpt' ? t('ai.usingPlan') : t('me.ai.key', { provider: providerName(aiChoice) })) : t('today.noAi')}
+            onPress={() => router.push('/ai-setup')}
+            chevron
+          />
+        ) : (
+          <Item
+            icon={<Sparkles size={20} color={colors.text} />}
+            title={serverInfo.data?.ai.enabled === false ? t('me.ai.serverOff') : t('me.ai.server')}
+            subtitle={serverInfo.data?.ai.enabled ? (serverInfo.data.ai.model ?? undefined) : undefined}
+          />
+        )}
+      </Card>
+
+      {onPhone ? (
+        <>
+          <SectionTitle>{t('me.data')}</SectionTitle>
+          <Card padded={false} style={{ marginTop: -Space.sm }}>
+            <Item icon={<Smartphone size={20} color={colors.text} />} title={t('me.data.onPhone')} subtitle={lastBackupText} />
             <Divider />
             <Item
-              icon={<ShieldCheck size={20} color={colors.text} />}
-              title={t('admin.title')}
-              subtitle={t('admin.row')}
-              onPress={() => router.push('/admin')}
-              right={waitingRequests ? <CountBadge count={waitingRequests} label={plural('admin.waiting', waitingRequests)} /> : null}
+              icon={<Download size={20} color={colors.text} />}
+              title={t('me.data.backup')}
+              subtitle={t('backup.hint')}
+              right={dataBusy === 'backup' ? <ActivityIndicator /> : null}
+              onPress={() => void runData('backup', () => shareBackup(t))}
+            />
+            <Divider />
+            <Item
+              icon={<ArchiveRestore size={20} color={colors.text} />}
+              title={t('me.data.restore')}
+              right={dataBusy === 'restore' ? <ActivityIndicator /> : null}
+              onPress={() =>
+                void runData('restore', async () => {
+                  if (await restoreBackupFromPicker(t)) {
+                    queryClient.clear();
+                    await startOnPhone();
+                  }
+                })
+              }
+            />
+            <Divider />
+            <Item icon={<Server size={20} color={colors.text} />} title={t('me.data.toServer')} onPress={() => router.push({ pathname: '/server', params: { move: '1' } })} chevron />
+            <Divider />
+            <Item icon={<Trash2 size={20} color={colors.danger} />} title={t('me.data.erase')} danger onPress={() => void confirmErase()} />
+          </Card>
+        </>
+      ) : (
+        <>
+          <SectionTitle>{t('me.account')}</SectionTitle>
+          <Card padded={false} style={{ marginTop: -Space.sm }}>
+            <Item icon={<Server size={20} color={colors.text} />} title={api.baseUrl.replace(/^https?:\/\//, '')} subtitle={user.email} />
+            {/* Only for the emails listed in ADMIN_EMAILS on the server. */}
+            {showAdmin ? (
+              <>
+                <Divider />
+                <Item
+                  icon={<ShieldCheck size={20} color={colors.text} />}
+                  title={t('admin.title')}
+                  subtitle={t('admin.row')}
+                  onPress={() => router.push('/admin')}
+                  right={waitingRequests ? <CountBadge count={waitingRequests} label={plural('admin.waiting', waitingRequests)} /> : null}
+                  chevron
+                />
+              </>
+            ) : null}
+            <Divider />
+            <Item
+              icon={<Download size={20} color={colors.text} />}
+              title={t('me.export')}
+              onPress={() => void WebBrowser.openBrowserAsync(`${api.exportUrl()}?token=${encodeURIComponent(api.token)}`)}
               chevron
             />
-          </>
-        ) : null}
-        <Divider />
-        <Item
-          icon={<Download size={20} color={colors.text} />}
-          title={t('me.export')}
-          onPress={() => void WebBrowser.openBrowserAsync(`${api.exportUrl()}?token=${encodeURIComponent(api.token)}`)}
-          chevron
-        />
-        <Divider />
-        <Item icon={<LogOut size={20} color={colors.text} />} title={t('me.signOut')} onPress={confirmSignOut} />
-        <Divider />
-        <Item icon={<Trash2 size={20} color={colors.danger} />} title={t('me.deleteAccount')} danger onPress={confirmDelete} />
-      </Card>
+            {localModeAvailable ? (
+              <>
+                <Divider />
+                <Item
+                  icon={<Smartphone size={20} color={colors.text} />}
+                  title={t('me.data.toPhone')}
+                  right={dataBusy === 'toPhone' ? <ActivityIndicator /> : null}
+                  onPress={() => void runData('toPhone', bringToPhone)}
+                />
+              </>
+            ) : null}
+            <Divider />
+            <Item icon={<LogOut size={20} color={colors.text} />} title={t('me.signOut')} onPress={confirmSignOut} />
+            <Divider />
+            <Item icon={<Trash2 size={20} color={colors.danger} />} title={t('me.deleteAccount')} danger onPress={confirmDelete} />
+          </Card>
+        </>
+      )}
 
       <Pressy onPress={() => void WebBrowser.openBrowserAsync('https://github.com/Synapsr/Symbiose')} style={{ marginTop: Space.xxl, alignItems: 'center', gap: 6 }}>
         <CodeXml size={18} color={colors.text3} />

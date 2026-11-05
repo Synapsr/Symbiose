@@ -7,17 +7,17 @@ import { toLocalDate, toLocalDateTime, type AdminOverview, type AdminRequest, ty
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createDisabledAi } from './ai/claude';
-import { createMockAi } from './ai/mock';
-import type { Ai, AiUsage } from './ai/types';
+import { createDisabledAi } from '@symbiose/core/ai/claude';
+import { createMockAi } from '@symbiose/core/ai/mock';
+import type { Ai, AiUsage } from '@symbiose/core/ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
-import { aiUsage, coachMessages, cravings, journalEntries, meals, photos, users, weights } from './db/schema';
+import { aiUsage, coachMessages, cravings, journalEntries, meals, photos, users, weights } from '@symbiose/core/db/schema';
 import { databaseBehind } from './db/testing';
 import { loadConfig, VERSION, type Config } from './env';
 import { adminSetupLog } from './services/admin';
-import { costOf, parsePrices, priceOf } from './services/ai-prices';
-import { createUsageRecorder, pruneAiUsage, usageRow } from './services/ai-usage';
+import { costOf, parsePrices, priceOf } from '@symbiose/core/services/ai-prices';
+import { createUsageRecorder, pruneAiUsage, usageRow } from '@symbiose/core/services/ai-usage';
 import { PhotoStore } from './services/photos';
 
 const dir = mkdtempSync(join(tmpdir(), 'symbiose-admin-'));

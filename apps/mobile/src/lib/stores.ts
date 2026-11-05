@@ -48,6 +48,10 @@ interface SettingsState {
   /** Today's hero card: the page swiped to (null: the goal's own), and whether its one-time swipe hint has played. */
   heroPage: HeroChoice | null;
   heroHinted: boolean;
+  /** On a phone without a server: when the last backup was made (ISO), for « Dernière sauvegarde ». */
+  lastBackupAt: string;
+  /** With a server: the server whose AI the person was told about (what it receives, and who answers). */
+  aiNoticeFor: string;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -81,6 +85,8 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   describeHints: 0,
   heroPage: null,
   heroHinted: false,
+  lastBackupAt: '',
+  aiNoticeFor: '',
   set: (patch) => {
     set(patch);
     const s = get();
@@ -109,6 +115,8 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       describeHints: s.describeHints,
       heroPage: s.heroPage,
       heroHinted: s.heroHinted,
+      lastBackupAt: s.lastBackupAt,
+      aiNoticeFor: s.aiNoticeFor,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

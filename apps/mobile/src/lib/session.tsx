@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { deviceLocale, translate } from '@/i18n';
+import { isLocalUrl, LOCAL_SERVER_URL, LOCAL_TOKEN } from '@/local/constants';
+import { phoneDataExists } from '@/local/transport';
 
 import { ApiError, createApi, type Api } from './api';
 import { storage } from './storage';
@@ -32,9 +34,16 @@ interface SessionValue {
   api: Api | null;
   user: User | null;
   userLoading: boolean;
+  /** True when the data lives on this phone, without a server (`src/local`). */
+  onPhone: boolean;
   signIn: (session: StoredSession, user: User) => Promise<void>;
+  /** Starts (or resumes) Symbiose on this phone alone: no server, no account. */
+  startOnPhone: () => Promise<void>;
   signOut: () => Promise<void>;
 }
+
+/** The session of the app on its own: the API runs on the phone and asks for no token. */
+export const PHONE_SESSION: StoredSession = { serverUrl: LOCAL_SERVER_URL, token: LOCAL_TOKEN };
 
 const SessionContext = createContext<SessionValue | null>(null);
 
@@ -49,9 +58,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     Promise.all([storage.get(KEY), storage.get(USER_KEY).catch(() => null)])
       .then(([raw, rawUser]) => {
-        const stored = raw ? (JSON.parse(raw) as StoredSession) : null;
+        // The data can outlive the settings (Android restores app files, not the keystore): it opens on its data.
+        const stored = raw ? (JSON.parse(raw) as StoredSession) : phoneDataExists() ? PHONE_SESSION : null;
         setCachedUser(readCachedUser(rawUser, stored));
         setSession(stored);
+        if (stored && !raw) void storage.set(KEY, JSON.stringify(stored)).catch(() => undefined);
       })
       .catch(() => setSession(null))
       .finally(() => setReady(true));
@@ -103,13 +114,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [queryClient],
   );
 
+  const startOnPhone = useCallback(async () => {
+    const user = await createApi(PHONE_SESSION.serverUrl, PHONE_SESSION.token).me();
+    await signIn(PHONE_SESSION, user);
+  }, [signIn]);
+
   const value: SessionValue = {
     ready,
     session: revoked ? null : session,
     api,
     user: revoked ? null : (me.data ?? null),
     userLoading: Boolean(api) && me.isPending,
+    onPhone: isLocalUrl(session?.serverUrl),
     signIn,
+    startOnPhone,
     signOut,
   };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

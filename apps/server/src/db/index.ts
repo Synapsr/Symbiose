@@ -2,18 +2,25 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:f
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { schema, type Db } from '@symbiose/core';
 import Database from 'better-sqlite3';
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 
-import * as schema from './schema';
+export type { Db };
 
-export type Db = BetterSQLite3Database<typeof schema>;
-
-/** Works from src/ (tsx, vitest) and from the bundled dist/ alike. */
-function migrationsFolder(): string {
+/**
+ * The migrations live with the schema in packages/core. Found from the bundled
+ * dist/ (the image copies them next to it) and from src/ (tsx, vitest) alike.
+ */
+export function migrationsFolder(): string {
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const candidate of [join(here, '../drizzle'), join(here, '../../drizzle')]) {
+  const candidates = [
+    join(here, '../drizzle'), // the image: dist/ and drizzle/ side by side
+    join(here, '../../../packages/core/drizzle'), // apps/server/dist in the repository
+    join(here, '../../../../packages/core/drizzle'), // apps/server/src/db
+  ];
+  for (const candidate of candidates) {
     if (existsSync(join(candidate, 'meta/_journal.json'))) return candidate;
   }
   throw new Error('Could not locate the drizzle migrations folder');

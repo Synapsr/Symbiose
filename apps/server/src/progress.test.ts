@@ -5,8 +5,8 @@ import { join } from 'node:path';
 import { addDays, toLocalDate, type AuthResponse, type DaySummary, type FoodItemInput, type GoalPlan, type GoalsResponse, type InsightsResponse, type Profile, type User, type WeeklyReview, type WeeklyReviewState } from '@symbiose/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createDisabledAi } from './ai/claude';
-import type { Ai, ReviewInput } from './ai/types';
+import { createDisabledAi } from '@symbiose/core/ai/claude';
+import type { Ai, ReviewInput } from '@symbiose/core/ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
 import type { Config } from './env';

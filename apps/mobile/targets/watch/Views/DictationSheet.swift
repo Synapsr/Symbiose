@@ -9,7 +9,7 @@ struct DictationSheet: View {
   @Environment(\.dismiss) private var dismiss
   @State private var phase = Phase.analyzing
 
-  enum Phase: Equatable { case analyzing, logged(LoggedMeal), failed(String) }
+  enum Phase: Equatable { case analyzing, logged(LoggedMeal), queued, failed(String) }
 
   var body: some View {
     let copy = model.copy
@@ -47,6 +47,13 @@ struct DictationSheet: View {
           .font(.rounded(14, .medium))
           .foregroundStyle(Palette.text2)
           .frame(minHeight: 36)
+        case .queued:
+          // No server and the iPhone out of reach: the words wait for it.
+          MealBadge(emoji: "", done: true)
+          Text(copy.queued).font(.rounded(14, .medium)).multilineTextAlignment(.center)
+          Button(copy.done) { dismiss() }
+            .tint(Palette.accent)
+            .padding(.top, 6)
         case let .failed(message):
           Image(systemName: "exclamationmark.bubble").font(.system(size: 28)).foregroundStyle(Palette.warning)
           Text(message).font(.rounded(14, .medium)).multilineTextAlignment(.center)
@@ -69,6 +76,9 @@ struct DictationSheet: View {
       let meal = try await model.logMeal(text: text)
       Haptic.success()
       phase = .logged(meal)
+    } catch API.Failure.queued {
+      Haptic.success()
+      phase = .queued
     } catch {
       Haptic.failure()
       phase = .failed(model.message(for: error))

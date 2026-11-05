@@ -1,7 +1,9 @@
 import type { ActivityLevel, GoalsResponse, Profile, Sex } from '@symbiose/shared';
 import { useMutation } from '@tanstack/react-query';
-import { ChevronLeft, Flame, HeartPulse, Ruler, Sparkles, Watch } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { ChevronLeft, Flame, HeartPulse, Ruler, ShieldCheck, Sparkles, Watch } from 'lucide-react-native';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,12 +20,18 @@ import { feedback } from '@/lib/feedback';
 import { haptics } from '@/lib/haptics';
 import { health, HEALTH_SCOPES, type HealthProfile } from '@/lib/health';
 import { errorMessage } from '@/lib/hooks';
-import { useApi, useSetUser, useUser } from '@/lib/session';
+import { useApi, useSession, useSetUser, useUser } from '@/lib/session';
 import { useSettings } from '@/lib/stores';
+import { useAiSettings } from '@/local/ai-settings';
+import { CHATGPT_USAGE_URL } from '@/local/chatgpt-auth';
+import { useConnectChatGpt } from '@/local/use-connect-chatgpt';
 import { Radius, Space, useTheme } from '@/theme';
 
-/** `waiting`: sign-up on request, after the goals, until an admin approves the account. */
-type Step = 'name' | 'health' | 'sex' | 'body' | 'activity' | 'goals' | 'plan' | 'waiting';
+/**
+ * `ai`: on a phone without a server, the AI comes first (the plan is written with it).
+ * `waiting`: sign-up on request, after the goals, until an admin approves the account.
+ */
+type Step = 'ai' | 'name' | 'health' | 'sex' | 'body' | 'activity' | 'goals' | 'plan' | 'waiting';
 
 const BENEFITS = [
   { icon: Ruler, key: 'onb.health.b1' },
@@ -37,6 +45,9 @@ export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const user = useUser();
+  const { onPhone } = useSession();
+  const aiChoice = useAiSettings((s) => s.choice);
+  const chatgpt = useConnectChatGpt();
   const setUser = useSetUser();
   const setSettings = useSettings((s) => s.set);
   const waitingIntentions = useSettings((s) => s.waitingIntentions);
@@ -48,10 +59,19 @@ export default function Onboarding() {
   // Sex already known from the health store: no need to ask.
   const [sexFromHealth, setSexFromHealth] = useState(false);
   const [bodyFromHealth, setBodyFromHealth] = useState(false);
-  const steps: Step[] = ['name', ...(healthAvailable ? (['health'] as const) : []), ...(sexFromHealth ? [] : (['sex'] as const)), 'body', 'activity', 'goals', 'plan'];
+  const steps: Step[] = [
+    ...(onPhone ? (['ai'] as const) : []),
+    'name',
+    ...(healthAvailable ? (['health'] as const) : []),
+    ...(sexFromHealth ? [] : (['sex'] as const)),
+    'body',
+    'activity',
+    'goals',
+    'plan',
+  ];
 
   // Goals written while waiting: back at the plan step, approved or not yet.
-  const [step, setStep] = useState<Step>(user.profile ? (waitingIntentions ? 'waiting' : 'goals') : 'name');
+  const [step, setStep] = useState<Step>(user.profile ? (waitingIntentions ? 'waiting' : 'goals') : onPhone && !aiChoice ? 'ai' : 'name');
   const [name, setName] = useState(user.profile?.name ?? user.name);
   const [sex, setSex] = useState<Sex | null>(user.profile?.sex ?? null);
   const [body, setBody] = useState<BodyValues>({
@@ -74,6 +94,20 @@ export default function Onboarding() {
     setStep(next);
   };
   const afterName = healthAvailable ? 'health' : 'sex';
+
+  const chatgptStage = chatgpt.state.stage;
+  // An AI chosen in « Paramètres avancés »: back here, on to the next step. (ChatGPT chosen here first says so.)
+  const chatgptBusy = useRef(false);
+  useEffect(() => {
+    chatgptBusy.current = chatgptStage !== 'idle';
+  }, [chatgptStage]);
+  useEffect(
+    () =>
+      useAiSettings.subscribe((state, previous) => {
+        if (state.choice && !previous.choice && !chatgptBusy.current) setStep((current) => (current === 'ai' ? 'name' : current));
+      }),
+    [],
+  );
 
   // Health first: one permission sheet, then the profile fills itself.
   const connectHealth = useMutation({
@@ -151,6 +185,15 @@ export default function Onboarding() {
 
   const primary = (() => {
     switch (step) {
+      case 'ai':
+        if (chatgptStage === 'connected') return { title: t('ai.welcome.ok'), onPress: () => go('name') };
+        if (chatgptStage === 'notEligible') return { title: t('ai.notEligible.other'), onPress: () => router.push('/ai-setup') };
+        return {
+          title: chatgptStage === 'checking' ? t('ai.checking') : t('ai.chatgpt'),
+          onPress: () => void chatgpt.connect(),
+          loading: chatgpt.busy,
+          icon: <Sparkles size={18} color={colors.onInverted} />,
+        };
       case 'name':
         return { title: t('common.continue'), onPress: () => go(afterName), disabled: !name.trim() };
       case 'health':
@@ -211,7 +254,8 @@ export default function Onboarding() {
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: Space.xl, paddingTop: Space.xxl, gap: Space.xxl, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
-        <Animated.View key={step} entering={FadeIn.duration(250)} style={{ gap: Space.xxl }}>
+        <Animated.View key={`${step}-${step === 'ai' ? chatgptStage : ''}`} entering={FadeIn.duration(250)} style={{ gap: Space.xxl }}>
+          {step === 'ai' ? <AiStep stage={chatgptStage} /> : null}
           {step === 'name' ? (
             <>
               <Txt variant="title">{t('onb.name.title')}</Txt>
@@ -306,8 +350,70 @@ export default function Onboarding() {
         {step !== 'sex' && !((step === 'goals' || step === 'waiting') && thinking) ? <Button {...primary} /> : null}
         {step === 'plan' ? <Button title={t('onb.plan.adjust')} variant="ghost" onPress={() => go('goals')} /> : null}
         {step === 'health' ? <Button title={t('common.later')} variant="ghost" onPress={() => go(sexFromHealth ? 'body' : 'sex')} disabled={connectHealth.isPending} /> : null}
+        {step === 'ai' && chatgptStage === 'connected' ? (
+          <Button title={t('ai.manageUsage')} variant="ghost" onPress={() => void WebBrowser.openBrowserAsync(CHATGPT_USAGE_URL)} />
+        ) : null}
+        {step === 'ai' && chatgptStage === 'notEligible' ? (
+          <>
+            <Button title={t('ai.notEligible.plans')} variant="ghost" onPress={() => void WebBrowser.openBrowserAsync('https://chatgpt.com/#pricing')} />
+            <Button title={t('ai.notEligible.without')} variant="ghost" onPress={() => go('name')} />
+          </>
+        ) : null}
+        {step === 'ai' && chatgptStage !== 'connected' && chatgptStage !== 'notEligible' ? (
+          <Row style={{ justifyContent: 'center', gap: Space.sm }}>
+            <Button title={t('ai.advanced')} variant="ghost" size="md" onPress={() => router.push('/ai-setup')} disabled={chatgpt.busy} />
+            <Button title={t('ai.later')} variant="ghost" size="md" onPress={() => go('name')} disabled={chatgpt.busy} />
+          </Row>
+        ) : null}
       </View>
     </KeyboardAvoiding>
+  );
+}
+
+/** The first step on a phone without a server: the AI, what it receives, and from whom. */
+function AiStep({ stage }: { stage: ReturnType<typeof useConnectChatGpt>['state']['stage'] }) {
+  const { t } = useI18n();
+  const { colors, elevation } = useTheme();
+  if (stage === 'connected' || stage === 'notEligible') {
+    const ok = stage === 'connected';
+    return (
+      <View style={{ gap: Space.lg }}>
+        <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: ok ? colors.accentSoft : colors.surface2, alignItems: 'center', justifyContent: 'center' }}>
+          <Sparkles size={34} color={ok ? colors.accent : colors.text2} />
+        </View>
+        <Txt variant="title">{ok ? t('ai.welcome.title') : t('ai.notEligible.title')}</Txt>
+        <Txt tone="secondary" style={{ fontSize: 17, lineHeight: 24 }}>
+          {ok ? t('ai.welcome.body') : t('ai.notEligible.body')}
+        </Txt>
+      </View>
+    );
+  }
+  return (
+    <View style={{ gap: Space.xl }}>
+      <View style={{ gap: Space.lg, alignItems: 'flex-start' }}>
+        <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Sparkles size={34} color={colors.accent} />
+        </View>
+        <Txt variant="title">{t('ai.title')}</Txt>
+        <Txt tone="secondary" style={{ fontSize: 17, lineHeight: 24 }}>
+          {t('ai.body')}
+        </Txt>
+      </View>
+      {/* What leaves the phone, and to whom: said before anything is sent (App Store 5.1.2(i)). */}
+      <Reveal index={2}>
+        <View style={[{ flexDirection: 'row', gap: Space.md, padding: Space.lg, borderRadius: Radius.lg, backgroundColor: colors.surface }, elevation]}>
+          <ShieldCheck size={20} color={colors.accentText} style={{ marginTop: 2 }} />
+          <Txt variant="caption" tone="secondary" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
+            {t('ai.consent', { provider: 'OpenAI' })}
+          </Txt>
+        </View>
+      </Reveal>
+      {stage === 'failed' || stage === 'unavailable' ? (
+        <Txt variant="caption" tone="warning">
+          {stage === 'unavailable' ? t('ai.unavailable') : t('ai.failed')}
+        </Txt>
+      ) : null}
+    </View>
   );
 }
 

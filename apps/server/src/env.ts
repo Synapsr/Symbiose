@@ -2,14 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { AI_PROVIDERS, isAiProvider, VERSION, type AiConfig, type CoreConfig } from '@symbiose/core';
+import { parsePrices, type Rates } from '@symbiose/core/services/ai-prices';
 import type { SignupMode } from '@symbiose/shared';
 
-import { AI_PROVIDERS, isAiProvider } from './ai/providers';
-import { parsePrices, type Rates } from './services/ai-prices';
+export { VERSION };
 
-export const VERSION = '0.1.0';
-
-export interface Config {
+export interface Config extends AiConfig, CoreConfig {
   port: number;
   dataDir: string;
   publicUrl: string | null;

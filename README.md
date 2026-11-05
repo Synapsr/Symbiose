@@ -8,7 +8,7 @@
 <div align="center">
 
 **Your health goals, in your own words.**<br />
-Snap, say or scan a meal: an AI follows *your* goal, on *your* server.
+Snap, say or scan a meal: an AI follows *your* goal, on *your* phone or *your* server.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Synapsr/Symbiose/ci.yml?branch=main&label=CI)](https://github.com/Synapsr/Symbiose/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -33,7 +33,7 @@ Symbiose is an open-source app for eating the way **you** decided to. Write your
 
 Log a meal with a photo, a sentence or a barcode. The AI works out portions and nutrients, plain code checks every number, and each meal gets one line of feedback that fits your goal. A coach that knows your day answers your questions, and helps you ride out a craving.
 
-It runs on your own server: one Docker container, one SQLite file, with Claude or the AI provider of your choice. iPhone, Android, Apple Watch, widgets, in French and English. No subscription, no ads, no tracking.
+It runs on your phone, with nothing to install: sign in with your ChatGPT plan, or bring a key from Claude, Gemini, Mistral, OpenRouter or a model on your own network. Or run it on your own server: one Docker container, one SQLite file, for every device and the whole family. iPhone, Android, Apple Watch, widgets, in French and English. No subscription, no ads, no tracking.
 
 ## How it works
 
@@ -79,6 +79,18 @@ It runs on your own server: one Docker container, one SQLite file, with Claude o
     <img src="docs/screenshots/devices-light.webp" width="760" alt="The Apple Watch app with 16 g of added sugar left, and the medium and small Home Screen widgets" />
   </picture>
 </p>
+
+## Two ways to run it
+
+| | On your phone | On your server |
+| --- | --- | --- |
+| To start | Install the app, tap **Get started** | One `docker run`, then scan the server's QR code |
+| The AI | Your ChatGPT plan (Plus or Pro), or your own key | The server's key, for everyone on it |
+| Your data | On the phone; back it up as one file (Google Drive, iCloud Drive, Files) | On the server, for all your devices |
+| Apple Watch | Through the iPhone | Straight to the server, even without the iPhone |
+| Family | One person per phone | Accounts for everyone, an admin view |
+
+Moving between the two keeps everything: **Me → Your data → Move to a Symbiose server**, and back. A backup is one SQLite file with the photos inside, the same on both sides.
 
 ## Self-host in one command
 
@@ -151,10 +163,12 @@ This builds the app, with its watch app and widgets on iOS, and opens it in the 
 
 ## Privacy
 
-- **Your data stays on your server**, in one SQLite file and a photos folder.
-- **Only what an answer needs goes to the AI provider you chose**: the meal's photo or words, and the context for that answer (your goal, your day's numbers). Never your name, email or password. Barcodes go to Open Food Facts.
+- **Your data stays with you**: on your phone, or on your server, in one SQLite file and a photos folder. Synapsr hosts nothing.
+- **Only what an answer needs goes to the AI provider you chose**, and the app names it before anything is sent: the meal's photo or words, and the context for that answer (your goal, your day's numbers). Never your name, email or password. Barcodes go to Open Food Facts.
+- **Your AI key or ChatGPT session stays in the phone's Keychain** (Keystore on Android): never in backups, never sent anywhere but to the provider.
 - **No analytics, no tracking, no ads**, in the app or on the server.
-- **Export everything** as JSON, or **delete your account**, from the app.
+- **Back up or export everything**, move it between your phone and a server, or **delete it all**, from the app.
+- The full policy, for the stores and for you: **[PRIVACY.md](PRIVACY.md)**.
 - **Not a medical device.** Plans are conservative by design (calorie floors, capped deficits), but if you have a medical condition, are pregnant, or have a history of eating disorders, ask a professional before following any nutrition target.
 
 ## FAQ
@@ -162,14 +176,14 @@ This builds the app, with its watch app and widgets on iOS, and opens it in the 
 <details>
 <summary><b>Do I need an API key?</b></summary>
 
-For the AI, yes: a key from Anthropic or another provider, which you pay per use, directly. Symbiose takes nothing. A local model through Ollama needs no key at all.
+No. On your phone, a ChatGPT Plus or Pro plan is enough: tap **Continue with ChatGPT**. Under **Advanced settings**, you can sign in to OpenRouter or paste a key from Anthropic, OpenAI, Google or Mistral, paid per use, directly. A local model through Ollama needs no key at all. Symbiose takes nothing.
 
 </details>
 
 <details>
 <summary><b>Which AI should I use?</b></summary>
 
-Claude, the default: the prompts were written and tuned on it. OpenAI, Mistral, Gemini, OpenRouter, Ollama and any OpenAI-compatible server work too, through one setting. The server's start-up log says which model answers.
+On your phone, the simplest is your ChatGPT plan. Claude is the reference: the prompts were written and tuned on it, through a key or OpenRouter. OpenAI, Mistral, Gemini, Ollama and any OpenAI-compatible server work too. On a server, one setting picks the provider and its start-up log says which model answers.
 
 </details>
 
@@ -177,6 +191,13 @@ Claude, the default: the prompts were written and tuned on it. OpenAI, Mistral, 
 <summary><b>Does it work without AI?</b></summary>
 
 Yes. Barcodes, manual logging, portions, Trends, Health sync, the watch and widgets all work, and a keyword-based planner turns your goal into a reasonable plan. Photo and text meals, the coach and the reviews need an AI.
+
+</details>
+
+<details>
+<summary><b>Do I need a server?</b></summary>
+
+No. The app runs on its own: your data stays on your phone and the AI is the one you connect. A server is for using Symbiose on several devices, letting the watch work without the iPhone, or sharing one installation with your family.
 
 </details>
 
@@ -190,29 +211,38 @@ Yes. With `SIGNUP=open`, anyone who can reach the server gets an account, fine o
 <details>
 <summary><b>How is it different from MyFitnessPal or Cal AI?</b></summary>
 
-Symbiose starts from your goal rather than from calories: if you're cutting sugar, sugar is the number you see. AI estimates are checked by code before you see them, a coach knows your whole day, and everything runs on your server. It's open source, with no subscription, no ads and no paywall.
+Symbiose starts from your goal rather than from calories: if you're cutting sugar, sugar is the number you see. AI estimates are checked by code before you see them, a coach knows your whole day, and everything runs on your phone or your own server. It's open source, with no subscription, no ads and no paywall.
 
 </details>
 
 ## Architecture
 
+The same API (`packages/core`) runs in two places: inside the app, on the phone's SQLite, or on your server.
+
 ```mermaid
 flowchart LR
-  app["App<br/>iOS · Android"] -->|JSON| api
-  wrist["Apple Watch<br/>widgets"] -->|JSON| api
+  app["App<br/>iOS · Android"] -->|in memory| phone
+  app -->|JSON| api
+  wrist["Apple Watch<br/>widgets"] --> app
+  wrist -->|JSON| api
   health["Apple Health<br/>Health Connect"] <--> app
-  subgraph server["Your server · one container"]
-    api["Hono API"] --> db[("SQLite<br/>+ photos")]
-    api --> math["Nutrition math<br/>(shared, tested)"]
+  subgraph phone["On the phone"]
+    core1["Symbiose API"] --> db1[("SQLite<br/>+ photos")]
   end
-  api --> ai["Claude, or another<br/>AI provider"]
-  api --> off["Open Food Facts"]
+  subgraph server["Or your server · one container"]
+    api["Symbiose API"] --> db[("SQLite<br/>+ photos")]
+  end
+  core1 --> ai["ChatGPT plan, Claude,<br/>or another AI provider"]
+  api --> ai
+  core1 --> off["Open Food Facts"]
+  api --> off
 ```
 
 ```
-apps/server       Hono + SQLite (Drizzle) API, the AI adapters, one Docker image
-apps/mobile       Expo Router app (iOS, Android, web), with the watch app and widgets in targets/
-packages/shared   Types, zod schemas and the nutrition math both sides use
+packages/core     The API: routes, services, AI adapters, schema and migrations, free of Node APIs
+apps/server       The Node host: accounts, admin, backups, one Docker image
+apps/mobile       Expo Router app (iOS, Android, web), the API on the phone in src/local, the watch app and widgets in targets/
+packages/shared   Types, zod schemas and the nutrition math every side uses
 website/          The public site (Vite + React)
 docs/             Architecture, self-hosting, watch and health, brand
 ```

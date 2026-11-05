@@ -18,6 +18,12 @@ export type OutboxEntry = {
   emoji: string | null;
   /** Set when the server refused it for good: shown on the card until retried or deleted. */
   error: string | null;
+  /**
+   * On a phone without a server: the AI isn't ready (none chosen yet, ChatGPT
+   * to reconnect, its limit reached). The capture waits for it, as it would
+   * for the network, and goes as soon as the AI is back.
+   */
+  waitingFor?: 'ai' | null;
   /** Where it goes (see `CourseTarget`): the meal it follows, as the capture screen said. Absent: a new meal. */
   course?: CourseTarget;
 } & (
@@ -39,6 +45,13 @@ export function isNetworkStatus(status: number): boolean {
 export function isRetryableStatus(status: number): boolean {
   return isNetworkStatus(status) || status === 408 || status === 429;
 }
+
+/**
+ * The AI chosen on the phone isn't ready yet: no AI, ChatGPT to sign in to
+ * again, a plan that can't be used here, its limit reached. Not a failure of
+ * the capture: it waits for the AI.
+ */
+export const AI_NOT_READY: ReadonlySet<string> = new Set(['ai_disabled', 'ai_reconnect', 'ai_not_eligible', 'ai_plan_limit']);
 
 /** The gateway gave up before the server did: the server may still be finishing the first request. */
 export function mayStillBeProcessing(status: number): boolean {

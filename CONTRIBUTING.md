@@ -53,9 +53,14 @@ cd website && npm run build      # if you touched the website
 - **Motion with purpose.** Use the primitives in `apps/mobile/src/components/ui`
   (`Pressy`, `Reveal`, `Ring`, `Bar`, `AnimatedNumber`, `SwapIcon`) so press
   feedback, haptics and easing stay consistent.
-- **Database changes** are Drizzle migrations: edit `apps/server/src/db/schema.ts`,
-  then `npx drizzle-kit generate --name <what>` in `apps/server`. The server
-  applies them at start-up, after a backup.
+- **The API lives in `packages/core`** (routes, services, AI adapters, schema)
+  and runs in two places: the Node server (`apps/server`) and the app on its
+  own (`apps/mobile/src/local`). Keep it free of Node APIs: no `node:` imports,
+  `Buffer` or `process` (its `tsconfig` refuses them).
+- **Database changes** are Drizzle migrations: edit `packages/core/src/db/schema.ts`,
+  then `pnpm --filter @symbiose/core db:generate --name <what>`. It writes the
+  migration and bundles it for the app; CI checks the bundle is up to date. The
+  server applies migrations at start-up, after a backup; the app when it opens.
 
 ## Reporting
 

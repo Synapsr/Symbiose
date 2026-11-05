@@ -1,11 +1,14 @@
 import Foundation
 
-/// The few Symbiose endpoints the watch calls, straight to the server.
+/// The few Symbiose endpoints the watch calls, straight to the server, or to the
+/// iPhone app when Symbiose runs there without a server (`PhoneLink`).
 struct API {
   enum Failure: Error, Equatable {
     case offline
     case unauthorized
     case server(String)
+    /// No server, iPhone out of reach: the change waits for the iPhone app.
+    case queued
   }
 
   let credentials: Credentials
@@ -53,6 +56,12 @@ struct API {
   }
 
   private func send<T: Decodable>(_ method: String, _ path: String, body: [String: Any]? = nil, timeout: TimeInterval = 20) async throws -> T {
+    if PhoneLink.isLocal(credentials.serverUrl) {
+      let reply = try await PhoneLink.send(method, path, body: try body.map { try JSONSerialization.data(withJSONObject: $0) }, timeout: timeout)
+      // The iPhone answered, but its AI or the network didn't: like a server out of reach.
+      if reply.status == 0 || reply.status == 503 { throw Failure.offline }
+      return try decode(status: reply.status, data: reply.body)
+    }
     guard let url = URL(string: credentials.serverUrl + path) else { throw Failure.server("Bad server URL") }
     var request = URLRequest(url: url, timeoutInterval: timeout)
     request.httpMethod = method
@@ -70,7 +79,10 @@ struct API {
     } catch {
       throw Failure.offline
     }
-    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    return try decode(status: (response as? HTTPURLResponse)?.statusCode ?? 0, data: data)
+  }
+
+  private func decode<T: Decodable>(status: Int, data: Data) throws -> T {
     if status == 401 { throw Failure.unauthorized }
     guard (200 ..< 300).contains(status) else {
       let message = (try? JSONDecoder().decode(ErrorBody.self, from: data))?.error.message
@@ -104,5 +116,6 @@ struct CravingHelp: Decodable, Equatable {
   }
 
   var craving: Craving
-  var alternative: String
+  /// Null when the AI gave a tip without an alternative.
+  var alternative: String?
 }

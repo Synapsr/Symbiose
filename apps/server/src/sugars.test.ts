@@ -5,13 +5,13 @@ import { join } from 'node:path';
 import type { AuthResponse, CoachMessage, DaySummary, GoalsResponse, Meal, Profile } from '@symbiose/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createMockAi } from './ai/mock';
-import { coachText } from './ai/shared';
-import type { Ai, CoachInput, PlanDraft, PlanDraftInput } from './ai/types';
+import { createMockAi } from '@symbiose/core/ai/mock';
+import { coachText } from '@symbiose/core/ai/shared';
+import type { Ai, CoachInput, PlanDraft, PlanDraftInput } from '@symbiose/core/ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
 import type { Config } from './env';
-import { heuristicPlan, planFromDraft } from './services/goals';
+import { heuristicPlan, planFromDraft } from '@symbiose/core/services/goals';
 import { PhotoStore } from './services/photos';
 
 /**

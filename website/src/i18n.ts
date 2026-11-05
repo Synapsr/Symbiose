@@ -14,7 +14,7 @@ const fr = {
   meta: {
     title: 'Symbiose · Mange en conscience, pas en comptant.',
     description:
-      "Symbiose est un compagnon repas open source, piloté par l'IA. Dis ton objectif avec tes mots, photographie ton assiette : il calcule tout selon ce qui compte pour toi, sur ton propre serveur.",
+      "Symbiose est un compagnon repas open source, piloté par l'IA. Dis ton objectif avec tes mots, photographie ton assiette : il calcule tout selon ce qui compte pour toi, sur ton téléphone ou ton propre serveur.",
   },
   nav: {
     skip: 'Aller au contenu',
@@ -31,10 +31,10 @@ const fr = {
     primary: 'Navigation principale',
   },
   hero: {
-    eyebrow: ['Open source', 'Auto-hébergé', 'Licence MIT'],
+    eyebrow: ['Open source', 'Sans serveur ou auto-hébergé', 'Licence MIT'],
     title1: 'Mange en conscience,',
     title2: 'pas en comptant.',
-    lead: "Dis ce que tu veux changer, avec tes mots. Prends ton repas en photo. Symbiose calcule tout selon ton objectif, sur ton propre serveur.",
+    lead: "Dis ce que tu veux changer, avec tes mots. Prends ton repas en photo. Symbiose calcule tout selon ton objectif, sur ton téléphone ou sur ton propre serveur.",
     ctaPrimary: 'Héberger mon serveur',
     ctaSecondary: 'Voir le code',
     note: 'Sans abonnement, sans pub, sans paywall.',
@@ -47,7 +47,7 @@ const fr = {
     { value: '2', label: 'gestes pour noter un repas' },
     { value: '≤ 1', label: 'question, seulement si elle change le calcul' },
     { value: '0', label: 'abonnement, pub ou paywall' },
-    { value: '1', label: 'conteneur Docker, tes données chez toi' },
+    { value: '0', label: 'serveur nécessaire : tes données restent sur ton téléphone' },
   ],
   how: {
     kicker: 'Comment ça marche',
@@ -251,16 +251,16 @@ const fr = {
   privacy: {
     kicker: 'Vie privée',
     title: 'Tes données restent chez toi.',
-    body: "Symbiose tourne sur ton serveur : une image Docker, un volume. Pas de compte chez nous. D'ailleurs, il n'y a pas de « chez nous ».",
+    body: "Sur ton téléphone, sans rien installer : tu branches ton abonnement ChatGPT ou ta clé d'IA, et tes données ne quittent pas l'app. Ou sur ton serveur, pour tous tes appareils et toute la famille : une image Docker, un volume. Pas de compte chez nous. D'ailleurs, il n'y a pas de « chez nous ».",
     steps: [
       { title: 'Lance le serveur', body: 'Une commande. Ta clé d’IA (Claude par défaut, ou un autre fournisseur) active les photos, les plans, le coach et les bilans.' },
       { title: 'Ouvre sa page', body: 'http://ton-serveur:3000 affiche un QR code.' },
       { title: 'Scanne-le avec l’app', body: '« Scanner le QR du serveur », puis crée ton compte, le premier du serveur.' },
     ],
     facts: [
-      'Une base SQLite et un dossier de photos, dans un seul volume. Sauvegarde-le, c’est tout.',
-      'Export de toutes tes données en JSON. Suppression du compte quand tu veux.',
-      "Les photos et descriptions de repas ne partent que chez le fournisseur d'IA que tu as choisi, pour l'analyse. Rien d'autre ne quitte ton serveur.",
+      'Une base SQLite et un dossier de photos. Sur le téléphone, une sauvegarde tient en un fichier, photos comprises : range-la sur Google Drive ou iCloud Drive.',
+      'Tu passes du téléphone à un serveur, et retour, sans rien perdre. Suppression de tout quand tu veux.',
+      "Les photos et descriptions de repas ne partent que chez le fournisseur d'IA que tu as choisi, pour l'analyse, et l'app le nomme avant. Rien d'autre ne quitte ton téléphone ou ton serveur.",
       'Sans clé API, l’app reste utilisable : codes-barres, saisie manuelle, plan par mots-clés.',
       'Mise à jour : docker pull et redémarrage. Les migrations se font toutes seules.',
     ],
@@ -319,6 +319,9 @@ const fr = {
         status: 'wip',
         label: 'En cours',
         items: [
+          'Sans serveur : tout sur ton téléphone, avec ton abonnement ChatGPT ou ta clé d’IA',
+          'Sauvegarde en un fichier, et passage du téléphone à un serveur, dans les deux sens',
+          'Sur l’App Store et le Play Store',
           'Inscription sur demande, validée par l’admin de ton serveur',
           'Un petit espace admin : la consommation d’IA et l’usage, sans jamais voir tes données',
           'Une nouvelle identité, plus fraîche',
@@ -340,19 +343,19 @@ const fr = {
     items: [
       {
         q: 'C’est gratuit ?',
-        a: "Oui. Le code est sous licence MIT et tu héberges le serveur. La seule dépense, c'est ton usage de l'IA pour l'analyse (Claude par défaut, OpenAI, Mistral, Gemini, OpenRouter), ou rien avec un modèle local.",
+        a: "Oui. Le code est sous licence MIT, et Symbiose tourne sur ton téléphone ou sur ton serveur. Avec ton abonnement ChatGPT Plus ou Pro, rien de plus à payer ; avec une clé, tu paies ton usage directement à ton fournisseur d'IA ; avec un modèle local, rien.",
       },
       {
         q: 'Où télécharger l’app ?',
         a: "Elle n'est pas encore sur l'App Store ni sur le Play Store. Pour l'instant, on la compile depuis le dépôt avec Expo, sur son Mac ou son PC. Les étapes sont dans le README.",
       },
       {
-        q: 'Faut-il une clé API ?',
-        a: "Pour l'IA, oui : une clé Claude (par défaut) ou d'un autre fournisseur, ou un modèle local avec Ollama. Sans IA, Symbiose reste utilisable avec les codes-barres, la saisie manuelle et un plan établi à partir de mots-clés.",
+        q: 'Faut-il un serveur ou une clé API ?',
+        a: "Non. Sur ton téléphone, ton abonnement ChatGPT suffit : « Continuer avec ChatGPT ». Dans les paramètres avancés, tu peux aussi te connecter à OpenRouter ou coller une clé (Claude, OpenAI, Gemini, Mistral), ou viser un modèle local. Sans IA, Symbiose reste utilisable avec les codes-barres, la saisie manuelle et un plan établi à partir de mots-clés.",
       },
       {
         q: 'Qui voit mes photos ?',
-        a: "Ton serveur, et le fournisseur d'IA le temps de l'analyse. Rien d'autre : pas de traqueur, pas de pub, pas de revente.",
+        a: "Ton téléphone (ou ton serveur), et le fournisseur d'IA que tu as choisi, le temps de l'analyse. Rien d'autre : pas de traqueur, pas de pub, pas de revente.",
       },
       {
         q: 'Et sans montre ?',
@@ -389,7 +392,7 @@ const en: Dict = {
   meta: {
     title: 'Symbiose · Eat mindfully, not by counting.',
     description:
-      'Symbiose is an open-source, AI-first meal companion. State your goal in your own words, snap your plate: it works out what matters for you, on your own server.',
+      'Symbiose is an open-source, AI-first meal companion. State your goal in your own words, snap your plate: it works out what matters for you, on your phone or your own server.',
   },
   nav: {
     skip: 'Skip to content',
@@ -406,10 +409,10 @@ const en: Dict = {
     primary: 'Main navigation',
   },
   hero: {
-    eyebrow: ['Open source', 'Self-hosted', 'MIT licence'],
+    eyebrow: ['Open source', 'No server needed, or self-hosted', 'MIT licence'],
     title1: 'Eat mindfully,',
     title2: 'not by counting.',
-    lead: 'Say what you want to change, in your own words. Snap your meal. Symbiose works out the rest for your goal, on your own server.',
+    lead: 'Say what you want to change, in your own words. Snap your meal. Symbiose works out the rest for your goal, on your phone or on your own server.',
     ctaPrimary: 'Host my server',
     ctaSecondary: 'View the code',
     note: 'No subscription, no ads, no paywall.',
@@ -422,7 +425,7 @@ const en: Dict = {
     { value: '2', label: 'gestures to log a meal' },
     { value: '≤ 1', label: 'question, only when it changes the numbers' },
     { value: '0', label: 'subscriptions, ads or paywalls' },
-    { value: '1', label: 'Docker container, your data at home' },
+    { value: '0', label: 'servers needed: your data stays on your phone' },
   ],
   how: {
     kicker: 'How it works',
@@ -626,16 +629,16 @@ const en: Dict = {
   privacy: {
     kicker: 'Privacy',
     title: 'Your data stays with you.',
-    body: 'Symbiose runs on your server: one Docker image, one volume. No account with us. In fact, there is no “us” to hold it.',
+    body: 'On your phone, with nothing to install: connect your ChatGPT plan or your AI key, and your data never leaves the app. Or on your server, for all your devices and the whole family: one Docker image, one volume. No account with us. In fact, there is no “us” to hold it.',
     steps: [
       { title: 'Start the server', body: 'One command. Your AI key (Claude by default, or another provider) enables photos, plans, the coach and reviews.' },
       { title: 'Open its page', body: 'http://your-server:3000 shows a QR code.' },
       { title: 'Scan it with the app', body: '“Scan the server QR code”, then create your account, the server’s first.' },
     ],
     facts: [
-      'One SQLite database and a photos folder, in a single volume. Back it up and you’re done.',
-      'Export all your data as JSON. Delete your account whenever you want.',
-      'Meal photos and descriptions only go to the AI provider you chose, for analysis. Nothing else leaves your server.',
+      'One SQLite database and a photos folder. On the phone, a backup is one file, photos included: keep it on Google Drive or iCloud Drive.',
+      'Move from your phone to a server and back without losing a thing. Delete everything whenever you want.',
+      'Meal photos and descriptions only go to the AI provider you chose, for analysis, and the app names it first. Nothing else leaves your phone or your server.',
       'Without an API key the app still works: barcodes, manual logging, keyword-based plans.',
       'Updating is docker pull and a restart. Migrations run on their own.',
     ],
@@ -694,6 +697,9 @@ const en: Dict = {
         status: 'wip',
         label: 'In progress',
         items: [
+          'No server needed: everything on your phone, with your ChatGPT plan or your AI key',
+          'Backups as one file, and moving from your phone to a server, both ways',
+          'On the App Store and Google Play',
           'Sign-up on request, approved by your server’s admin',
           'A small admin space: AI usage and activity, never your data',
           'A fresher identity',
@@ -715,19 +721,19 @@ const en: Dict = {
     items: [
       {
         q: 'Is it free?',
-        a: 'Yes. The code is MIT-licensed and you host the server. Your only cost is your AI usage for analysis (Claude by default, OpenAI, Mistral, Gemini, OpenRouter), or nothing with a local model.',
+        a: 'Yes. The code is MIT-licensed, and Symbiose runs on your phone or your server. With a ChatGPT Plus or Pro plan there is nothing more to pay; with a key, you pay your AI provider for what you use; with a local model, nothing.',
       },
       {
         q: 'Where do I get the app?',
         a: 'It isn’t on the App Store or Play Store yet. For now you build it from the repository with Expo, on your Mac or PC. The steps are in the README.',
       },
       {
-        q: 'Do I need an API key?',
-        a: 'For the AI, yes: a Claude key (the default) or another provider’s, or a local model with Ollama. Without AI, Symbiose still works with barcodes, manual logging and a keyword-based plan.',
+        q: 'Do I need a server or an API key?',
+        a: 'No. On your phone, your ChatGPT plan is enough: “Continue with ChatGPT”. Under advanced settings you can also sign in to OpenRouter, paste a key (Claude, OpenAI, Gemini, Mistral) or point to a local model. Without AI, Symbiose still works with barcodes, manual logging and a keyword-based plan.',
       },
       {
         q: 'Who sees my photos?',
-        a: 'Your server, and the AI provider while it analyses them. Nobody else: no trackers, no ads, no data resale.',
+        a: 'Your phone (or your server), and the AI provider you chose while it analyses them. Nobody else: no trackers, no ads, no data resale.',
       },
       {
         q: 'What if I don’t have a watch?',

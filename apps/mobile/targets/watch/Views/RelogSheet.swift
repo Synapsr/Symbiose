@@ -9,14 +9,14 @@ struct RelogSheet: View {
   @State private var phase = Phase.waiting
   @State private var countdown: CGFloat = 1
 
-  enum Phase: Equatable { case waiting, sending, done, failed(String) }
+  enum Phase: Equatable { case waiting, sending, done, queued, failed(String) }
 
   private static let undoWindow: Double = 2.4
 
   var body: some View {
     let copy = model.copy
     VStack(spacing: 6) {
-      MealBadge(emoji: meal.emoji, progress: phase == .waiting ? countdown : 1, done: phase == .done, busy: phase == .sending)
+      MealBadge(emoji: meal.emoji, progress: phase == .waiting ? countdown : 1, done: phase == .done || phase == .queued, busy: phase == .sending)
       Text(meal.title)
         .font(.rounded(16, .semibold))
         .multilineTextAlignment(.center)
@@ -34,6 +34,8 @@ struct RelogSheet: View {
           Text(copy.adding).font(.rounded(14, .medium)).foregroundStyle(Palette.text2).frame(minHeight: 44)
         case .done:
           Text(copy.logged).font(.rounded(15, .semibold)).foregroundStyle(Palette.accent).frame(minHeight: 44)
+        case .queued:
+          Text(copy.queuedShort).font(.rounded(14, .semibold)).foregroundStyle(Palette.accent).multilineTextAlignment(.center).frame(minHeight: 44)
         case let .failed(message):
           VStack(spacing: 4) {
             Text(message).font(.rounded(12, .medium)).foregroundStyle(Palette.warning).multilineTextAlignment(.center)
@@ -61,6 +63,11 @@ struct RelogSheet: View {
       Haptic.success()
       phase = .done
       try? await Task.sleep(for: .seconds(1.1))
+      dismiss()
+    } catch API.Failure.queued {
+      Haptic.success()
+      phase = .queued
+      try? await Task.sleep(for: .seconds(1.6))
       dismiss()
     } catch {
       Haptic.failure()

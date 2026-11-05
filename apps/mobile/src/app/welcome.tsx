@@ -1,116 +1,61 @@
-import type { ServerInfo } from '@symbiose/shared';
-import { router } from 'expo-router';
-import { QrCode } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
+import { Redirect, router } from 'expo-router';
+import { ArchiveRestore, Server } from 'lucide-react-native';
+import { useState } from 'react';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Dot, Field, IconButton, Pressy, Reveal, Row, Txt } from '@/components/ui';
-import { KeyboardAvoiding } from '@/components/ui/keyboard-avoiding';
+import { Button, Pressy, Reveal, Row, Txt } from '@/components/ui';
 import { Logo } from '@/components/ui/logo';
 import { Wordmark } from '@/components/ui/wordmark';
 import { useI18n } from '@/i18n';
-import { ApiError, authenticate, getServerInfo, normalizeServerUrl } from '@/lib/api';
 import { haptics } from '@/lib/haptics';
 import { useSession } from '@/lib/session';
-import { useScannedServer } from '@/lib/stores';
+import { useToast } from '@/lib/stores';
+import { restoreBackupFromPicker } from '@/local/backup-actions';
+import { localModeAvailable } from '@/local/transport';
 import { Space, useTheme } from '@/theme';
 
-type ServerState = { status: 'idle' | 'checking' | 'error' } | { status: 'ok'; info: ServerInfo };
-
-// Builds can ship with a server pre-filled (EXPO_PUBLIC_SERVER_URL), e.g. for TestFlight.
-const DEFAULT_SERVER = process.env.EXPO_PUBLIC_SERVER_URL ?? (Platform.OS === 'web' ? 'http://localhost:3000' : '');
-
+/**
+ * The first screen: one promise, one button. Symbiose starts on this phone,
+ * nothing to install; a backup or a server are there for those who have one.
+ */
 export default function Welcome() {
   const { t } = useI18n();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signIn } = useSession();
+  const { startOnPhone } = useSession();
+  const showToast = useToast((s) => s.show);
+  const [busy, setBusy] = useState<'start' | 'restore' | null>(null);
 
-  const [server, setServer] = useState(DEFAULT_SERVER);
-  const [probe, setProbe] = useState<{ url: string; info: ServerInfo | null } | null>(null);
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // The web build is a development tool: it always talks to a server.
+  if (!localModeAvailable) return <Redirect href="/server" />;
 
-  // The QR scanner screen hands the address back through a tiny store.
-  useEffect(
-    () =>
-      useScannedServer.subscribe((state) => {
-        if (!state.url) return;
-        setServer(state.url);
-        state.set(null);
-      }),
-    [],
-  );
-
-  // Probe the server as the address is typed.
-  const url = normalizeServerUrl(server);
-  useEffect(() => {
-    if (url.length < 10) return;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      getServerInfo(url)
-        .then((info) => {
-          if (cancelled) return;
-          setProbe({ url, info: info.name === 'symbiose' ? info : null });
-          if (info.name === 'symbiose') setMode(info.hasUsers ? 'login' : 'register');
-        })
-        .catch(() => !cancelled && setProbe({ url, info: null }));
-    }, 450);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [url]);
-
-  const serverState: ServerState =
-    url.length < 10
-      ? { status: 'idle' }
-      : probe?.url !== url
-        ? { status: 'checking' }
-        : probe.info
-          ? { status: 'ok', info: probe.info }
-          : { status: 'error' };
-
-  const submit = async () => {
-    setError(null);
-    setBusy(true);
+  const start = async () => {
+    setBusy('start');
     try {
-      const res = await authenticate(url, mode, { email, password });
+      await startOnPhone();
       haptics.success();
-      await signIn({ serverUrl: url, token: res.token }, res.user);
-    } catch (e) {
+    } catch {
       haptics.warning();
-      if (e instanceof ApiError && e.code === 'signup_closed') setError(t('welcome.signupClosed'));
-      else if (e instanceof ApiError && e.code === 'email_reserved') setError(t('admin.emailReserved'));
-      else setError(e instanceof ApiError ? (e.status === 0 ? t('common.offline') : e.message) : t('common.error'));
-    } finally {
-      setBusy(false);
+      showToast({ message: t('common.error') });
+      setBusy(null);
     }
   };
 
-  const ok = serverState.status === 'ok';
-  const statusText =
-    serverState.status === 'checking'
-      ? t('welcome.checking')
-      : serverState.status === 'error'
-        ? t('welcome.serverKo')
-        : serverState.status === 'ok'
-          ? serverState.info.ai.enabled
-            ? t('welcome.serverOk')
-            : t('welcome.serverAiOff')
-          : null;
-  const statusColor = serverState.status === 'ok' ? colors.accent : serverState.status === 'error' ? colors.warning : colors.text3;
-  const canSubmit = ok && email.includes('@') && password.length >= 8;
+  const restore = async () => {
+    setBusy('restore');
+    try {
+      const restored = await restoreBackupFromPicker(t);
+      if (restored) await startOnPhone();
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
-    <KeyboardAvoiding style={{ flex: 1, backgroundColor: colors.bg }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingTop: insets.top + Space.xxxl, paddingBottom: insets.bottom + Space.xxl, paddingHorizontal: Space.xxl, gap: Space.xxl, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
+        contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + Space.xxxl, paddingHorizontal: Space.xxl, gap: Space.xxl, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
         <Reveal index={0}>
           <Row gap={Space.sm}>
             <Logo size={40} animated />
@@ -133,77 +78,33 @@ export default function Welcome() {
             </Txt>
           </Reveal>
         </View>
+      </ScrollView>
 
-        <Reveal index={6} style={{ gap: Space.md }}>
-          <Row gap={Space.sm} style={{ alignItems: 'flex-end' }}>
-            <View style={{ flex: 1 }}>
-              <Field
-                label={t('welcome.server')}
-                value={server}
-                onChangeText={setServer}
-                placeholder={t('welcome.serverHint')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                textContentType="URL"
-              />
-            </View>
-            {Platform.OS !== 'web' ? (
-              <IconButton label={t('welcome.scan')} size={54} icon={<QrCode size={22} color={colors.text} />} onPress={() => router.push('/scan-server')} />
-            ) : null}
-          </Row>
-          {statusText ? (
-            <Row gap={6} style={{ marginLeft: 4 }}>
-              <Dot color={statusColor} />
-              <Txt variant="caption" tone="secondary">
-                {statusText}
+      {/* Where the thumb is. */}
+      <Reveal index={6} style={{ paddingHorizontal: Space.xxl, paddingBottom: insets.bottom + Space.lg, gap: Space.md, maxWidth: 520, width: '100%', alignSelf: 'center' }}>
+        <Button title={t('welcome.start')} onPress={() => void start()} loading={busy === 'start'} disabled={busy !== null} />
+        <Txt variant="caption" tone="tertiary" style={{ textAlign: 'center' }}>
+          {t('welcome.startNote')}
+        </Txt>
+        <Row style={{ justifyContent: 'center', gap: Space.lg, marginTop: Space.sm, flexWrap: 'wrap' }}>
+          <Pressy onPress={() => void restore()} disabled={busy !== null} style={{ padding: Space.sm }} accessibilityRole="button">
+            <Row gap={6}>
+              <ArchiveRestore size={15} color={colors.text2} />
+              <Txt variant="label" tone="secondary">
+                {t('welcome.haveBackup')}
               </Txt>
             </Row>
-          ) : null}
-        </Reveal>
-
-        {ok ? (
-          <Reveal style={{ gap: Space.md }}>
-            <Field
-              label={t('welcome.email')}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-            <Field
-              label={t('welcome.password')}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-              textContentType={mode === 'register' ? 'newPassword' : 'password'}
-              onSubmitEditing={() => canSubmit && void submit()}
-            />
-            {mode === 'register' && serverState.info.signup === 'request' && serverState.info.hasUsers ? (
-              <Txt variant="caption" tone="secondary" style={{ marginLeft: 4 }}>
-                {t('admin.signupOnRequest')}
+          </Pressy>
+          <Pressy onPress={() => router.push('/server')} disabled={busy !== null} style={{ padding: Space.sm }} accessibilityRole="button">
+            <Row gap={6}>
+              <Server size={15} color={colors.text2} />
+              <Txt variant="label" tone="secondary">
+                {t('welcome.haveServer')}
               </Txt>
-            ) : null}
-            {error ? (
-              <Txt variant="caption" tone="warning" style={{ marginLeft: 4 }}>
-                {error}
-              </Txt>
-            ) : null}
-            <Button title={mode === 'register' ? t('welcome.signUp') : t('welcome.signIn')} onPress={submit} loading={busy} disabled={!canSubmit} style={{ marginTop: Space.sm }} />
-            {serverState.info.signupOpen || mode === 'register' ? (
-              <Pressy onPress={() => setMode(mode === 'login' ? 'register' : 'login')} style={{ alignSelf: 'center', padding: Space.sm }}>
-                <Txt variant="label" tone="secondary">
-                  {mode === 'login' ? t('welcome.toSignUp') : t('welcome.toSignIn')}
-                </Txt>
-              </Pressy>
-            ) : null}
-          </Reveal>
-        ) : null}
-      </ScrollView>
-    </KeyboardAvoiding>
+            </Row>
+          </Pressy>
+        </Row>
+      </Reveal>
+    </View>
   );
 }

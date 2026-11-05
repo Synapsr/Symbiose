@@ -3,10 +3,13 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 
-import { requireAuth, type AuthEnv } from '../auth';
-import { users } from '../db/schema';
-import { HttpError } from '../errors';
-import { validate, type Deps } from '../http';
+import type { AuthEnv } from '@symbiose/core/auth';
+import { users } from '@symbiose/core/db/schema';
+import { HttpError } from '@symbiose/core/errors';
+import { validate } from '@symbiose/core/http';
+
+import { requireAuth } from '../auth';
+import type { ServerDeps } from '../http';
 import { adminOverview, approveRequest, isAdmin, pendingRequests, refuseRequest } from '../services/admin';
 
 /**
@@ -15,7 +18,7 @@ import { adminOverview, approveRequest, isAdmin, pendingRequests, refuseRequest 
  * 404 would hide nothing, and a clear refusal helps an owner who forgot to list
  * their email). The log says who looked, never what they saw.
  */
-export function adminRoutes(deps: Deps) {
+export function adminRoutes(deps: ServerDeps) {
   const { db, config } = deps;
   const app = new Hono<AuthEnv>();
   app.use(requireAuth(config.jwtSecret));

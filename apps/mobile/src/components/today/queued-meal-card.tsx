@@ -54,7 +54,7 @@ export function QueuedMealCard({ entry, sending, onRetry, onDelete }: { entry: O
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const refused = Boolean(entry.error) && !sending;
-  const status = sending ? t('outbox.sending') : (entry.error ?? t('outbox.waiting'));
+  const status = sending ? t('outbox.sending') : (entry.error ?? (entry.waitingFor === 'ai' ? t('outbox.waitingAi') : t('outbox.waiting')));
   const actions = open && !sending;
   const StatusIcon = sending ? CloudUpload : refused ? TriangleAlert : CloudOff;
 

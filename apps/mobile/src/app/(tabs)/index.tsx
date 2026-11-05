@@ -1,6 +1,6 @@
 import { addDays, mealCarbLoad, type Craving, type JournalEntry, type Meal, type MoodCheckIn, type Workout } from '@symbiose/shared';
 import { router, useFocusEffect } from 'expo-router';
-import { Camera, ChevronRight, CloudOff, Flame } from 'lucide-react-native';
+import { Camera, ChevronRight, CloudOff, Flame, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PanResponder, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -26,10 +26,11 @@ import { useBottomOverlap } from '@/lib/keyboard';
 import { dropEntry, isNetworkError, retryEntry, useOutbox, type OutboxEntry } from '@/lib/outbox';
 import { timeline, type TimelineRow } from '@/lib/outbox-logic';
 import { useGoalRewards, useGoodDay } from '@/lib/rewards';
-import { useUser } from '@/lib/session';
+import { useSession, useUser } from '@/lib/session';
 import { usePending, useSettings, useToast } from '@/lib/stores';
 import { useHiddenIds } from '@/lib/undo';
 import { dayVoice, greeting } from '@/lib/voice';
+import { useAiSettings } from '@/local/ai-settings';
 import { Radius, Space, useTheme } from '@/theme';
 
 /** Today opens many times a day: its entrance plays once per session, then it simply appears. */
@@ -188,6 +189,8 @@ export default function Today() {
                   </View>
                   {queued.length ? <WaitingNote count={queued.length} /> : null}
                 </View>
+                {/* On a phone without a server: no AI yet, or meals waiting for it. */}
+                {isToday ? <AiNotice waitingForAi={outbox.some((entry) => entry.waitingFor === 'ai')} /> : null}
                 {/* Day 1, or a new morning: the invitation comes right under the hero. */}
                 {empty && isToday ? <Invite date={date} /> : null}
                 <StatusRow day={data} />
@@ -296,6 +299,34 @@ function Invite({ date }: { date: string }) {
 }
 
 /** The totals only count meals the server confirmed: said quietly under the hero. */
+/** One calm line when the AI is missing on a phone without a server, and the way to connect it. */
+function AiNotice({ waitingForAi }: { waitingForAi: boolean }) {
+  const { t } = useI18n();
+  const { colors } = useTheme();
+  const { onPhone } = useSession();
+  const aiChoice = useAiSettings((s) => s.choice);
+  const aiLoaded = useAiSettings((s) => s.loaded);
+  if (!onPhone || !aiLoaded || (aiChoice && !waitingForAi)) return null;
+  return (
+    <Animated.View entering={FadeIn.duration(260)}>
+      <Pressy onPress={() => router.push('/ai-setup')} accessibilityRole="button">
+        <Card padded={false} style={{ flexDirection: 'row', alignItems: 'center', gap: Space.md, padding: Space.lg }}>
+          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
+            <Sparkles size={18} color={colors.accentText} />
+          </View>
+          <Txt variant="caption" tone="secondary" style={{ flex: 1, fontSize: 14, lineHeight: 19 }}>
+            {aiChoice ? t('outbox.waitingAi') : t('today.noAi')}
+          </Txt>
+          <Txt variant="label" tone="accent">
+            {aiChoice ? t('me.ai') : t('today.noAiAction')}
+          </Txt>
+          <ChevronRight size={16} color={colors.accentText} />
+        </Card>
+      </Pressy>
+    </Animated.View>
+  );
+}
+
 function WaitingNote({ count }: { count: number }) {
   const { t } = useI18n();
   const { colors } = useTheme();
