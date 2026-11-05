@@ -36,7 +36,9 @@ struct CravingSheet: View {
           ProgressView().frame(maxWidth: .infinity, minHeight: 120)
         case let .tip(help):
           section(copy.cravingTip, systemImage: "sparkles", color: Palette.accent, text: help.craving.tip ?? "")
-          section(copy.cravingAlternative, systemImage: "lightbulb", color: Palette.warning, text: help.alternative)
+          if let alternative = help.alternative, !alternative.isEmpty {
+            section(copy.cravingAlternative, systemImage: "lightbulb", color: Palette.warning, text: alternative)
+          }
           Button {
             Task { await settle(help, resisted: true) }
           } label: {
@@ -83,10 +85,16 @@ struct CravingSheet: View {
     .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Palette.surface2))
   }
 
+  /// The craving waits for the iPhone (no server, out of reach): a tip from the watch meanwhile.
+  private static let queuedId = "queued"
+
   private func ask(_ what: String) async {
     phase = .thinking
     do {
       phase = .tip(try await model.craving(what))
+    } catch API.Failure.queued {
+      let copy = model.copy
+      phase = .tip(CravingHelp(craving: .init(id: Self.queuedId, tip: copy.cravingOfflineTip), alternative: copy.cravingOfflineAlternative))
     } catch {
       Haptic.failure()
       phase = .failed(model.message(for: error))
@@ -95,7 +103,17 @@ struct CravingSheet: View {
 
   private func settle(_ help: CravingHelp, resisted: Bool) async {
     do {
-      try await model.settleCraving(help, resisted: resisted)
+      // A craving still waiting for the iPhone has no id yet: its outcome stays on the wrist.
+      if help.craving.id != Self.queuedId { try await model.settleCraving(help, resisted: resisted) }
+      if resisted {
+        Haptic.success()
+        phase = .beaten
+        try? await Task.sleep(for: .seconds(1.6))
+        dismiss()
+      } else {
+        phase = .gaveIn
+      }
+    } catch API.Failure.queued {
       if resisted {
         Haptic.success()
         phase = .beaten

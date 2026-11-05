@@ -19,12 +19,12 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createDisabledAi } from './ai/claude';
-import { createMockAi } from './ai/mock';
-import type { Ai, CoachInput, MorningInput, NudgesInput } from './ai/types';
+import { createDisabledAi } from '@symbiose/core/ai/claude';
+import { createMockAi } from '@symbiose/core/ai/mock';
+import type { Ai, CoachInput, MorningInput, NudgesInput } from '@symbiose/core/ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
-import { coachMessages, vitals } from './db/schema';
+import { coachMessages, vitals } from '@symbiose/core/db/schema';
 import type { Config } from './env';
 import { PhotoStore } from './services/photos';
 

@@ -6,11 +6,11 @@ import type { AuthResponse, CoachMealActionResult, CoachMessage, DaySummary, Foo
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createMockAi } from './ai/mock';
-import type { Ai, AnalyzedItem, CoachInput, MealAnalysis, MealAnalysisInput } from './ai/types';
+import { createMockAi } from '@symbiose/core/ai/mock';
+import type { Ai, AnalyzedItem, CoachInput, MealAnalysis, MealAnalysisInput } from '@symbiose/core/ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
-import { coachMessages, meals } from './db/schema';
+import { coachMessages, meals } from '@symbiose/core/db/schema';
 import type { Config } from './env';
 import { PhotoStore } from './services/photos';
 

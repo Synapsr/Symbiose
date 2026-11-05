@@ -1,5 +1,14 @@
 # Self-hosting
 
+You don't need a server to use Symbiose: the app runs on its own, with your data on your phone and the AI you connect (your ChatGPT plan, or a key). A server is worth it when you want:
+
+- Symbiose on **several devices** (an iPhone and an iPad, a new phone without moving a backup);
+- the **Apple Watch on its own**, without the iPhone nearby;
+- **one AI key for the whole family**, with an account each and an admin view;
+- your data on a machine you run, with backups you control.
+
+Someone already using Symbiose on their phone moves to your server from the app: **Me → Your data → Move to a Symbiose server**, then they sign in. Their data (photos included) lands in their account. The way back is **Bring my data back to this phone**.
+
 The Symbiose server is one small Docker image (amd64 and arm64) and one volume. Releases are published on Docker Hub as `synapsr/symbiose` and on GitHub as `ghcr.io/synapsr/symbiose`: use either. It needs no database server, no mail server and no account anywhere, except at the AI provider you choose.
 
 ## Start

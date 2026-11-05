@@ -8,18 +8,20 @@ WORKDIR /repo
 # better-sqlite3 ships prebuilt binaries for linux/musl.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json packages/shared/
+COPY packages/core/package.json packages/core/
 COPY apps/server/package.json apps/server/
 COPY apps/mobile/package.json apps/mobile/
 RUN pnpm install --frozen-lockfile --ignore-scripts --filter "@symbiose/server..."
 
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
+COPY packages/core packages/core
 COPY apps/server apps/server
 RUN pnpm --filter @symbiose/server build \
  && mkdir -p /out/node_modules \
  && cp -r node_modules/better-sqlite3 /out/node_modules/ \
  && rm -rf /out/node_modules/better-sqlite3/deps /out/node_modules/better-sqlite3/src /out/node_modules/better-sqlite3/build \
- && cp -r apps/server/dist apps/server/drizzle /out/ \
+ && cp -r apps/server/dist packages/core/drizzle /out/ \
  && printf '{"name":"symbiose-server","private":true,"type":"module"}\n' > /out/package.json
 
 FROM node:22-alpine

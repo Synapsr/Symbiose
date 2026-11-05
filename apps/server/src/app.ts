@@ -1,89 +1,52 @@
+import { createApp as createApi } from '@symbiose/core';
+import { users } from '@symbiose/core/db/schema';
+import { JSON_BODY_LIMIT, limitBody } from '@symbiose/core/http';
 import { count } from 'drizzle-orm';
-import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 
-import type { ServerInfo } from '@symbiose/shared';
-
-import { blockPending } from './auth';
-import { users } from './db/schema';
+import { blockPending, requireAuth } from './auth';
 import { signupMode, VERSION } from './env';
-import { HttpError } from './errors';
-import { JSON_BODY_LIMIT, limitBody, type Deps } from './http';
+import type { ServerDeps } from './http';
 import { landingPage } from './landing';
-import { authRoutes, meRoutes } from './routes/account';
 import { adminRoutes } from './routes/admin';
-import { bloodPressureRoutes } from './routes/blood-pressure';
-import { coachRoutes } from './routes/coach';
-import { glanceRoutes } from './routes/glance';
-import { goalRoutes } from './routes/goals';
-import { hydrationRoutes } from './routes/hydration';
-import { journalRoutes } from './routes/journal';
-import { mealRoutes } from './routes/meals';
-import { moodRoutes } from './routes/mood';
-import { proactiveRoutes } from './routes/proactive';
-import { sleepRoutes } from './routes/sleep';
-import { trackingRoutes } from './routes/tracking';
-import { vitalsRoutes } from './routes/vitals';
-import { workoutRoutes } from './routes/workouts';
+import { authRoutes } from './routes/auth';
+import { backupRoutes } from './routes/backup';
 
-export function createApp(deps: Deps, options: { log?: boolean } = {}) {
+/**
+ * The server: the Symbiose API (packages/core) behind signed tokens, plus what
+ * only a server has: accounts and sign-up, the admin view, the QR page, CORS
+ * and body limits.
+ */
+export function createApp(deps: ServerDeps, options: { log?: boolean } = {}) {
   const { db, ai, config } = deps;
-  const app = new Hono();
+  const api = { ...deps, auth: requireAuth(config.jwtSecret) };
 
-  if (options.log) app.use(logger());
-  app.use('/api/*', cors({ origin: config.corsOrigins.includes('*') ? '*' : config.corsOrigins }));
-  // An oversized body is refused before it is read. A new meal sets its own, larger limit for the photo (routes/meals.ts).
-  const jsonLimit = limitBody(JSON_BODY_LIMIT);
-  app.use('/api/*', (c, next) => (c.req.method === 'POST' && c.req.path === '/api/meals' ? next() : jsonLimit(c, next)));
-  app.use('/api/*', blockPending(db, config.jwtSecret));
-
-  app.onError((error, c) => {
-    if (error instanceof HttpError) {
-      return c.json({ error: { code: error.code, message: error.message } }, error.status);
-    }
-    console.error(error);
-    return c.json({ error: { code: 'internal', message: 'Something went wrong' } }, 500);
+  return createApi(api, {
+    middleware(app) {
+      if (options.log) app.use(logger());
+      app.use('/api/*', cors({ origin: config.corsOrigins.includes('*') ? '*' : config.corsOrigins }));
+      // An oversized body is refused before it is read. A new meal (its photo) and a backup set their own, larger limits.
+      const jsonLimit = limitBody(JSON_BODY_LIMIT);
+      const ownLimit = new Set(['/api/meals', '/api/me/restore']);
+      app.use('/api/*', (c, next) => (c.req.method === 'POST' && ownLimit.has(c.req.path) ? next() : jsonLimit(c, next)));
+      app.use('/api/*', blockPending(db, config.jwtSecret));
+    },
+    signup() {
+      const hasUsers = (db.select({ n: count() }).from(users).get()?.n ?? 0) > 0;
+      return { signupOpen: !hasUsers || signupMode(config) !== 'closed', signup: signupMode(config), hasUsers };
+    },
+    routes(app) {
+      app.get('/health', (c) => c.json({ ok: true, version: VERSION }));
+      app.get('/', async (c) => {
+        const proto = c.req.header('x-forwarded-proto') ?? new URL(c.req.url).protocol.replace(':', '');
+        const host = c.req.header('x-forwarded-host') ?? c.req.header('host') ?? `localhost:${config.port}`;
+        const url = config.publicUrl ?? `${proto}://${host}`;
+        return c.html(await landingPage({ url, version: VERSION, aiEnabled: ai.enabled, model: ai.model }));
+      });
+      app.route('/api/auth', authRoutes(deps));
+      app.route('/api/me', backupRoutes(deps));
+      app.route('/api/admin', adminRoutes(deps));
+    },
   });
-  app.notFound((c) => c.json({ error: { code: 'not_found', message: 'Route not found' } }, 404));
-
-  app.get('/health', (c) => c.json({ ok: true, version: VERSION }));
-
-  app.get('/', async (c) => {
-    const proto = c.req.header('x-forwarded-proto') ?? new URL(c.req.url).protocol.replace(':', '');
-    const host = c.req.header('x-forwarded-host') ?? c.req.header('host') ?? `localhost:${config.port}`;
-    const url = config.publicUrl ?? `${proto}://${host}`;
-    return c.html(await landingPage({ url, version: VERSION, aiEnabled: ai.enabled, model: ai.model }));
-  });
-
-  app.get('/api/info', (c) => {
-    const hasUsers = (db.select({ n: count() }).from(users).get()?.n ?? 0) > 0;
-    return c.json<ServerInfo>({
-      name: 'symbiose',
-      version: VERSION,
-      ai: { enabled: ai.enabled, model: ai.model },
-      signupOpen: !hasUsers || signupMode(config) !== 'closed',
-      signup: signupMode(config),
-      hasUsers,
-    });
-  });
-
-  app.route('/api/auth', authRoutes(deps));
-  app.route('/api/me', meRoutes(deps));
-  app.route('/api/goals', goalRoutes(deps));
-  app.route('/api/meals', mealRoutes(deps));
-  app.route('/api/coach', coachRoutes(deps));
-  app.route('/api/workouts', workoutRoutes(deps));
-  app.route('/api/blood-pressure', bloodPressureRoutes(deps));
-  app.route('/api/sleep', sleepRoutes(deps));
-  app.route('/api/hydration', hydrationRoutes(deps));
-  app.route('/api/mood', moodRoutes(deps));
-  app.route('/api/glance', glanceRoutes(deps));
-  app.route('/api/journal', journalRoutes(deps));
-  app.route('/api/proactive', proactiveRoutes(deps));
-  app.route('/api/vitals', vitalsRoutes(deps));
-  app.route('/api/admin', adminRoutes(deps));
-  app.route('/api', trackingRoutes(deps));
-
-  return app;
 }

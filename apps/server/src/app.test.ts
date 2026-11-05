@@ -30,15 +30,15 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createDisabledAi } from './ai/claude';
-import { createMockAi } from './ai/mock';
-import type { Ai, CoachInput, CravingInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from './ai/types';
+import { createDisabledAi } from '@symbiose/core/ai/claude';
+import { createMockAi } from '@symbiose/core/ai/mock';
+import type { Ai, CoachInput, CravingInput, MealAnalysis, MealAnalysisInput, PlanDraftInput, ReviewInput } from '@symbiose/core/ai/types';
 import { createApp } from './app';
 import { openDb } from './db';
-import { coachMessages, journalEntries, moods, sleepNights, waterLogs } from './db/schema';
+import { coachMessages, journalEntries, moods, sleepNights, waterLogs } from '@symbiose/core/db/schema';
 import type { Config } from './env';
-import { JSON_BODY_LIMIT, MEAL_BODY_LIMIT } from './http';
-import { heuristicPlan, planFromDraft } from './services/goals';
+import { JSON_BODY_LIMIT, MEAL_BODY_LIMIT } from '@symbiose/core/http';
+import { heuristicPlan, planFromDraft } from '@symbiose/core/services/goals';
 import { PhotoStore } from './services/photos';
 
 const dir = mkdtempSync(join(tmpdir(), 'symbiose-test-'));

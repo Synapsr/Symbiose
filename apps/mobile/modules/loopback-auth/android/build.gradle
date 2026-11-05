@@ -1,0 +1,15 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'io.synapsr.symbiose.loopbackauth'
+version = '1.0.0'
+
+android {
+  namespace "io.synapsr.symbiose.loopbackauth"
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+  }
+}

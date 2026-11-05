@@ -27,6 +27,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # The app applies the migrations bundled in packages/core: they must match drizzle/.
+      - run: pnpm --filter @symbiose/core migrations:check
       - run: pnpm test
       - run: pnpm --filter @symbiose/mobile lint
 

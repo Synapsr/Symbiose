@@ -7,14 +7,17 @@ import { AppState } from 'react-native';
 import { create } from 'zustand';
 
 import { translate, useI18n } from '@/i18n';
+import { useAiSettings } from '@/local/ai-settings';
 
 import { ApiError, type Api } from './api';
 import { joinedCourse, withMeal, yourMeal } from './course-logic';
+import { explainApiError } from './error-texts';
 import { feedback } from './feedback';
 import { haptics } from './haptics';
 import { health } from './health';
 import { outboxPhotos } from './outbox-files';
 import {
+  AI_NOT_READY,
   backoffDelay,
   findSentMeal,
   isNetworkStatus,
@@ -150,10 +153,19 @@ export function dropEntry(id: string): Promise<void> {
 }
 
 function setError(id: string, error: string | null): void {
+  updateEntry(id, { error });
+}
+
+/** On a phone without a server: the capture waits for the AI (see `AI_NOT_READY`), or no longer does. */
+export function setWaitingFor(id: string, waitingFor: OutboxEntry['waitingFor']): void {
+  updateEntry(id, { waitingFor: waitingFor ?? null });
+}
+
+function updateEntry(id: string, patch: Partial<Pick<OutboxEntry, 'error' | 'waitingFor'>>): void {
   const { scope, items } = useOutbox.getState();
   const entry = items.find((i) => i.id === id);
-  if (!entry || entry.error === error) return;
-  const next: OutboxEntry = { ...entry, error };
+  if (!entry || Object.entries(patch).every(([key, value]) => (entry[key as keyof OutboxEntry] ?? null) === value)) return;
+  const next = { ...entry, ...patch } as OutboxEntry;
   useOutbox.setState((s) => ({ items: s.items.map((i) => (i.id === id ? next : i)) }));
   if (scope) void persist(() => storage.set(entryKey(scope, id), JSON.stringify(next)));
 }
@@ -213,7 +225,7 @@ function refusal(entry: OutboxEntry, error: unknown, locale: Locale): string {
     if (entry.kind === 'barcode') return translate(locale, 'capture.notFound');
     if (entry.kind === 'duplicate') return translate(locale, 'outbox.sourceGone');
   }
-  return error instanceof ApiError ? error.message : translate(locale, 'common.error');
+  return error instanceof ApiError ? (explainApiError(error) ?? error.message) : translate(locale, 'common.error');
 }
 
 // One runner for the whole app; the hook below gives it the API and the screens to refresh.
@@ -309,11 +321,13 @@ export function useOutboxSync() {
       flushing = true;
       cancelTimer();
       let sent = 0;
+      // Captures that wait for the AI (phone without a server) are skipped this time; the others go on.
+      const waiting = new Set<string>();
       try {
         for (;;) {
           const state = useOutbox.getState();
           if (state.scope !== scope) return;
-          const entry = nextToSend(state.items, new Set(state.live));
+          const entry = nextToSend(state.items, new Set([...state.live, ...waiting]));
           if (!entry) {
             failures = 0;
             return;
@@ -325,7 +339,14 @@ export function useOutboxSync() {
             landed(entry, meal, ++sent);
           } catch (error) {
             const status = error instanceof ApiError ? error.status : -1;
+            if (api.local && error instanceof ApiError && AI_NOT_READY.has(error.code)) {
+              // Nothing to retry until the AI is back: choosing or reconnecting it kicks the queue.
+              waiting.add(entry.id);
+              setWaitingFor(entry.id, 'ai');
+              continue;
+            }
             if (isRetryableStatus(status)) {
+              setWaitingFor(entry.id, null);
               failures += 1;
               if (mayStillBeProcessing(status)) settleUntil = Date.now() + SETTLE_DELAY;
               schedule(backoffDelay(failures, Math.random, settleUntil - Date.now()));
@@ -374,4 +395,13 @@ export function useOutboxSync() {
     });
     return () => subscription.remove();
   }, []);
+
+  // On a phone without a server: an AI chosen or reconnected sends what waited for it.
+  useEffect(
+    () =>
+      useAiSettings.subscribe((state, previous) => {
+        if (state.choice !== previous.choice) kickOutbox('now');
+      }),
+    [],
+  );
 }

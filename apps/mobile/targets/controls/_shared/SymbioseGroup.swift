@@ -36,9 +36,11 @@ enum SymbioseGroup {
     return (server.hasSuffix("/") ? String(server.dropLast()) : server, token)
   }
 
-  /// An authenticated JSON request to the person's own server.
+  /// An authenticated JSON request to the person's own server. None when the data
+  /// lives on the phone (`local://phone`, no server): the widget shows what the app
+  /// last shared, and a craving's outcome waits for the app (`pendingOutcomes`).
   static func request(_ method: String, _ path: String, body: [String: Any]? = nil, timeout: TimeInterval = 10) -> URLRequest? {
-    guard let session, let url = URL(string: session.server + path) else { return nil }
+    guard let session, session.server.hasPrefix("http"), let url = URL(string: session.server + path) else { return nil }
     var request = URLRequest(url: url, timeoutInterval: timeout)
     request.httpMethod = method
     request.setValue("application/json", forHTTPHeaderField: "accept")

@@ -1,12 +1,11 @@
 import { randomBytes, scrypt as scryptCb, timingSafeEqual, type ScryptOptions } from 'node:crypto';
 
+import type { AuthEnv, Db } from '@symbiose/core';
+import { users } from '@symbiose/core/db/schema';
+import { HttpError } from '@symbiose/core/errors';
 import { eq } from 'drizzle-orm';
 import type { MiddlewareHandler } from 'hono';
 import { sign, verify } from 'hono/jwt';
-
-import type { Db } from './db';
-import { users } from './db/schema';
-import { HttpError } from './errors';
 
 function scrypt(password: string, salt: Buffer, keylen: number, options: ScryptOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -40,8 +39,6 @@ export function issueToken(userId: string, secret: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   return sign({ sub: userId, iat: now, exp: now + TOKEN_TTL_SECONDS }, secret, 'HS256');
 }
-
-export type AuthEnv = { Variables: { userId: string } };
 
 function bearer(header: string | undefined, query: string | undefined): string | undefined {
   return header?.startsWith('Bearer ') ? header.slice(7) : query;

@@ -126,6 +126,13 @@ struct Copy {
   }
   var offline: String { t("Serveur injoignable.", "Server unreachable.") }
   var failed: String { t("Quelque chose a coincé.", "Something went wrong.") }
+  /// Without a server, Symbiose runs on the iPhone: these say so.
+  var phoneAway: String { t("Ton iPhone est hors de portée.", "Your iPhone is out of reach.") }
+  var queued: String { t("Noté. Ton iPhone s’en occupe dès que tu ouvres Symbiose.", "Noted. Your iPhone takes care of it next time you open Symbiose.") }
+  var queuedShort: String { t("Noté pour ton iPhone", "Noted for your iPhone") }
+  /// A craving tip while the iPhone is out of reach.
+  var cravingOfflineTip: String { t("Un grand verre d’eau, puis dix minutes : l’envie redescend souvent d’elle-même.", "A big glass of water, then ten minutes: the craving often fades on its own.") }
+  var cravingOfflineAlternative: String { t("Si c’est vraiment la faim : un fruit ou une poignée de noix.", "If you’re really hungry: a piece of fruit or a handful of nuts.") }
   var retry: String { t("Réessayer", "Try again") }
 
   /// « deux œufs », “two eggs”.

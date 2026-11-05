@@ -19,7 +19,8 @@
         "NSCameraUsageDescription": "Symbiose uses the camera to photograph your meals and scan barcodes.",
         "NSPhotoLibraryUsageDescription": "Symbiose lets you pick a meal photo from your library.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSSupportsLiveActivities": true
+        "NSSupportsLiveActivities": true,
+        "NSLocalNetworkUsageDescription": "Symbiose reaches an AI server on your network (Ollama, LM Studio) only if you set one up in Your AI."
       },
       "entitlements": {
         "com.apple.security.application-groups": ["group.io.synapsr.symbiose"]
@@ -92,7 +93,7 @@
           "photosPermission": "Symbiose lets you pick a meal photo from your library."
         }
       ],
-      "expo-secure-store",
+      ["expo-secure-store", { "configureAndroidBackup": false }],
       "expo-localization",
       [
         "@kingstinct/react-native-healthkit",
@@ -136,7 +137,10 @@
           "microphonePermission": "Symbiose uses the microphone so you can dictate your meals, notes and questions instead of typing them. Your voice is turned into text and never recorded.",
           "speechRecognitionPermission": "Symbiose turns what you dictate into text, on your iPhone whenever it can."
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-sharing",
+      "./plugins/with-backup-rules"
     ],
     "experiments": {
       "typedRoutes": true,

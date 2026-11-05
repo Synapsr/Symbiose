@@ -812,7 +812,8 @@ export interface AuthResponse {
 export interface ServerInfo {
   name: 'symbiose';
   version: string;
-  ai: { enabled: boolean; model: string | null };
+  /** `provider`: who answers (anthropic, openai…), so the app can name it before sending anything; older servers don't say. */
+  ai: { enabled: boolean; model: string | null; provider?: string | null };
   signupOpen: boolean;
   /** How new accounts get in once the first one exists (older servers don't say). */
   signup?: SignupMode;

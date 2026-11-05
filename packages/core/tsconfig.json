@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Web-standard APIs only (fetch, Web Crypto, streams): no Node types, so a
+    // `node:` import, `Buffer` or `process` fails to compile. The core runs on
+    // the Node server and inside the app's JavaScript engine alike.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["src", "drizzle.config.ts"]
+}

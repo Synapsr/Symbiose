@@ -7,14 +7,15 @@ import { AppState } from 'react-native';
 import { useI18n } from '@/i18n';
 
 import { ApiError } from './api';
+import { explainApiError } from './error-texts';
 import { joinedCourse, withMeal, yourMeal } from './course-logic';
 import { withoutMeal } from './day-logic';
 import { claimReward, feedback } from './feedback';
 import { mealMilestone } from './feedback-logic';
 import { haptics } from './haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, inferWalkIntensity } from './health';
-import { dropEntry, isNetworkError, kickOutbox, openOutbox, releaseCapture, stashCapture, useOutbox, type OutboxEntry } from './outbox';
-import { uniqueEatenAt } from './outbox-logic';
+import { dropEntry, isNetworkError, kickOutbox, openOutbox, releaseCapture, setWaitingFor, stashCapture, useOutbox, type OutboxEntry } from './outbox';
+import { AI_NOT_READY, uniqueEatenAt } from './outbox-logic';
 import { useApi, useSession, useUser } from './session';
 import { usePending, useSettings, useToast, type PendingMeal } from './stores';
 import { useUndoableDelete } from './undo';
@@ -45,7 +46,7 @@ export function useDay(date: string) {
 }
 
 export function errorMessage(error: unknown, fallback: string, offline: string): string {
-  if (error instanceof ApiError) return error.status === 0 ? offline : error.message;
+  if (error instanceof ApiError) return explainApiError(error) ?? (error.status === 0 ? offline : error.message);
   return fallback;
 }
 
@@ -176,14 +177,15 @@ export function useMealLogger() {
     [serverUrl, userId],
   );
 
-  // No network: nothing went wrong, the meal just waits for it.
+  // No network (or, on a phone without a server, no AI ready yet): nothing went wrong, the meal just waits for it.
   const park = useCallback(
-    (id: string, error?: unknown) => {
+    (id: string, error?: unknown, waitingFor?: 'ai') => {
       remove(id);
       releaseCapture(id);
       haptics.tap();
-      showToast({ message: t('outbox.queued') });
-      kickOutbox('later', error);
+      showToast({ message: waitingFor === 'ai' ? t('outbox.queuedAi') : t('outbox.queued') });
+      if (waitingFor) setWaitingFor(id, waitingFor);
+      else kickOutbox('later', error);
       return null;
     },
     [remove, showToast, t],
@@ -231,6 +233,7 @@ export function useMealLogger() {
         return meal;
       } catch (error) {
         if (isNetworkError(error)) return park(entry.id, error);
+        if (api.local && error instanceof ApiError && AI_NOT_READY.has(error.code)) return park(entry.id, error, 'ai');
         // Validation and AI errors show on the card, as before.
         void dropEntry(entry.id);
         haptics.warning();
@@ -298,6 +301,7 @@ export function useMealLogger() {
         return copy;
       } catch (error) {
         if (isNetworkError(error)) return park(entry.id, error);
+        if (api.local && error instanceof ApiError && AI_NOT_READY.has(error.code)) return park(entry.id, error, 'ai');
         void dropEntry(entry.id);
         throw error;
       }
