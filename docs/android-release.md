@@ -41,10 +41,10 @@ On a CI runner, the same four values can come from environment variables named `
 cd apps/mobile
 npx expo prebuild --platform android --clean
 cd android
-EXPO_PUBLIC_SERVER_URL=https://cloud.symbiose.synapsr.io ./gradlew app:bundleRelease
+./gradlew -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 app:bundleRelease
 ```
 
-- `EXPO_PUBLIC_SERVER_URL` pre-fills the server on the welcome screen, as for TestFlight. Leave it out for a build that asks for the server.
+- Published builds start on the phone alone, without a server. `EXPO_PUBLIC_SERVER_URL` only pre-fills the form behind « J'ai un serveur Symbiose »: keep it for development builds, leave it out of the builds you publish.
 - The bundle is `android/app/build/outputs/bundle/release/app-release.aab`.
 - Check it is signed with the upload key, not the debug one: `keytool -printcert -jarfile app/build/outputs/bundle/release/app-release.aab` must show your certificate, not `CN=Android Debug`.
 - `android/` is generated (git-ignored): never edit it, change `app.json` or a config plugin and prebuild again.
