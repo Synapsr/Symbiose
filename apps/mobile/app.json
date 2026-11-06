@@ -25,12 +25,12 @@
       "entitlements": {
         "com.apple.security.application-groups": ["group.io.synapsr.symbiose"]
       },
-      "buildNumber": "19",
+      "buildNumber": "20",
       "appleTeamId": "3RZSUHDN87"
     },
     "android": {
       "package": "io.synapsr.symbiose",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#2C3036",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
