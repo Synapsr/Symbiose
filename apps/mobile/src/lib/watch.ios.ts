@@ -80,6 +80,7 @@ export function useWatchRequests() {
       void queryClient.invalidateQueries({ queryKey: ['day'] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
     };
 
     // One at a time, in the order the wrist sent them.

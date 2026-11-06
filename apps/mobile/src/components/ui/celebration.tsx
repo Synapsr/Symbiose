@@ -14,16 +14,27 @@ const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
   color: PALETTE[i % PALETTE.length]!,
 }));
 
-function Particle({ angle, distance, size, color }: (typeof PARTICLES)[number]) {
+function Particle({ angle, distance, size, color, spread = 1 }: (typeof PARTICLES)[number] & { spread?: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.set(withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }));
   }, [t]);
   const style = useAnimatedStyle(() => ({
     opacity: 1 - t.value * t.value,
-    transform: [{ translateX: Math.cos(angle) * distance * t.value }, { translateY: Math.sin(angle) * distance * t.value + 40 * t.value * t.value }, { scale: 1 - t.value * 0.4 }],
+    transform: [{ translateX: Math.cos(angle) * distance * spread * t.value }, { translateY: Math.sin(angle) * distance * spread * t.value + 40 * t.value * t.value }, { scale: 1 - t.value * 0.4 }],
   }));
   return <Animated.View style={[{ position: 'absolute', width: size, height: size, borderRadius: size / 2, backgroundColor: color }, style]} />;
+}
+
+/** The particles alone, bursting from the centre of their parent; `spread` sends them further, around something bigger than an emoji. */
+export function Burst({ spread = 1 }: { spread?: number }) {
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 1, height: 1 }}>
+      {PARTICLES.map((p, i) => (
+        <Particle key={i} {...p} spread={spread} />
+      ))}
+    </View>
+  );
 }
 
 /** A small, joyful moment: particles burst around a popping emoji. */

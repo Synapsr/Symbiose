@@ -11,7 +11,7 @@ import { explainApiError } from './error-texts';
 import { joinedCourse, withMeal, yourMeal } from './course-logic';
 import { withoutMeal } from './day-logic';
 import { claimReward, feedback } from './feedback';
-import { mealMilestone } from './feedback-logic';
+import { firstMeal } from './feedback-logic';
 import { haptics } from './haptics';
 import { grantedScopes, health, HEALTH_SCOPES, healthModules, inferWalkIntensity } from './health';
 import { dropEntry, isNetworkError, kickOutbox, openOutbox, releaseCapture, setWaitingFor, stashCapture, useOutbox, type OutboxEntry } from './outbox';
@@ -59,6 +59,8 @@ export function useRefreshAfterMeal() {
       void queryClient.invalidateQueries({ queryKey: ['day', meal.localDate] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
+      // The streak and the milestones: a meal can open a day, or delete its only one.
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
     [queryClient],
   );
@@ -200,15 +202,14 @@ export function useMealLogger() {
         const meal = await api.createMeal(entry.input);
         // A course that joined a meal: the meal is already there, the day already opened.
         const course = joinedCourse(meal, entry.input.eatenAt);
-        // Today as it stood before this meal: the one that opens a day can mark a milestone.
-        const milestone = course ? null : mealMilestone(queryClient.getQueryData<DaySummary>(['day', meal.localDate]), toLocalDate(), joined);
-        const celebrated = milestone && claimReward(meal.localDate, milestone) ? milestone : null;
+        // Today as it stood before this meal: the very first one is welcomed (the milestones come from « Ta progression »).
+        const welcome = !course && firstMeal(queryClient.getQueryData<DaySummary>(['day', meal.localDate]), toLocalDate(), joined) && claimReward(meal.localDate, 'firstMeal');
         void dropEntry(entry.id);
         remove(entry.id);
         queryClient.setQueryData<DaySummary>(['day', meal.localDate], (day) => (day && course ? withMeal(day, meal) : day));
         refresh(meal);
-        // A milestone: the meal is analysed. A course plays the same « noté ».
-        feedback.mealLogged(meal, Boolean(celebrated));
+        // The first meal blooms. A course plays the same « noté ».
+        feedback.mealLogged(meal, welcome);
         const question = meal.insight?.clarification ? ` · ${t('today.question')} ›` : '';
         showToast(
           course
@@ -220,7 +221,7 @@ export function useMealLogger() {
               }
             : {
                 // The AI has a question: the toast says so, and a tap opens it.
-                message: question ? `${t('today.mealLogged')}${question}` : `${celebrated ? t(`reward.${celebrated}`) : t('today.mealLogged')} · ${meal.title}`,
+                message: question ? `${t('today.mealLogged')}${question}` : `${welcome ? t('reward.firstMeal') : t('today.mealLogged')} · ${meal.title}`,
                 onPress: () => router.push({ pathname: '/meal/[id]', params: { id: meal.id } }),
                 action: {
                   label: t('today.undo'),

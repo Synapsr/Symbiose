@@ -40,6 +40,7 @@ import { adaptiveEnergyHistory } from './expenditure';
 import { dayHydration, hydrationTrend } from './hydration';
 import { moodOf, visibleMoodTrend } from './mood';
 import { nightOf, sleepTrend } from './sleep';
+import { streakFor } from './progress';
 import { weightTrend } from './weights';
 import { activeMinutes, activityWeek, workoutsBetween, workoutsKcal } from './workouts';
 
@@ -79,25 +80,6 @@ export function toCraving(row: CravingRow): Craving {
     tip: row.tip,
     createdAt: row.createdAt,
   };
-}
-
-/** Consecutive days with at least one logged meal, ending at `date` (today doesn't break it yet). */
-export function streakFor(db: Db, userId: string, date: string): number {
-  const rows = db
-    .selectDistinct({ day: meals.localDate })
-    .from(meals)
-    .where(and(eq(meals.userId, userId), lte(meals.localDate, date)))
-    .orderBy(desc(meals.localDate))
-    .limit(1000)
-    .all();
-  const days = new Set(rows.map((r) => r.day));
-  let cursor = days.has(date) ? date : addDays(date, -1);
-  let streak = 0;
-  while (days.has(cursor)) {
-    streak++;
-    cursor = addDays(cursor, -1);
-  }
-  return streak;
 }
 
 export function daySummary(db: Db, userId: string, date: string): DaySummary {

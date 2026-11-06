@@ -50,6 +50,7 @@ export function MealActionCard({ messageId, index, action }: { messageId: string
       void queryClient.invalidateQueries({ queryKey: ['day'] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
     onError: () => haptics.warning(),
   });

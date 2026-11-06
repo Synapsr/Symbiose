@@ -13,6 +13,7 @@ import {
   type FoodItem,
   type InsightsResponse,
   type LibraryResponse,
+  type ProgressSummary,
   type WeeklyReview,
   type WeeklyReviewState,
   type WeightTrend,
@@ -31,6 +32,7 @@ import { nowIso, validate, type Deps } from '../http';
 import { newId } from '../ids';
 import { computeInsights, daySummary, library, toActivity, toCraving } from '../services/day';
 import { lookupBarcode } from '../services/openfoodfacts';
+import { progressFor } from '../services/progress';
 import { resolveUser } from '../services/users';
 import { lifeBrief } from '../services/life';
 import { generateReview, weeklyReviewState } from '../services/review';
@@ -55,6 +57,11 @@ export function trackingRoutes({ db, ai, photos, fetch: fetchImpl, auth }: Deps)
   app.get('/days/:date', (c) => {
     const date = LocalDateSchema.parse(c.req.param('date'));
     return c.json<DaySummary>(daySummary(db, c.get('userId'), date));
+  });
+
+  /** « Ta progression »: the streak, its rest days, the milestones reached and the next ones. */
+  app.get('/progress', validate('query', z.object({ today: LocalDateSchema.optional() })), (c) => {
+    return c.json<ProgressSummary>(progressFor(db, c.get('userId'), c.req.valid('query').today ?? toLocalDate()));
   });
 
   app.get('/foods/library', validate('query', z.object({ today: LocalDateSchema.optional() })), (c) => {

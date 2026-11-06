@@ -38,6 +38,7 @@ import type {
   ProactiveSchedule,
   ProactiveSettingsPatch,
   Profile,
+  ProgressSummary,
   Review,
   SeparateCourseResult,
   ServerInfo,
@@ -270,6 +271,7 @@ export function createApi(baseUrl: string, token: string) {
     updateNote: (id: string, patch: JournalEntryPatch) => call<JournalEntry>('PATCH', `/api/journal/${id}`, patch),
     deleteNote: (id: string) => call<void>('DELETE', `/api/journal/${id}`),
 
+    progress: (today: string) => call<ProgressSummary>('GET', `/api/progress?today=${today}`),
     insights: (days: number, to: string, hideCalories = false) => call<InsightsResponse>('GET', `/api/insights?days=${days}&to=${to}&hideCalories=${hideCalories ? 1 : 0}`),
     /** The saved « Bilan de la semaine » and whether to (re)write it now. */
     weeklyReview: (to: string, hideCalories = false) => call<WeeklyReviewState>('GET', `/api/insights/review?to=${to}&hideCalories=${hideCalories ? 1 : 0}`),

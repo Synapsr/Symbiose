@@ -12,6 +12,7 @@ import {
   Sparkles,
   EyeOff,
   FaceSlightlySmiling,
+  Flame,
   Gauge,
   GlassWater,
   Hand,
@@ -368,6 +369,13 @@ export default function Me() {
               }}
             />
           }
+        />
+        <Divider />
+        <Item
+          icon={<Flame size={20} color={colors.text} />}
+          title={t('me.motivation')}
+          subtitle={t('me.motivationHint')}
+          right={<Toggle value={settings.motivation} onValueChange={(on) => settings.set({ motivation: on })} />}
         />
         <Divider />
         <Item

@@ -56,7 +56,13 @@ interface SettingsState {
   aiNoticeFor: string;
   /** The walks and runs last added in steps: the Bouger sheet opens on « Pas » for them. */
   workoutInSteps: WorkoutType[];
-  set:(patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
+  /** « Séries et étapes »: the flame, the milestones and their celebrations. Off, Symbiose stays factual. */
+  motivation: boolean;
+  /** The milestones already celebrated (or found already reached) on this phone: each one is celebrated once (`milestoneDue`). */
+  milestonesSeen: string[];
+  /** The evening reminder when the streak still waits for today's meal (`STREAK_REMINDER_AT`). */
+  streakReminder: boolean;
+  set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
 
@@ -93,6 +99,9 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   lastBackupAt: '',
   aiNoticeFor: '',
   workoutInSteps: [],
+  motivation: true,
+  milestonesSeen: [],
+  streakReminder: false,
   set: (patch) => {
     set(patch);
     const s = get();
@@ -125,6 +134,9 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       lastBackupAt: s.lastBackupAt,
       aiNoticeFor: s.aiNoticeFor,
       workoutInSteps: s.workoutInSteps,
+      motivation: s.motivation,
+      milestonesSeen: s.milestonesSeen,
+      streakReminder: s.streakReminder,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

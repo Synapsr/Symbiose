@@ -129,6 +129,8 @@ export default function CravingSheet() {
       endCravingActivity(settled.id, outcome);
       void queryClient.invalidateQueries({ queryKey: ['day', today] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
+      // A craving beaten can be a milestone: celebrated once this sheet has closed.
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
       if (outcome === 'resisted') {
         setCelebrating(true);
         setTimeout(() => dismiss(), 1900);

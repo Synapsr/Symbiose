@@ -6,6 +6,7 @@ import { DayBars } from '@/components/insights/charts';
 import { Card, Dot, Row, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount, weekdayInitial } from '@/lib/format';
+import { useSettings } from '@/lib/stores';
 import { NUTRIENT_COLORS, Radius, Space, useTheme } from '@/theme';
 
 const SIGN: Record<TargetKind, string> = { max: '≤', min: '≥', target: '≈' };
@@ -17,6 +18,7 @@ const SIGN: Record<TargetKind, string> = { max: '≤', min: '≥', target: '≈'
 export function GoalCard({ data, hero, hideCalories }: { data: InsightsResponse; hero: NutrientKey; hideCalories: boolean }) {
   const { t, plural, locale, nutrient } = useI18n();
   const { colors } = useTheme();
+  const motivation = useSettings((s) => s.motivation);
   const color = hero === 'kcal' ? colors.accent : NUTRIENT_COLORS[hero];
   const adherence = data.adherence.find((a) => a.nutrient === hero);
   const target = adherence?.target ?? data.days.at(-1)?.kcalTarget ?? 0;
@@ -63,7 +65,7 @@ export function GoalCard({ data, hero, hideCalories }: { data: InsightsResponse;
           <Txt variant="label" tone={adherence && kept >= 0.5 ? 'accent' : 'primary'} style={{ fontVariant: ['tabular-nums'] }}>
             {adherence ? plural('insights.kept', adherence.daysLogged, { ok: adherence.daysOk, total: adherence.daysLogged, rule }) : plural('insights.tracked', data.loggedDays)}
           </Txt>
-          {data.streak > 1 ? (
+          {motivation && data.streak > 1 ? (
             <Row gap={4} accessible accessibilityLabel={plural('today.streakLabel', data.streak)}>
               <Flame size={13} color={colors.warning} fill={colors.warning} />
               <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>

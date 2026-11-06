@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Linking, Platform } from 'react-native';
 
 import { ACTION_CRAVING, ACTION_FINE, CRAVING_CATEGORY, PROACTIVE_PREFIX, type PlannedNotification, type ProactiveData } from './proactive-plan';
+import { STREAK_PREFIX } from './progress-logic';
 
 /**
  * Local notifications for the proactive coach (no push, no server): planned
@@ -20,8 +21,10 @@ const CHANNEL = 'coach';
 // The coach doesn't interrupt someone already in the app: Today's coach line says the same thing.
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const proactive = notification.request.identifier.startsWith(PROACTIVE_PREFIX);
-    return { shouldShowBanner: !proactive, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false };
+    const { identifier } = notification.request;
+    // Nor does the streak reminder: Today already shows the flame waiting for its meal.
+    const quiet = identifier.startsWith(PROACTIVE_PREFIX) || identifier.startsWith(STREAK_PREFIX);
+    return { shouldShowBanner: !quiet, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false };
   },
 });
 
@@ -73,12 +76,26 @@ const localDate = (date: string, time: string) => {
 
 let replacing: Promise<void> = Promise.resolve();
 
-/** Makes the pending proactive notifications exactly `planned`: one at a time, so two plans never interleave. */
-export function replaceScheduled(planned: PlannedNotification[]): Promise<void> {
+/** A notification planned on the phone: the coach's (`PlannedNotification`) or the streak reminder's. */
+export interface LocalNotification {
+  id: string;
+  date: string;
+  time: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  category?: string;
+}
+
+/**
+ * Makes the pending notifications whose identifier starts with `prefix` exactly
+ * `planned`: one replacement at a time, so two plans never interleave.
+ */
+export function replaceNotifications(prefix: string, planned: readonly LocalNotification[]): Promise<void> {
   replacing = replacing.then(async () => {
     if ((await notificationPermission()) !== 'granted') return;
     const pending = await Notifications.getAllScheduledNotificationsAsync();
-    await Promise.all(pending.filter((n) => n.identifier.startsWith(PROACTIVE_PREFIX)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+    await Promise.all(pending.filter((n) => n.identifier.startsWith(prefix)).map((n) => Notifications.cancelScheduledNotificationAsync(n.identifier)));
     const now = Date.now();
     for (const n of planned) {
       const date = localDate(n.date, n.time);
@@ -90,9 +107,14 @@ export function replaceScheduled(planned: PlannedNotification[]): Promise<void> 
       });
     }
   }).catch(() => {
-    // A bonus, never a blocker: the coach line shows the same thing in the app.
+    // A bonus, never a blocker: the app shows the same thing when it opens.
   });
   return replacing;
+}
+
+/** Makes the pending proactive notifications exactly `planned`. */
+export function replaceScheduled(planned: PlannedNotification[]): Promise<void> {
+  return replaceNotifications(PROACTIVE_PREFIX, planned);
 }
 
 export type NotificationResponse = { data: ProactiveData; action: 'open' | typeof ACTION_CRAVING | typeof ACTION_FINE };

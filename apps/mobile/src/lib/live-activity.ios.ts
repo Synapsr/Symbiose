@@ -81,6 +81,7 @@ export function useCravingActivitySync() {
       if (Object.keys(retry).length) appGroup.set('craving.pendingOutcomes', JSON.stringify(retry));
       void queryClient.invalidateQueries({ queryKey: ['day'] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
     };
 
     void sync();
