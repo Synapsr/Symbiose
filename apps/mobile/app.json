@@ -2,7 +2,7 @@
   "expo": {
     "name": "Symbiose",
     "slug": "symbiose",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "symbiose",
@@ -25,12 +25,12 @@
       "entitlements": {
         "com.apple.security.application-groups": ["group.io.synapsr.symbiose"]
       },
-      "buildNumber": "20",
+      "buildNumber": "21",
       "appleTeamId": "3RZSUHDN87"
     },
     "android": {
       "package": "io.synapsr.symbiose",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#2C3036",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
