@@ -4,32 +4,56 @@
  * (`pnpm --filter @symbiose/mobile test`); the snapping helpers are worklets,
  * run on the UI thread by the card's swipe.
  */
-import { goalNutrient, SUGAR_FAMILY, sugarGoal, type GoalPlan, type NutrientKey } from '@symbiose/shared';
+import { goalNutrient, SUGAR_FAMILY, type GoalPlan, type NutrientKey } from '@symbiose/shared';
 
-type HeroPlan = Pick<GoalPlan, 'focus' | 'rules'> & Partial<Pick<GoalPlan, 'tags' | 'carbsPerMeal'>>;
+type HeroPlan = Pick<GoalPlan, 'focus'> & Partial<Pick<GoalPlan, 'rules' | 'tags' | 'carbsPerMeal'>>;
 
 /**
- * The pages, in one order used everywhere on the card: the plan's focus (the
- * goal first), calories, the plan's other rules, then protein and fibre.
- * Hidden calories stay hidden.
- * A sugar goal keeps the sugar family together where it first appears, nested
- * order: added sugars, total sugars, then carbs (carbs, total, added when
- * carbs lead, as in blood-sugar mode). Total sugars and carbs are always there.
+ * The pages, in one order used everywhere on the card: the goal's nutrient
+ * first, a small ring each in one row under the big one.
+ * By default the day is read simply: the goal, the plan's focus, calories,
+ * protein and fibre (« Sucres ajoutés, Calories, Protéines, Fibres »).
+ * `chosen`, set by a long press on the card (`hero-rings`), replaces all but the goal,
+ * in `HERO_ORDER`. Either way hidden calories stay hidden, the sugars stay
+ * together (`gatherSugars`) and there are `HERO_MAX` at most.
  */
-export function heroPages(plan: HeroPlan | null, hideCalories: boolean): NutrientKey[] {
+export function heroPages(plan: HeroPlan | null, hideCalories: boolean, chosen: readonly NutrientKey[] | null = null): NutrientKey[] {
   const goal = goalNutrient(plan, hideCalories);
-  const keys = [...new Set<NutrientKey>([goal, ...(plan?.focus ?? []), 'kcal', ...(plan?.rules.map((r) => r.nutrient) ?? []), 'protein', 'fiber'])];
-  const pages = sugarGoal(plan) ? withSugarFamily(keys) : keys;
-  return pages.filter((key) => !(hideCalories && key === 'kcal'));
+  const keys: NutrientKey[] = chosen ? [goal, ...HERO_ORDER.filter((key) => chosen.includes(key))] : [goal, ...(plan?.focus ?? []), 'kcal', 'protein', 'fiber'];
+  return gatherSugars([...new Set<NutrientKey>(keys)])
+    .filter((key) => !(hideCalories && key === 'kcal'))
+    .slice(0, HERO_MAX);
 }
 
-/** The sugar family gathered at its first page, inside out from there; added sugars only when the plan names them. */
-function withSugarFamily(keys: NutrientKey[]): NutrientKey[] {
+/** As many small rings as a phone's width holds in one row, each with its nutrient's name under it. */
+export const HERO_MAX = 6;
+
+/** Every nutrient the card can show, in the order the choice lists them. */
+export const HERO_ORDER: readonly NutrientKey[] = ['kcal', 'addedSugar', 'sugar', 'carbs', 'protein', 'fiber', 'fat', 'satFat', 'sodium'];
+
+/** The default's nutrients besides the goal: what the choice starts from (`heroPages` without `chosen`). */
+export function heroDefaults(plan: HeroPlan | null, hideCalories: boolean): NutrientKey[] {
+  return heroPages(plan, hideCalories).slice(1);
+}
+
+/** The choice after a nutrient is ticked or unticked; the goal is always there and never counted. */
+export function toggleHero(current: readonly NutrientKey[], key: NutrientKey, goal: NutrientKey): NutrientKey[] {
+  if (key === goal) return [...current];
+  if (current.includes(key)) return current.filter((other) => other !== key);
+  return current.filter((other) => other !== goal).length >= HERO_MAX - 1 ? [...current] : [...current, key];
+}
+
+/**
+ * The sugars that are there, side by side where the first one is, nested:
+ * added sugars, total sugars, carbs (carbs, total, added when carbs come
+ * first, as in blood-sugar mode).
+ */
+function gatherSugars(keys: NutrientKey[]): NutrientKey[] {
   const at = keys.findIndex((key) => SUGAR_FAMILY.includes(key));
   const first = keys[at];
   if (!first) return keys;
   const order = first === 'carbs' ? [...SUGAR_FAMILY].reverse() : [...SUGAR_FAMILY.slice(SUGAR_FAMILY.indexOf(first)), ...SUGAR_FAMILY.slice(0, SUGAR_FAMILY.indexOf(first))];
-  const family = order.filter((key) => key !== 'addedSugar' || keys.includes(key));
+  const family = order.filter((key) => keys.includes(key));
   const rest = keys.filter((key) => !SUGAR_FAMILY.includes(key));
   return [...rest.slice(0, at), ...family, ...rest.slice(at)];
 }
@@ -55,11 +79,6 @@ export function heroIndex(pages: readonly NutrientKey[], saved: HeroChoice | nul
 export function heroChoice(pages: readonly NutrientKey[], index: number, goal: NutrientKey = pages[0] ?? 'kcal'): HeroChoice | null {
   const nutrient = pages[index];
   return nutrient && nutrient !== goal ? { nutrient, goal } : null;
-}
-
-/** The quiet bars beside a page's ring: the other pages in the same order (the goal leads them), three at most. */
-export function heroBars(pages: readonly NutrientKey[], current: NutrientKey, max = 3): NutrientKey[] {
-  return pages.filter((key) => key !== current).slice(0, max);
 }
 
 /** A release faster than this (in pages per second) is a flick: its direction decides. */

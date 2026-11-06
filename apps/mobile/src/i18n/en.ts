@@ -788,6 +788,20 @@ export const en: Record<TranslationKey, string> = {
   // Hero swipe: Today's card turns like pages
   'hero.a11y': 'Your day',
   'hero.page': '{n} of {count}',
+  // Hero rings: what the small rings under Today's ring show (long press on the card)
+  'heroRings.title': 'Your rings',
+  'heroRings.subtitle': 'What you want to see at a glance under the big ring. Up to {max}.',
+  'heroRings.goal': 'Your goal, always shown',
+  'heroRings.reset': 'Back to the simple view',
+  'heroRings.about.kcal': 'The day’s energy',
+  'heroRings.about.addedSugar': 'Sugar, syrups and honey added to food',
+  'heroRings.about.sugar': 'Including fruit and milk sugars',
+  'heroRings.about.carbs': 'Sugars and starches: bread, pasta, rice',
+  'heroRings.about.protein': 'For fullness and muscle',
+  'heroRings.about.fiber': 'Vegetables, fruit, whole grains',
+  'heroRings.about.fat': 'All fats',
+  'heroRings.about.satFat': 'Butter, cheese, cured meats',
+  'heroRings.about.sodium': 'Salt: 1 g of salt ≈ 400 mg of sodium',
   // Sugars: total sugars, carbs and the blood-sugar mode
   'sugars.carbs': 'Carbs {carbs}',
   'sugars.line': 'Sugars {sugar}, {added} added',

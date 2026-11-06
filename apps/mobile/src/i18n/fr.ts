@@ -801,6 +801,20 @@ export const fr = {
   // Hero swipe: Today's card turns like pages
   'hero.a11y': 'Ta journée',
   'hero.page': '{n} sur {count}',
+  // Hero rings: what the small rings under Today's ring show (long press on the card)
+  'heroRings.title': 'Tes anneaux',
+  'heroRings.subtitle': 'Ce que tu veux voir d’un coup d’œil sous le grand anneau. Jusqu’à {max}.',
+  'heroRings.goal': 'Ton objectif, toujours là',
+  'heroRings.reset': 'Revenir à l’affichage simple',
+  'heroRings.about.kcal': 'L’énergie de la journée',
+  'heroRings.about.addedSugar': 'Sucre, sirops et miel ajoutés aux aliments',
+  'heroRings.about.sugar': 'Avec ceux des fruits et du lait',
+  'heroRings.about.carbs': 'Sucres et amidons : pain, pâtes, riz',
+  'heroRings.about.protein': 'Pour la satiété et les muscles',
+  'heroRings.about.fiber': 'Légumes, fruits, céréales complètes',
+  'heroRings.about.fat': 'Toutes les matières grasses',
+  'heroRings.about.satFat': 'Beurre, fromage, charcuterie',
+  'heroRings.about.sodium': 'Le sel : 1 g de sel ≈ 400 mg de sodium',
   // Sugars: total sugars, carbs and the blood-sugar mode
   'sugars.carbs': 'Glucides {carbs}',
   'sugars.line': 'Sucres {sugar} dont ajoutés {added}',
