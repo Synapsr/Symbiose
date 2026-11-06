@@ -103,7 +103,7 @@ Accounts whose email is listed in `ADMIN_EMAILS` see the admin view (`/api/admin
 | `photos` | ownership and mime of files in `DATA_DIR/photos` |
 | `activity` | one row per day: steps, active/resting energy, source |
 | `weights` | one body-weight reading per day |
-| `workouts` | sessions from the health store or added by hand |
+| `workouts` | sessions from the health store or added by hand; a walk or a run added by hand may carry its steps, which count for the day when the store has fewer (`daySteps`: the larger, never the sum) |
 | `blood_pressure` | readings from the health store or added by hand |
 | `sleep_nights` | one night per wake-up day: bedtime, wake time, time asleep |
 | `water_logs` | drinks logged in the app or imported |
@@ -138,7 +138,7 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 | GET | `/api/foods/library`, `/api/foods/barcode/:code` | recents and favourites, Open Food Facts lookup |
 | PUT | `/api/activity` | daily health data from the phone |
 | GET / PUT | `/api/weights` | weight trend, readings from the health store |
-| GET / PUT / POST / DELETE | `/api/workouts`, `/api/workouts/:id` | sessions: list, import, add by hand, delete |
+| GET / PUT / POST / DELETE | `/api/workouts`, `/api/workouts/:id` | sessions: list, import, add by hand (optionally with `steps`), delete |
 | GET / PUT / POST / DELETE | `/api/blood-pressure`, `/api/blood-pressure/:id` | trend, import, add a reading, delete |
 | GET / PUT | `/api/sleep` | nights: trend, import |
 | GET / POST / PUT / DELETE | `/api/hydration`, `/api/hydration/:id` | water: trend, add a glass, import, delete |
@@ -158,7 +158,7 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 
 ## Testing
 
-- `packages/shared`: unit tests for energy, targets, adaptive energy, sanitization, the glance and dates.
+- `packages/shared`: unit tests for energy, targets, adaptive energy, sanitization, the glance, dates and a day's steps.
 - `packages/core`: the AI adapters against fake providers (Claude, OpenAI-compatible, the ChatGPT plan's Responses stream).
 - `apps/server`: end-to-end API tests on an in-memory database with a fake AI and a fake Open Food Facts; the API run as the app runs it, with React Native's fetch classes (`local-mode.test.ts`); backups from a server to a phone and back (`backup.test.ts`); the bundled migrations against the server's (`core-parity.test.ts`).
 - `apps/mobile`: unit tests for the pure logic (offline queue, dictation, Today, Markdown), typecheck and lint (React Compiler rules), plus manual runs on web and devices.

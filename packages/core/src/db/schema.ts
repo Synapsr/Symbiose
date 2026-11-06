@@ -133,6 +133,8 @@ export const workouts = sqliteTable(
     activeKcal: real('active_kcal'),
     distanceKm: real('distance_km'),
     avgHeartRate: real('avg_heart_rate'),
+    /** Steps of a walk or a run added by hand. */
+    steps: integer('steps'),
     source: text('source', { enum: ['healthkit', 'health_connect', 'manual'] }).notNull(),
     createdAt: text('created_at').notNull(),
   },

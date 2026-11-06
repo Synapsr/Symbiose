@@ -1,4 +1,4 @@
-import { DEFAULT_GLASS_ML, type CreateMealInput, type NutrientKey } from '@symbiose/shared';
+import { DEFAULT_GLASS_ML, type CreateMealInput, type NutrientKey, type WorkoutType } from '@symbiose/shared';
 import { AppState } from 'react-native';
 import { create } from 'zustand';
 
@@ -54,7 +54,9 @@ interface SettingsState {
   lastBackupAt: string;
   /** With a server: the server whose AI the person was told about (what it receives, and who answers). */
   aiNoticeFor: string;
-  set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
+  /** The walks and runs last added in steps: the Bouger sheet opens on « Pas » for them. */
+  workoutInSteps: WorkoutType[];
+  set:(patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
 
@@ -90,6 +92,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   heroRings: null,
   lastBackupAt: '',
   aiNoticeFor: '',
+  workoutInSteps: [],
   set: (patch) => {
     set(patch);
     const s = get();
@@ -121,6 +124,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       heroRings: s.heroRings,
       lastBackupAt: s.lastBackupAt,
       aiNoticeFor: s.aiNoticeFor,
+      workoutInSteps: s.workoutInSteps,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

@@ -99,13 +99,14 @@ export function ActivitySummary({ day }: { day: DaySummary }) {
   );
 }
 
-/** « Course · 32 min ». A session added by hand has its × (the twin of the long press on Today); the watch's are read-only. */
+/** « Course · 32 min », « Marche · 6 200 pas ». A session added by hand has its × (the twin of the long press on Today); the watch's are read-only. */
 function SessionChip({ workout }: { workout: Workout }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { colors } = useTheme();
   const remove = useDeleteWorkout();
   const Icon = WORKOUT_ICONS[workout.type];
-  const label = `${t(workoutTypeKey(workout.type))} · ${Math.round(workout.durationMin)} min`;
+  const measure = workout.steps != null ? t('today.steps', { count: formatNumber(workout.steps, locale) }) : `${Math.round(workout.durationMin)} min`;
+  const label = `${t(workoutTypeKey(workout.type))} · ${measure}`;
   const manual = workout.source === 'manual';
   return (
     <Row gap={6} style={{ height: 32, paddingLeft: 12, paddingRight: manual ? 4 : 12, borderRadius: Radius.pill, backgroundColor: colors.surface2 }}>

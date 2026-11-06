@@ -268,14 +268,22 @@ export interface CoachInput extends UserContext {
   /** Total sugars and carbs: the juice signal, carbs per meal in blood-sugar mode. */
   sugars?: SugarsBrief | null;
   today: Pick<DaySummary, 'date' | 'totals' | 'progress' | 'activity'> & {
-    workouts: { time: string; type: WorkoutType; minutes: number; kcal: number | null }[];
+    workouts: (WorkoutBrief & { time: string })[];
   };
   /** Meals of the conversation's day and the 2 days before: the ones the coach may edit or delete. */
   recentMeals: CoachMealBrief[];
   week: Pick<InsightsResponse, 'averages' | 'loggedDays' | 'adherence' | 'topSources' | 'byHour' | 'cravings' | 'weight'> & {
     activity: ActivityWeek;
-    workouts: { date: string; type: WorkoutType; minutes: number; kcal: number | null }[];
+    workouts: (WorkoutBrief & { date: string })[];
   };
+}
+
+/** A session as the coach sees it; `steps` only for a walk or a run logged in steps. */
+export interface WorkoutBrief {
+  type: WorkoutType;
+  minutes: number;
+  kcal: number | null;
+  steps?: number;
 }
 
 /** A logged meal as the coach sees it: kcal plus the nutrients the plan focuses on, and its courses' names when it has several. */

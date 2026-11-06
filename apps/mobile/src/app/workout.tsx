@@ -1,13 +1,13 @@
-import { estimateWorkoutKcal, toLocalDate, toLocalDateTime, type WorkoutIntensity, type WorkoutType } from '@symbiose/shared';
+import { countsSteps, estimateWorkoutKcal, minutesFromSteps, toLocalDate, toLocalDateTime, type WorkoutIntensity, type WorkoutType } from '@symbiose/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 import { Flame, Minus, Plus } from 'lucide-react-native';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ActivitySummary } from '@/components/today/activity-summary';
-import { AnimatedNumber, Button, Chip, IconButton, Reveal, Row, Segmented, Txt } from '@/components/ui';
+import { AnimatedNumber, Button, Chip, IconButton, Pressy, Reveal, Row, Segmented, Txt, webInput } from '@/components/ui';
 import { intensityKey, WORKOUT_ICONS, WORKOUT_INTENSITIES, WORKOUT_TYPES, workoutTypeKey } from '@/components/workout-meta';
 import { useI18n } from '@/i18n';
 import { formatDay, formatNumber } from '@/lib/format';
@@ -17,13 +17,29 @@ import { errorMessage, useDay, useRefreshAfterWorkout } from '@/lib/hooks';
 import { dismiss } from '@/lib/nav';
 import { useApi, useUser } from '@/lib/session';
 import { useSettings, useToast } from '@/lib/stores';
-import { Space, useTheme } from '@/theme';
+import { Fonts, Space, useTheme } from '@/theme';
 
 const PRESETS = [15, 30, 45, 60];
 const MIN = 5;
 const MAX = 300;
+const DEFAULT_MINUTES = 30;
+// A walk or a run can be counted in steps, instead of the minutes or as well.
+const STEP_PRESETS = [2000, 5000, 8000, 10_000];
+const DEFAULT_STEPS = 5000;
+const STEP = 500;
+const MIN_STEPS = 100;
+const MAX_STEPS = 100_000;
 
-/** Add a session by hand: type, duration, done. Intensity and the energy estimate are there when they matter. */
+type Measure = 'time' | 'steps';
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+/** The next round value in that direction: 62 min → 65 or 60, 6 237 steps → 6 500 or 6 000. */
+const nudge = (value: number, unit: number, direction: 1 | -1) => (direction > 0 ? Math.floor(value / unit) + 1 : Math.ceil(value / unit) - 1) * unit;
+
+/**
+ * Add a session by hand: type, duration, done. Intensity and the energy estimate are there when they matter.
+ * A walk or a run can be counted in steps too (« Durée | Pas »): a duration not given is then estimated from them.
+ */
 export default function WorkoutSheet() {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
@@ -33,6 +49,8 @@ export default function WorkoutSheet() {
   const refresh = useRefreshAfterWorkout();
   const showToast = useToast((s) => s.show);
   const hideCalories = useSettings((s) => s.hideCalories);
+  const inSteps = useSettings((s) => s.workoutInSteps);
+  const setSettings = useSettings((s) => s.set);
   const params = useLocalSearchParams<{ date?: string }>();
 
   const today = toLocalDate();
@@ -41,11 +59,28 @@ export default function WorkoutSheet() {
   const day = useDay(date).data;
   const summary = day?.date === date ? day : null;
   const [type, setType] = useState<WorkoutType | null>(null);
-  const [duration, setDuration] = useState(30);
   const [intensity, setIntensity] = useState<WorkoutIntensity>('moderate');
+  // Minutes and steps are the person's once they set them (null until then), whichever the big number shows.
+  const [minutes, setMinutes] = useState<number | null>(null);
+  const [steps, setSteps] = useState<number | null>(null);
+  const [chosenMeasure, setChosenMeasure] = useState<Measure | null>(null);
+
+  const stepsAllowed = type !== null && countsSteps(type);
+  // Until the toggle is touched, a walk opens the way it was last added.
+  const measure: Measure = stepsAllowed ? (chosenMeasure ?? (inSteps.includes(type) ? 'steps' : 'time')) : 'time';
+  const inStepsNow = measure === 'steps';
+  const shownSteps = steps ?? DEFAULT_STEPS;
+  // Steps go with the session while they're on screen, or once set before going back to the minutes.
+  const loggedSteps = stepsAllowed && (inStepsNow || steps !== null) ? shownSteps : null;
+  const estimated = type && loggedSteps !== null ? minutesFromSteps(type, intensity, loggedSteps) : null;
+  const duration = minutes ?? estimated ?? DEFAULT_MINUTES;
+  const durationGiven = !inStepsNow || minutes !== null;
 
   const kcal = type ? estimateWorkoutKcal(type, intensity, duration, user.profile?.weightKg ?? 70) : 0;
-  const label = type ? `${t(workoutTypeKey(type))} · ${duration} min` : '';
+  const stepsText = loggedSteps === null ? null : t('today.steps', { count: formatNumber(loggedSteps, locale) });
+  // « Marche · 6 200 pas », with the duration when the person gave it.
+  const label = type ? [t(workoutTypeKey(type)), durationGiven ? `${duration} min` : null, stepsText].filter(Boolean).join(' · ') : '';
+  const note = !stepsAllowed ? null : inStepsNow ? (minutes !== null ? `${minutes} min` : `≈ ${duration} min`) : stepsText;
 
   const add = useMutation({
     mutationFn: () => {
@@ -65,12 +100,17 @@ export default function WorkoutSheet() {
         activeKcal: null,
         distanceKm: null,
         avgHeartRate: null,
+        steps: loggedSteps,
         source: 'manual',
       });
     },
     onSuccess: (workout) => {
       feedback.workoutLogged();
       refresh();
+      if (stepsAllowed) {
+        const others = inSteps.filter((kind) => kind !== type);
+        setSettings({ workoutInSteps: inStepsNow ? [...others, type] : others });
+      }
       showToast({
         message: `${t('workout.added')} · ${label}`,
         action: { label: t('today.undo'), onPress: () => void api.deleteWorkout(workout.id).then(refresh) },
@@ -80,7 +120,10 @@ export default function WorkoutSheet() {
     onError: () => haptics.warning(),
   });
 
-  const step = (delta: number) => setDuration((d) => Math.min(MAX, Math.max(MIN, d + delta)));
+  const step = (direction: 1 | -1) => {
+    if (inStepsNow) setSteps(clamp(nudge(shownSteps, STEP, direction), MIN_STEPS, MAX_STEPS));
+    else setMinutes(clamp(nudge(duration, 5, direction), MIN, MAX));
+  };
 
   return (
     <ScrollView style={{ backgroundColor: colors.bg }} contentContainerStyle={{ padding: Space.xl, paddingTop: Space.xxl, paddingBottom: insets.bottom + Space.xxl, gap: Space.xl }}>
@@ -112,21 +155,56 @@ export default function WorkoutSheet() {
       </Reveal>
 
       <Reveal index={2} style={{ gap: Space.md }}>
-        <Txt variant="caption" tone="secondary">
-          {t('workout.duration')}
-        </Txt>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <IconButton label={t('workout.less')} size={48} icon={<Minus size={20} color={colors.text} />} onPress={() => step(-5)} />
-          <Row gap={6} style={{ alignItems: 'baseline' }}>
-            <AnimatedNumber value={duration} format={(n) => String(Math.round(n))} variant="display" />
-            <Txt tone="secondary">min</Txt>
+        {stepsAllowed ? (
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Segmented
+              value={measure}
+              onChange={setChosenMeasure}
+              options={[
+                { value: 'time', label: t('workout.duration') },
+                { value: 'steps', label: t('workout.steps') },
+              ]}
+            />
+            {/* Beside the toggle, the other measure: « ≈ 62 min » from the steps, or the one the person set. */}
+            {note ? (
+              <Txt
+                variant="label"
+                tone="secondary"
+                accessibilityLabel={inStepsNow && minutes === null ? t('workout.aboutMinutes', { count: duration }) : undefined}
+                style={{ fontVariant: ['tabular-nums'] }}>
+                {note}
+              </Txt>
+            ) : null}
           </Row>
-          <IconButton label={t('workout.more')} size={48} icon={<Plus size={20} color={colors.text} />} onPress={() => step(5)} />
+        ) : (
+          <Txt variant="caption" tone="secondary">
+            {t('workout.duration')}
+          </Txt>
+        )}
+        <Row style={{ justifyContent: 'space-between' }}>
+          <IconButton label={inStepsNow ? t('workout.lessSteps') : t('workout.less')} size={48} icon={<Minus size={20} color={colors.text} />} onPress={() => step(-1)} />
+          {inStepsNow ? (
+            <StepCount value={shownSteps} onChange={(count) => setSteps(clamp(count, MIN_STEPS, MAX_STEPS))} />
+          ) : (
+            <Row gap={6} style={{ alignItems: 'baseline' }}>
+              <AnimatedNumber value={duration} format={(n) => String(Math.round(n))} variant="display" />
+              <Txt tone="secondary">min</Txt>
+            </Row>
+          )}
+          <IconButton label={inStepsNow ? t('workout.moreSteps') : t('workout.more')} size={48} icon={<Plus size={20} color={colors.text} />} onPress={() => step(1)} />
         </Row>
         <Row gap={Space.sm} style={{ justifyContent: 'center' }}>
-          {PRESETS.map((minutes) => (
-            <Chip key={minutes} label={`${minutes} min`} selected={duration === minutes} onPress={() => setDuration(minutes)} />
-          ))}
+          {inStepsNow
+            ? STEP_PRESETS.map((count) => (
+                <Chip
+                  key={count}
+                  label={formatNumber(count, locale)}
+                  accessibilityLabel={t('today.steps', { count: formatNumber(count, locale) })}
+                  selected={shownSteps === count}
+                  onPress={() => setSteps(count)}
+                />
+              ))
+            : PRESETS.map((preset) => <Chip key={preset} label={`${preset} min`} selected={duration === preset} onPress={() => setMinutes(preset)} />)}
         </Row>
       </Reveal>
 
@@ -159,6 +237,43 @@ export default function WorkoutSheet() {
         <Button title={t('workout.add')} onPress={() => add.mutate()} disabled={!type} loading={add.isPending} />
       </Reveal>
     </ScrollView>
+  );
+}
+
+/** The step count: the steppers and presets give a round number, a tap types the one the phone shows (6 237). */
+function StepCount({ value, onChange }: { value: number; onChange: (steps: number) => void }) {
+  const { t, locale } = useI18n();
+  const { colors } = useTheme();
+  // The digits being typed; null while the number is shown.
+  const [typing, setTyping] = useState<string | null>(null);
+  return (
+    <Row gap={6} style={{ alignItems: 'baseline' }}>
+      {typing === null ? (
+        <Pressy
+          onPress={() => setTyping(String(value))}
+          accessibilityRole="button"
+          accessibilityLabel={t('today.steps', { count: formatNumber(value, locale) })}
+          accessibilityHint={t('workout.typeSteps')}>
+          <AnimatedNumber value={value} format={(n) => formatNumber(Math.round(n), locale)} variant="display" />
+        </Pressy>
+      ) : (
+        <TextInput
+          autoFocus
+          value={typing}
+          onChangeText={(text) => {
+            const digits = text.replace(/\D/g, '').slice(0, 6);
+            setTyping(digits);
+            if (digits) onChange(Number(digits));
+          }}
+          onBlur={() => setTyping(null)}
+          keyboardType="number-pad"
+          selectTextOnFocus
+          accessibilityLabel={t('workout.steps')}
+          style={[{ minWidth: 64, padding: 0, fontSize: 48, fontFamily: Fonts.display, letterSpacing: -1.2, color: colors.text, textAlign: 'right', fontVariant: ['tabular-nums'] }, webInput]}
+        />
+      )}
+      <Txt tone="secondary">{t('workout.stepsUnit')}</Txt>
+    </Row>
   );
 }
 

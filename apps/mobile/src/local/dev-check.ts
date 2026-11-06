@@ -98,7 +98,7 @@ export async function runDevCheck(log: Log): Promise<{ passed: number; failed: n
   await check('runtime: crypto.randomUUID', async () => crypto.randomUUID());
   await check('migrations on expo-sqlite', async () => {
     const rows = sqlite.getAllSync<{ n: number }>('SELECT count(*) AS n FROM __drizzle_migrations');
-    expect(rows[0]!.n >= 11, `only ${rows[0]?.n} migrations`);
+    expect(rows[0]!.n >= 12, `only ${rows[0]?.n} migrations`);
     return `${rows[0]!.n} applied`;
   });
   await check('engine: Intl and normalize', async () => {
