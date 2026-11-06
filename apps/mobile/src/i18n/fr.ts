@@ -157,6 +157,13 @@ export const fr = {
   'workout.light': 'Légère',
   'workout.moderate': 'Modérée',
   'workout.vigorous': 'Intense',
+  // A walk or a run in steps
+  'workout.steps': 'Pas',
+  'workout.stepsUnit': 'pas',
+  'workout.lessSteps': '500 pas de moins',
+  'workout.moreSteps': '500 pas de plus',
+  'workout.typeSteps': 'Touche pour saisir le nombre exact',
+  'workout.aboutMinutes': 'environ {count} min, d’après tes pas',
 
   // Meal types
   'meal.breakfast': 'Petit-déjeuner',

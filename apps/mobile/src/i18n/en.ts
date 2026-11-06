@@ -153,6 +153,13 @@ export const en: Record<TranslationKey, string> = {
   'workout.light': 'Light',
   'workout.moderate': 'Moderate',
   'workout.vigorous': 'Intense',
+  // A walk or a run in steps
+  'workout.steps': 'Steps',
+  'workout.stepsUnit': 'steps',
+  'workout.lessSteps': '500 fewer steps',
+  'workout.moreSteps': '500 more steps',
+  'workout.typeSteps': 'Tap to type the exact number',
+  'workout.aboutMinutes': 'about {count} min, from your steps',
 
   'meal.breakfast': 'Breakfast',
   'meal.lunch': 'Lunch',

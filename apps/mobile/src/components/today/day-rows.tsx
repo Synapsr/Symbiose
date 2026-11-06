@@ -53,16 +53,21 @@ function Bubble({ children, tint }: { children: ReactNode; tint: string }) {
   return <View style={{ width: 36, height: 36, borderRadius: BUBBLE_RADIUS, borderCurve: 'continuous', backgroundColor: tint, alignItems: 'center', justifyContent: 'center' }}>{children}</View>;
 }
 
-/** « Course · 32 min ». Tap: the Activité sheet. A session added by hand also leaves from there, or with a long press. */
+/**
+ * « Course · 32 min », or « Marche · 6 200 pas » with its minutes beside the intensity.
+ * Tap: the Activité sheet. A session added by hand also leaves from there, or with a long press.
+ */
 export function WorkoutRow({ workout, hideCalories }: { workout: Workout; hideCalories: boolean }) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
   const remove = useDeleteWorkout();
   const Icon = WORKOUT_ICONS[workout.type];
   const manual = workout.source === 'manual';
-  const title = `${t(workoutTypeKey(workout.type))} · ${Math.round(workout.durationMin)} min`;
+  const minutes = `${Math.round(workout.durationMin)} min`;
+  const steps = workout.steps != null ? t('today.steps', { count: formatNumber(workout.steps, locale) }) : null;
+  const title = `${t(workoutTypeKey(workout.type))} · ${steps ?? minutes}`;
   const kcal = workout.activeKcal !== null && !hideCalories ? `${formatNumber(workout.activeKcal, locale)} kcal` : null;
-  const detail = [manual ? (workout.intensity ? t(intensityKey(workout.intensity)) : null) : t('today.moveFromWatch'), kcal].filter(Boolean).join(' · ');
+  const detail = [steps ? minutes : null, manual ? (workout.intensity ? t(intensityKey(workout.intensity)) : null) : t('today.moveFromWatch'), kcal].filter(Boolean).join(' · ');
   return (
     <SmallRow
       bubble={

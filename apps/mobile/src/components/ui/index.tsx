@@ -294,12 +294,28 @@ export function IconButton({
   );
 }
 
-export function Chip({ label, selected, onPress, icon, color }: { label: string; selected?: boolean; onPress?: () => void; icon?: ReactNode; color?: string }) {
+export function Chip({
+  label,
+  selected,
+  onPress,
+  icon,
+  color,
+  accessibilityLabel,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress?: () => void;
+  icon?: ReactNode;
+  color?: string;
+  /** When the label leans on what's around it (« 5 000 » under a step count). */
+  accessibilityLabel?: string;
+}) {
   const { colors, elevation } = useTheme();
   return (
     <Pressy
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected }}
       style={[
         { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, height: 40, borderRadius: Radius.pill, backgroundColor: selected ? (color ?? colors.inverted) : colors.surface },
@@ -323,6 +339,8 @@ export function Segmented<T extends string>({ options, value, onChange }: { opti
           <Pressy
             key={option.value}
             onPress={() => onChange(option.value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
             style={[{ paddingHorizontal: Space.lg, height: 34, borderRadius: Radius.pill, justifyContent: 'center', backgroundColor: active ? colors.surface : 'transparent' }, active ? elevation : null]}>
             <Txt variant="label" tone={active ? 'primary' : 'secondary'}>
               {option.label}

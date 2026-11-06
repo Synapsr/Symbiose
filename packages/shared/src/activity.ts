@@ -19,6 +19,29 @@ export function estimateWorkoutKcal(type: WorkoutType, intensity: WorkoutIntensi
 }
 
 /**
+ * Steps per minute of the sessions that can be logged in steps, to estimate how
+ * long they lasted. Walking: about 100 steps/min is where moderate intensity
+ * starts and about 130 vigorous (Tudor-Locke et al., CADENCE-Adults, 2019); a
+ * stroll is slower, and 120 matches the brisk walk of the METs above.
+ * Running: recreational runners land around 150 to 170.
+ */
+export const STEP_CADENCE: Partial<Record<WorkoutType, Record<WorkoutIntensity, number>>> = {
+  walking: { light: 80, moderate: 100, vigorous: 120 },
+  running: { light: 150, moderate: 160, vigorous: 170 },
+};
+
+/** A walk or a run: what a step counter measures. */
+export function countsSteps(type: WorkoutType): boolean {
+  return STEP_CADENCE[type] !== undefined;
+}
+
+/** How long a session logged in steps lasted, in whole minutes, from its cadence. */
+export function minutesFromSteps(type: WorkoutType, intensity: WorkoutIntensity, steps: number): number {
+  const cadence = STEP_CADENCE[type]?.[intensity] ?? 100;
+  return Math.min(1440, Math.max(1, Math.round(steps / cadence)));
+}
+
+/**
  * A day's steps: the health store's count and the steps of the sessions added
  * by hand are never summed, since the phone may well have counted that walk
  * already. The larger one wins, so a store that missed it (phone left at home,
