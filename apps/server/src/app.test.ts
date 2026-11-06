@@ -655,6 +655,66 @@ describe('physical activity', () => {
   });
 });
 
+describe('steps of a walk added by hand', () => {
+  const coachInputs: CoachInput[] = [];
+  const app = makeApp({
+    ...fakeAi,
+    async coach(input) {
+      coachInputs.push(input);
+      return { reply: 'ok', planChange: null, mealActions: [] };
+    },
+  });
+  const today = toLocalDate();
+  const yesterday = addDays(today, -1);
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const walk = (date: string, steps: number | null, durationMin = 60) => ({ type: 'walking', intensity: 'moderate', startedAt: at(date, '10:00'), localDate: date, durationMin, steps, source: 'manual' });
+  let token = '';
+  const { request: call, register } = clientFor(app);
+  const request = <T,>(method: string, path: string, body?: unknown) => call<T>(method, path, token, body);
+
+  beforeAll(async () => {
+    token = await register('walker@example.com');
+    expect((await request('PUT', '/api/me/profile', profile)).status).toBe(200);
+  });
+
+  it('stores them, and an older client without them still works', async () => {
+    const added = await request<Workout>('POST', '/api/workouts', walk(today, 6200, 62));
+    expect(added.status).toBe(201);
+    expect(added.body).toMatchObject({ steps: 6200, durationMin: 62 });
+    const { steps: _steps, ...older } = walk(yesterday, null);
+    expect((await request<Workout>('POST', '/api/workouts', older)).body.steps).toBeNull();
+    expect((await request('POST', '/api/workouts', walk(today, 1.5))).status).toBe(400);
+    expect((await request('POST', '/api/workouts', walk(today, 250_000))).status).toBe(400);
+  });
+
+  it('count for a day the health store has no steps for: day, week, glance, insights and coach', async () => {
+    await request('POST', '/api/workouts', { ...walk(today, 1800, 20), startedAt: at(today, '18:00') });
+    const day = await request<DaySummary>('GET', `/api/days/${today}`);
+    expect(day.body.activity).toMatchObject({ localDate: today, steps: 8000, activeKcal: null, source: 'manual' });
+    expect(day.body.activityWeek.avgSteps).toBe(8000);
+    // Yesterday's walk has no steps: nothing to show, not a zero.
+    expect((await request<DaySummary>('GET', `/api/days/${yesterday}`)).body.activity).toBeNull();
+
+    expect((await request<Glance>('GET', `/api/glance?date=${today}`)).body.activity.steps).toBe(8000);
+    const insights = await request<InsightsResponse>('GET', '/api/insights?days=7');
+    expect(insights.body.activity.days.find((d) => d.date === today)?.steps).toBe(8000);
+    expect(insights.body.activity.days.find((d) => d.date === yesterday)?.steps).toBeNull();
+
+    await request('POST', '/api/coach/messages', { text: 'Bien marché ?', localDate: today });
+    const coach = coachInputs.at(-1)!;
+    expect(coach.today.activity?.steps).toBe(8000);
+    expect(coach.today.workouts[0]).toEqual({ time: '10:00', type: 'walking', minutes: 62, kcal: expect.any(Number), steps: 6200 });
+    expect(coach.week.workouts.find((w) => w.date === yesterday)).not.toHaveProperty('steps');
+  });
+
+  it("aren't added to the health store's count, which already has that walk", async () => {
+    await request('PUT', '/api/activity', { localDate: today, steps: 11_000, activeKcal: 420, source: 'healthkit' });
+    const day = await request<DaySummary>('GET', `/api/days/${today}`);
+    expect(day.body.activity).toMatchObject({ steps: 11_000, activeKcal: 420, source: 'healthkit' });
+    expect(day.body.activityWeek.avgSteps).toBe(11_000);
+  });
+});
+
 describe('blood pressure', () => {
   const seen = { meal: [] as MealAnalysisInput[], coach: [] as CoachInput[], review: [] as ReviewInput[], plan: [] as PlanDraftInput[] };
   const app = makeApp(

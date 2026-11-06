@@ -1,5 +1,5 @@
-import { activityGoalsFor, addDays, countsAsActive, type ActivityWeek, type GoalPlan, type Workout } from '@symbiose/shared';
-import { and, asc, eq, gte, isNotNull, lte } from 'drizzle-orm';
+import { activityGoalsFor, addDays, countsAsActive, dateRange, daySteps, type ActivityWeek, type GoalPlan, type Workout } from '@symbiose/shared';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 
 import type { ActivityToday, MealAnalysisInput } from '../ai/types';
 import type { Db } from '../db';
@@ -22,6 +22,7 @@ export function toWorkout(row: WorkoutRow): Workout {
     activeKcal: row.activeKcal,
     distanceKm: row.distanceKm,
     avgHeartRate: row.avgHeartRate,
+    steps: row.steps,
     source: row.source,
     createdAt: row.createdAt,
   };
@@ -68,12 +69,18 @@ export function workoutsKcal(list: Pick<Workout, 'activeKcal'>[]): number | null
 export function activityWeek(db: Db, userId: string, date: string, plan: GoalPlan | null): ActivityWeek {
   const from = addDays(date, -6);
   const list = workoutsBetween(db, userId, from, date);
-  const steps = db
-    .select({ steps: activity.steps })
-    .from(activity)
-    .where(and(eq(activity.userId, userId), gte(activity.localDate, from), lte(activity.localDate, date), isNotNull(activity.steps)))
-    .all()
-    .map((row) => row.steps!);
+  const stored = new Map(
+    db
+      .select({ localDate: activity.localDate, steps: activity.steps })
+      .from(activity)
+      .where(and(eq(activity.userId, userId), gte(activity.localDate, from), lte(activity.localDate, date)))
+      .all()
+      .map((row) => [row.localDate, row.steps]),
+  );
+  const steps = dateRange(from, date).flatMap((day) => {
+    const count = daySteps(stored.get(day), list.filter((w) => w.localDate === day));
+    return count === null ? [] : [count];
+  });
   return {
     activeMinutes: activeMinutes(list),
     strengthSessions: list.filter((w) => w.type === 'strength').length,
@@ -94,7 +101,7 @@ export function activityToday(db: Db, userId: string, date: string): ActivityTod
   if (!row && !list.length) return null;
   const watchKcal = row?.activeKcal ?? null;
   return {
-    steps: row?.steps ?? null,
+    steps: daySteps(row?.steps, list),
     activeKcal: watchKcal === null ? workoutsKcal(list) : Math.round(watchKcal),
     workouts: list.length,
   };

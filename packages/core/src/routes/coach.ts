@@ -89,7 +89,12 @@ function buildCoachInput(db: Db, userId: string, text: string, localDate: string
 
   const day = daySummary(db, userId, localDate);
   const week = computeInsights(db, userId, addDays(localDate, -6), localDate);
-  const brief = (w: Workout) => ({ type: w.type, minutes: Math.round(w.durationMin), kcal: w.activeKcal === null ? null : Math.round(w.activeKcal) });
+  const brief = (w: Workout) => ({
+    type: w.type,
+    minutes: Math.round(w.durationMin),
+    kcal: w.activeKcal === null ? null : Math.round(w.activeKcal),
+    ...(w.steps === null ? {} : { steps: w.steps }),
+  });
   return {
     ...resolved.context,
     history: turns,

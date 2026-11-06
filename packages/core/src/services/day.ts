@@ -5,6 +5,7 @@ import {
   computeTargets,
   courseItems,
   dateRange,
+  daySteps,
   focusNutrients,
   foodKey,
   goalNutrient,
@@ -52,6 +53,19 @@ export function toActivity(row: ActivityRow): DayActivity {
     source: row.source,
     updatedAt: row.updatedAt,
   };
+}
+
+/**
+ * A day's activity with its steps as `daySteps` counts them, so a walk added by
+ * hand shows on a day the health store has no steps for. Without a row from the
+ * store, those steps come alone (source « manual », the rest unknown).
+ */
+function dayActivity(row: ActivityRow | undefined, date: string, workouts: Workout[]): DayActivity | null {
+  const steps = daySteps(row?.steps, workouts);
+  if (row) return { ...toActivity(row), steps };
+  if (steps === null) return null;
+  const updatedAt = workouts.map((w) => w.createdAt).sort().at(-1)!;
+  return { localDate: date, steps, activeKcal: null, restingKcal: null, weightKg: null, source: 'manual', updatedAt };
 }
 
 export function toCraving(row: CravingRow): Craving {
@@ -115,6 +129,7 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
     .all()
     .map(toCraving);
 
+  const dayWorkouts = workoutsBetween(db, userId, date, date);
   const profile = resolved.row.profile!;
   return {
     date,
@@ -123,8 +138,8 @@ export function daySummary(db: Db, userId: string, date: string): DaySummary {
     totals,
     progress: computeProgress(totals, resolved.targets, order),
     meals: dayMeals,
-    activity: activityRow ? toActivity(activityRow) : null,
-    workouts: workoutsBetween(db, userId, date, date),
+    activity: dayActivity(activityRow, date, dayWorkouts),
+    workouts: dayWorkouts,
     activityWeek: activityWeek(db, userId, date, resolved.row.plan ?? null),
     cravings: {
       total: dayCravings.length,
@@ -203,7 +218,7 @@ export function computeInsights(db: Db, userId: string, from: string, to: string
       activeKcal,
       weightKg: weightByDay.get(date) ?? null,
     });
-    activityDays.push({ date, activeMinutes: activeMinutes(dayWorkouts), steps: act?.steps ?? null, workouts: dayWorkouts.length });
+    activityDays.push({ date, activeMinutes: activeMinutes(dayWorkouts), steps: daySteps(act?.steps, dayWorkouts), workouts: dayWorkouts.length });
     if (!logged) continue;
     for (const key of watched) {
       const target = targets[key];

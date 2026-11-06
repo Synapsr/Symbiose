@@ -87,5 +87,12 @@ export const MIGRATIONS: BundledMigration[] = [
     "tag": "0010_meal_courses",
     "breakpoints": true,
     "sql": "ALTER TABLE `meals` ADD `courses` text;"
+  },
+  {
+    "idx": 11,
+    "when": 1793993848728,
+    "tag": "0011_workout_steps",
+    "breakpoints": true,
+    "sql": "ALTER TABLE `workouts` ADD `steps` integer;"
   }
 ];

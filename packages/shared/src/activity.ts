@@ -18,6 +18,20 @@ export function estimateWorkoutKcal(type: WorkoutType, intensity: WorkoutIntensi
   return Math.round((MET[type][intensity] - 1) * weightKg * (durationMin / 60));
 }
 
+/**
+ * A day's steps: the health store's count and the steps of the sessions added
+ * by hand are never summed, since the phone may well have counted that walk
+ * already. The larger one wins, so a store that missed it (phone left at home,
+ * a Health Connect without a step counter saying 0) doesn't hide it either.
+ * Null when neither says anything.
+ */
+export function daySteps(storeSteps: number | null | undefined, workouts: readonly Pick<Workout, 'steps'>[]): number | null {
+  let logged: number | null = null;
+  for (const workout of workouts) if (workout.steps != null) logged = (logged ?? 0) + workout.steps;
+  if (storeSteps == null) return logged;
+  return logged === null ? storeSteps : Math.max(storeSteps, logged);
+}
+
 /** Goal-based defaults when the plan doesn't set activity guardrails. */
 export function defaultActivityGoals(plan: Pick<GoalPlan, 'tags'> | null): ActivityGoals {
   const tags = new Set(plan?.tags ?? []);

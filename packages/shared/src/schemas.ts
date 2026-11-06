@@ -97,6 +97,8 @@ export const WorkoutInputSchema = z.object({
   activeKcal: z.number().min(0).max(10_000).nullable().default(null),
   distanceKm: z.number().min(0).max(1000).nullable().default(null),
   avgHeartRate: z.number().min(30).max(250).nullable().default(null),
+  /** Steps of a walk or a run added by hand; they count for the day when the health store has none (`daySteps`). */
+  steps: z.number().int().min(0).max(200_000).nullable().default(null),
   source: WorkoutSourceSchema,
 });
 export type WorkoutInput = z.input<typeof WorkoutInputSchema>;
@@ -123,7 +125,7 @@ export interface ActivityWeek {
   activeMinutes: number;
   strengthSessions: number;
   workouts: number;
-  /** Average daily steps over the days that have step data. */
+  /** Average daily steps over the days that have step data (`daySteps`). */
   avgSteps: number | null;
   goals: ActivityGoals;
 }
@@ -413,6 +415,7 @@ export type ActivityInput = z.input<typeof ActivityInputSchema>;
 
 export interface DayActivity {
   localDate: string;
+  /** In a day's summary: the health store's count, else the steps of the sessions added by hand (`daySteps`). */
   steps: number | null;
   activeKcal: number | null;
   restingKcal: number | null;
