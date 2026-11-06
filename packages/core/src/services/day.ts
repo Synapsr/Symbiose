@@ -57,7 +57,7 @@ export function toActivity(row: ActivityRow): DayActivity {
 
 /**
  * A day's activity with its steps as `daySteps` counts them, so a walk added by
- * hand shows on a day the health store has no steps for. Without a row from the
+ * hand shows on a day the health store missed it. Without a row from the
  * store, those steps come alone (source « manual », the rest unknown).
  */
 function dayActivity(row: ActivityRow | undefined, date: string, workouts: Workout[]): DayActivity | null {
