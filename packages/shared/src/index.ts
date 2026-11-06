@@ -14,3 +14,4 @@ export * from './plan-limits';
 export * from './proactive';
 export * from './admin';
 export * from './sugars';
+export * from './progress';

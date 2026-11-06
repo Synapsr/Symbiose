@@ -63,6 +63,15 @@ Answering the question or typing a correction calls `/refine`, which re-runs the
 
 **Barcodes** go to Open Food Facts. When a product doesn't report added sugars, they are inferred from the ingredient list.
 
+## Streaks and milestones
+
+« Séries et étapes » rewards showing up, never a number on a plate or on the scale. It is computed, not stored: `packages/shared/src/progress.ts` reads the days with a meal and the cravings resisted, the same on a server and on the phone.
+
+- **The streak** counts the days logged in the run under way; today, while still open, never breaks it. **Rest days** forgive: one is earned every 7 days logged (2 at most) and covers a day without a meal, so one forgotten evening never wipes out weeks of effort.
+- **Milestones** come in three families: the streak (3, 7, 14, 30… 365 days), the days logged in all (10 to 1000) and the cravings beaten (5 to 100, shown once a craving was logged). Each is dated on the day it was reached.
+- **On the phone**, the flame on Today opens « Ta progression ». A milestone reached today is celebrated once, full screen, when the tabs are in front (`useMilestoneCelebrations`): the ones found already reached are noted quietly. Its card is drawn in SVG and shared as a PNG (`share-card.tsx`, `toDataURL`): the mark, the number, the day, nothing personal. An optional evening reminder (20:30) is planned on the phone while the streak waits for today's meal.
+- **Off switch.** « Séries et étapes » in Me hides the flame, the milestones, their celebrations and the reminder.
+
 ## The coach
 
 The coach answers in light Markdown, streamed word by word (`POST /api/coach/messages/stream`). Its context is built on the server: the plan and targets, today's meals, recent days, cravings, activity, and the modules the person turned on (sleep, water, mood, blood pressure, journal). It can **propose**, never act alone: a new plan (`propose_plan_change`) or adding, fixing or deleting a meal (`propose_meal_action`). Each proposal is a card the person confirms.
@@ -134,6 +143,7 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 | POST / DELETE | `/api/meals/:id/courses/:courseId/separate`, `/api/meals/:id/courses/:courseId` | a course as a meal of its own, or deleted |
 | POST | `/api/meals/:id/merge` | joins another meal of the day as courses (« Séparer », undone) |
 | GET | `/api/days/:date` | targets, totals, progress, meals, activity, cravings, streak |
+| GET | `/api/progress?today=` | the streak, its rest days, the milestones reached and the next ones |
 | GET | `/api/glance` | the key numbers for the watch, widgets and Live Activity, and meals to log again |
 | GET | `/api/foods/library`, `/api/foods/barcode/:code` | recents and favourites, Open Food Facts lookup |
 | PUT | `/api/activity` | daily health data from the phone |

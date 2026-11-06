@@ -22,6 +22,7 @@ import {
   type Meal,
   type MoodCheckIn,
   type Profile,
+  type ProgressSummary,
   type SleepTrend,
   type User,
   type WaterEntry,
@@ -363,6 +364,14 @@ describe('Symbiose API', () => {
     expect(day.body.activity?.steps).toBe(9000);
     expect(day.body.cravings).toMatchObject({ total: 1, resisted: 1 });
     expect(day.body.streak).toBe(1);
+
+    // « Ta progression »: the streak, and the cravings family once one is logged (its first step is 5).
+    const progress = await request<ProgressSummary>('GET', `/api/progress?today=${today}`);
+    expect(progress.status).toBe(200);
+    expect(progress.body.streak).toMatchObject({ current: 1, best: 1, todayLogged: true });
+    expect(progress.body.families.map((f) => f.family)).toEqual(['streak', 'days', 'cravings']);
+    expect(progress.body.families[2]).toEqual({ family: 'cravings', count: 1, next: 5 });
+    expect(progress.body.reached).toEqual([]);
 
     const me = await request<{ profile: Profile }>('GET', '/api/me');
     expect(me.body.profile.weightKg).toBe(74.2);
