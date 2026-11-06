@@ -6,7 +6,7 @@ import Animated, { LayoutAnimationConfig, ZoomIn } from 'react-native-reanimated
 import { Pressy, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { useProgress } from '@/lib/progress';
-import { useSettings, useToast } from '@/lib/stores';
+import { useSettings } from '@/lib/stores';
 import { Radius, Space, useTheme } from '@/theme';
 
 /**
@@ -18,7 +18,6 @@ export function StreakPill({ day }: { day: DaySummary | undefined }) {
   const { t, plural } = useI18n();
   const { colors, elevation } = useTheme();
   const on = useSettings((s) => s.motivation);
-  const showToast = useToast((s) => s.show);
   const progress = useProgress();
   const summary = progress.data;
   // An older server has no « Ta progression »: the day's own streak, as before.
@@ -32,7 +31,8 @@ export function StreakPill({ day }: { day: DaySummary | undefined }) {
 
   return (
     <Pressy
-      onPress={() => (progress.error ? showToast({ message: label }) : router.push('/progress'))}
+      // Always to « Ta progression »: with an older server it says, in so many words, that it comes with the update.
+      onPress={() => router.push('/progress')}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={t('progress.open')}
