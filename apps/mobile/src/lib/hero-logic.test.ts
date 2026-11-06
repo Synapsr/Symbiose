@@ -1,7 +1,7 @@
 import type { GoalPlan, NutrientKey } from '@symbiose/shared';
 import { describe, expect, it } from 'vitest';
 
-import { dragPosition, heroBars, heroChoice, heroIndex, heroPages, rubberBand, snapPage } from './hero-logic';
+import { dragPosition, HERO_MAX, HERO_ORDER, heroChoice, heroDefaults, heroIndex, heroPages, rubberBand, snapPage, toggleHero } from './hero-logic';
 
 type Plan = Pick<GoalPlan, 'focus' | 'rules'>;
 const rule = (nutrient: NutrientKey, kind: 'max' | 'min', value: number) => ({ nutrient, kind, value, reason: '' });
@@ -9,53 +9,61 @@ const rule = (nutrient: NutrientKey, kind: 'max' | 'min', value: number) => ({ n
 const sugar: Plan = { focus: ['addedSugar', 'kcal'], rules: [rule('addedSugar', 'max', 25), rule('satFat', 'max', 18)] };
 
 describe('heroPages', () => {
-  it('opens on the goal, then the focus, calories, the rules, protein and fibre', () => {
-    const plan: Plan = { focus: ['protein', 'kcal'], rules: [rule('satFat', 'max', 18)] };
-    expect(heroPages(plan, false)).toEqual(['protein', 'kcal', 'satFat', 'fiber']);
+  it('reads the day simply by default: the goal, calories, protein and fibre', () => {
+    expect(heroPages(sugar, false)).toEqual(['addedSugar', 'kcal', 'protein', 'fiber']);
   });
 
-  it('follows added sugars with total sugars, then carbs, when the goal is about sugar', () => {
-    expect(heroPages(sugar, false)).toEqual(['addedSugar', 'sugar', 'carbs', 'kcal', 'satFat', 'protein', 'fiber']);
+  it('adds the plan’s focus, in its order, and never repeats a page', () => {
+    expect(heroPages({ focus: ['protein', 'fiber', 'kcal'], rules: [rule('sodium', 'max', 2000)] }, false)).toEqual(['protein', 'fiber', 'kcal']);
+    expect(heroPages({ focus: ['fiber', 'sugar'], rules: [] }, false)).toEqual(['fiber', 'sugar', 'kcal', 'protein']);
   });
 
-  it('gathers the sugar family where it first appears, even after calories', () => {
-    const plan: Plan = { focus: ['kcal', 'addedSugar'], rules: [rule('carbs', 'max', 200), rule('sugar', 'max', 60)] };
-    expect(heroPages(plan, false)).toEqual(['kcal', 'addedSugar', 'sugar', 'carbs', 'protein', 'fiber']);
-  });
-
-  it('opens on total sugars then carbs when total sugars are the goal, added sugars only if the plan names them', () => {
-    expect(heroPages({ focus: ['sugar'], rules: [] }, false)).toEqual(['sugar', 'carbs', 'kcal', 'protein', 'fiber']);
-    expect(heroPages({ focus: ['sugar'], rules: [rule('addedSugar', 'max', 25)] }, false)).toEqual(['sugar', 'carbs', 'addedSugar', 'kcal', 'protein', 'fiber']);
-  });
-
-  it('leads with carbs, then total sugars, in blood-sugar mode', () => {
+  it('leads with carbs in blood-sugar mode, without the other sugars unless chosen', () => {
     const plan = { focus: ['carbs', 'fiber'] as NutrientKey[], rules: [rule('fiber', 'min', 30)], tags: ['blood_sugar' as const], carbsPerMeal: 45 };
-    expect(heroPages(plan, true)).toEqual(['carbs', 'sugar', 'fiber', 'protein']);
-  });
-
-  it('leaves the sugar family alone when the goal is not about sugar', () => {
-    const plan: Plan = { focus: ['protein'], rules: [rule('sugar', 'max', 50)] };
-    expect(heroPages(plan, false)).toEqual(['protein', 'kcal', 'sugar', 'fiber']);
-  });
-
-  it('keeps the plan’s focus order and never repeats a page', () => {
-    const plan: Plan = { focus: ['protein', 'fiber', 'kcal'], rules: [rule('protein', 'min', 120), rule('sodium', 'max', 2000)] };
-    expect(heroPages(plan, false)).toEqual(['protein', 'fiber', 'kcal', 'sodium']);
-  });
-
-  it('puts calories right after the focus when the plan does not name them', () => {
-    const plan: Plan = { focus: ['fiber'], rules: [rule('sugar', 'max', 50)] };
-    expect(heroPages(plan, false)).toEqual(['fiber', 'kcal', 'sugar', 'protein']);
+    expect(heroPages(plan, true)).toEqual(['carbs', 'fiber', 'protein']);
   });
 
   it('leaves hidden calories out, even when the plan puts them first', () => {
-    expect(heroPages(sugar, true)).toEqual(['addedSugar', 'sugar', 'carbs', 'satFat', 'protein', 'fiber']);
+    expect(heroPages(sugar, true)).toEqual(['addedSugar', 'protein', 'fiber']);
     expect(heroPages({ focus: ['kcal'], rules: [] }, true)).toEqual(['protein', 'fiber']);
   });
 
   it('has calories, protein and fibre before any plan', () => {
     expect(heroPages(null, false)).toEqual(['kcal', 'protein', 'fiber']);
     expect(heroPages(null, true)).toEqual(['protein', 'fiber']);
+  });
+});
+
+describe('the rings chosen with a long press', () => {
+  it('replace the default after the goal, in the choice’s order', () => {
+    expect(heroPages(sugar, false, ['fiber', 'sodium', 'protein'])).toEqual(['addedSugar', 'protein', 'fiber', 'sodium']);
+  });
+
+  it('keep the sugars side by side after the goal’s: total sugars, then carbs', () => {
+    expect(heroPages(sugar, false, ['carbs', 'kcal', 'sugar', 'fiber'])).toEqual(['addedSugar', 'sugar', 'carbs', 'kcal', 'fiber']);
+    expect(heroPages({ focus: ['carbs'], rules: [] }, false, ['addedSugar', 'sugar', 'protein'])).toEqual(['carbs', 'sugar', 'addedSugar', 'protein']);
+  });
+
+  it('always start with the goal, and still hide hidden calories', () => {
+    expect(heroPages(sugar, true, ['kcal', 'protein'])).toEqual(['addedSugar', 'protein']);
+    expect(heroPages(sugar, false, [])).toEqual(['addedSugar']);
+  });
+
+  it('hold six rings at most', () => {
+    expect(HERO_MAX).toBe(6);
+    expect(heroPages(sugar, false, [...HERO_ORDER])).toEqual(['addedSugar', 'sugar', 'carbs', 'kcal', 'protein', 'fiber']);
+  });
+
+  it('start from the default, without the goal', () => {
+    expect(heroDefaults(sugar, false)).toEqual(['kcal', 'protein', 'fiber']);
+  });
+
+  it('tick and untick a nutrient, never the goal, and stop at six with the goal', () => {
+    expect(toggleHero(['kcal', 'protein'], 'carbs', 'addedSugar')).toEqual(['kcal', 'protein', 'carbs']);
+    expect(toggleHero(['kcal', 'protein'], 'kcal', 'addedSugar')).toEqual(['protein']);
+    expect(toggleHero(['kcal'], 'addedSugar', 'addedSugar')).toEqual(['kcal']);
+    const full: NutrientKey[] = ['kcal', 'protein', 'fiber', 'sugar', 'carbs'];
+    expect(toggleHero(full, 'sodium', 'addedSugar')).toEqual(full);
   });
 });
 
@@ -67,9 +75,9 @@ describe('heroIndex and heroChoice', () => {
   });
 
   it('remembers the chosen page, from one day to the next', () => {
-    const saved = heroChoice(pages, 1);
-    expect(saved).toEqual({ nutrient: 'sugar', goal: 'addedSugar' });
-    expect(heroIndex(pages, saved)).toBe(1);
+    const saved = heroChoice(pages, 2);
+    expect(saved).toEqual({ nutrient: 'protein', goal: 'addedSugar' });
+    expect(heroIndex(pages, saved)).toBe(2);
   });
 
   it('forgets nothing when back on the goal: there is simply no choice to keep', () => {
@@ -77,36 +85,19 @@ describe('heroIndex and heroChoice', () => {
   });
 
   it('follows the nutrient, not the position, when the pages change', () => {
-    const saved = heroChoice(pages, 5); // protein
-    expect(heroIndex(heroPages(sugar, true), saved)).toBe(4);
+    const saved = heroChoice(pages, 2); // protein
+    expect(heroIndex(heroPages(sugar, true), saved)).toBe(1);
   });
 
   it('falls back to the goal when the chosen page is gone (calories hidden since)', () => {
-    const saved = heroChoice(pages, 3); // calories
+    const saved = heroChoice(pages, 1); // calories
     expect(heroIndex(heroPages(sugar, true), saved)).toBe(0);
   });
 
   it('opens a new goal on its own nutrient', () => {
-    const saved = heroChoice(pages, 5); // protein, chosen under the sugar goal
+    const saved = heroChoice(pages, 2); // protein, chosen under the sugar goal
     const next = heroPages({ focus: ['fiber', 'kcal'], rules: [] }, false);
     expect(heroIndex(next, saved)).toBe(0);
-  });
-});
-
-describe('heroBars', () => {
-  const pages = heroPages(sugar, false);
-
-  it('shows the next pages beside the goal’s ring: total sugars and carbs around added sugars', () => {
-    expect(heroBars(pages, 'addedSugar')).toEqual(['sugar', 'carbs', 'kcal']);
-  });
-
-  it('keeps the goal as the first bar on every other page', () => {
-    expect(heroBars(pages, 'kcal')).toEqual(['addedSugar', 'sugar', 'carbs']);
-    expect(heroBars(pages, 'fiber')).toEqual(['addedSugar', 'sugar', 'carbs']);
-  });
-
-  it('shows fewer bars when there are fewer pages', () => {
-    expect(heroBars(heroPages(null, true), 'protein')).toEqual(['fiber']);
   });
 });
 

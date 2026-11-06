@@ -144,6 +144,7 @@ function App({ signedIn, onboarded, locale }: { signedIn: boolean; onboarded: bo
               options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }}
             />
             <Stack.Screen name="log" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
+            <Stack.Screen name="hero-rings" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
             <Stack.Screen name="journal" options={{ presentation: 'modal' }} />
             <Stack.Screen name="coach-settings" options={{ presentation: 'modal' }} />
             <Stack.Screen name="admin" options={{ presentation: 'modal' }} />

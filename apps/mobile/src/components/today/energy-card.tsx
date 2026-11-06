@@ -1,17 +1,18 @@
 import { heroNutrient as sharedHero, type DaySummary, type GoalPlan, type NutrientKey, type NutrientProgress } from '@symbiose/shared';
+import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withSequence, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { AnimatedNumber, Bar, Card, Dot, Glow, Ring, Row, Txt } from '@/components/ui';
+import { AnimatedNumber, Card, Dot, Glow, Pressy, Ring, Row, Txt } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
 import { formatAmount, formatNumber, unitOf } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { dragPosition, heroBars, heroChoice, heroIndex, heroPages, snapPage } from '@/lib/hero-logic';
+import { dragPosition, heroChoice, heroIndex, heroPages, snapPage } from '@/lib/hero-logic';
 import { useSettings } from '@/lib/stores';
-import { Motion, NUTRIENT_COLORS, Space, useTheme, type Palette } from '@/theme';
+import { Fonts, Motion, NUTRIENT_COLORS, Radius, Space, useTheme, type Palette } from '@/theme';
 
 /** The goal decides the hero metric; shared with the server so the watch and widgets agree. */
 export function heroNutrient(day: DaySummary, plan: GoalPlan | null, hideCalories: boolean): NutrientKey {
@@ -25,12 +26,17 @@ const PAD = Space.lg + 2;
 const PAGE_SPRING = { damping: 30, stiffness: 260, mass: 1 } as const;
 
 /**
- * The hero: what's left today for one nutrient, with three others as quiet
- * bars beside it. One card, not two. It opens on the goal's nutrient and turns
- * like pages: a horizontal swipe shows calories, protein, fibre and the plan's
- * other nutrients; the page chosen is remembered (`heroPage`) until the goal
- * changes. The day line above it stays on the goal.
- * Before the first meal there are no bars: a day starts with its budget, not a row of zeros.
+ * The hero: what's left today for one nutrient in a big ring, and every
+ * nutrient of the day as a small ring in one row under it, so sugars, protein
+ * and fibre are read together. One card, not two. It opens on the goal's
+ * nutrient; a small ring tapped, or a horizontal swipe, brings another into the
+ * big ring (the row's tinted cell follows). The choice is remembered
+ * (`heroPage`) until the goal changes. The day line above it stays on the goal.
+ * Which rings: a simple default (the goal, calories, protein, fibre), or the
+ * person's own, chosen with a long press on the card (`heroRings`, `hero-rings.tsx`).
+ * A small ring says what its big ring would: what's left, « +5 » once a limit
+ * is passed, ✓ once a minimum is reached. Before the first meal that is the
+ * whole budget: a day starts with it, not with a row of zeros.
  * A goal reached today lights the ring up for a moment (`glow`, from `useGoalRewards`).
  * `hint` lets the card show, once ever, that it turns: it peeks at the next page.
  *
@@ -59,15 +65,14 @@ export function EnergyCard({
   const reduced = useReducedMotion();
   const saved = useSettings((s) => s.heroPage);
   const hinted = useSettings((s) => s.heroHinted);
+  const chosen = useSettings((s) => s.heroRings);
   const set = useSettings((s) => s.set);
 
-  const pages = heroPages(plan, hideCalories).filter((key) => day.progress.some((p) => p.nutrient === key));
+  const pages = heroPages(plan, hideCalories, chosen).filter((key) => day.progress.some((p) => p.nutrient === key));
   const count = pages.length;
   const index = heroIndex(pages, saved);
   const fresh = day.meals.length === 0;
   const views = pages.map((key) => pageView(day.progress.find((p) => p.nutrient === key)!, fresh, t, locale, colors));
-  const barsOf = (key: NutrientKey) =>
-    fresh ? [] : heroBars(pages, key).flatMap((other) => day.progress.filter((p) => p.nutrient === other));
 
   // A page is the card's width: guessed from the window (Today is one column, at most 640 wide) until measured.
   const [measured, setMeasured] = useState(0);
@@ -128,13 +133,26 @@ export function EnergyCard({
       if (next !== from) scheduleOnRN(choose, next);
     });
 
-  // VoiceOver and TalkBack turn the pages as an adjustable value: swipe up or down.
+  // A long press anywhere on the card chooses its rings. Whichever starts first wins: a finger that
+  // moves turns the page, one that rests opens the choice.
+  const customize = () => {
+    haptics.impact();
+    router.push('/hero-rings');
+  };
+  const hold = Gesture.LongPress()
+    .minDuration(420)
+    .onStart(() => {
+      scheduleOnRN(customize);
+    });
+
+  // VoiceOver and TalkBack turn the pages as an adjustable value: swipe up or down. The small rings
+  // are for the eye; each page reads the others' numbers instead.
   const spoken = views.map((view, i) =>
     [
       nutrient(view.key),
       view.center,
       view.summary.replace(' · ', ', '),
-      ...barsOf(view.key).map((p) => `${nutrient(p.nutrient)} ${barValue(p, locale)}`),
+      ...views.filter((other) => other !== view).map((other) => `${nutrient(other.key)} ${barValue(other.progress, locale)}`),
       t('hero.page', { n: i + 1, count }),
     ].join(', '),
   );
@@ -150,33 +168,31 @@ export function EnergyCard({
   const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -position.value * width }] }));
 
   return (
-    <GestureDetector gesture={pan}>
+    <GestureDetector gesture={Gesture.Race(pan, hold)}>
       <Animated.View
         onLayout={(e) => setMeasured(e.nativeEvent.layout.width)}
         accessible
         accessibilityRole={count > 1 ? 'adjustable' : 'summary'}
         accessibilityLabel={t('hero.a11y')}
         aria-valuetext={spoken[index]}
-        accessibilityActions={count > 1 ? [{ name: 'increment' }, { name: 'decrement' }] : undefined}
-        onAccessibilityAction={(e) => go(index + (e.nativeEvent.actionName === 'increment' ? 1 : -1))}>
+        accessibilityActions={[...(count > 1 ? [{ name: 'increment' }, { name: 'decrement' }] : []), { name: 'customize', label: t('heroRings.title') }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'customize') customize();
+          else go(index + (e.nativeEvent.actionName === 'increment' ? 1 : -1));
+        }}>
         <Card padded={false} style={{ overflow: 'hidden' }}>
           {views.map((view, i) => (
             <PageGlow key={view.key} page={i} position={position} color={view.color} />
           ))}
-          {/* The card speaks for its pages (above); TalkBack would otherwise stop on each bar too. */}
+          {/* The card speaks for its pages (above); TalkBack would otherwise stop on each ring too. */}
           <Animated.View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden style={[{ flexDirection: 'row', width: width * count }, strip]}>
             {views.map((view) => (
-              <View key={view.key} style={{ width, paddingHorizontal: PAD, paddingTop: PAD, paddingBottom: count > 1 ? Space.md : PAD, justifyContent: 'center' }}>
-                <HeroPage
-                  view={view}
-                  bars={barsOf(view.key)}
-                  kcal={fresh && view.key !== 'kcal' && !hideCalories ? day.progress.find((p) => p.nutrient === 'kcal') : undefined}
-                  glow={glow}
-                />
+              <View key={view.key} style={{ width, paddingHorizontal: PAD, paddingTop: PAD, paddingBottom: count > 1 ? Space.xs : PAD, justifyContent: 'center' }}>
+                <HeroPage view={view} glow={glow} />
               </View>
             ))}
           </Animated.View>
-          {count > 1 ? <PageDots colors={views.map((v) => colorFor(v.key, colors.accent))} position={position} /> : null}
+          {count > 1 ? <RingRow views={views} position={position} selected={index} onSelect={go} /> : null}
         </Card>
       </Animated.View>
     </GestureDetector>
@@ -239,9 +255,9 @@ function pageView(
   };
 }
 
-/** One page: the ring, the nutrient and its numbers, then the bars of the others. */
-function HeroPage({ view, bars, kcal, glow }: { view: PageView; bars: NutrientProgress[]; kcal?: NutrientProgress; glow?: SharedValue<number> }) {
-  const { locale, nutrient } = useI18n();
+/** One page: the big ring, the nutrient's name and its numbers beside it. */
+function HeroPage({ view, glow }: { view: PageView; glow?: SharedValue<number> }) {
+  const { nutrient } = useI18n();
   const { colors } = useTheme();
   const centerValue = view.formatCenter(Math.abs(view.remaining));
   return (
@@ -261,26 +277,16 @@ function HeroPage({ view, bars, kcal, glow }: { view: PageView; bars: NutrientPr
         </Ring>
       </RingSwell>
 
-      <View style={{ flex: 1, gap: Space.md }}>
-        <View style={{ gap: 3 }}>
-          <Row gap={6}>
-            <Dot color={colorFor(view.key, colors.accent)} />
-            <Txt variant="overline" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {nutrient(view.key)}
-            </Txt>
-          </Row>
-          <Txt variant="label" tone={view.over ? 'warning' : 'primary'} numberOfLines={2} style={{ fontVariant: ['tabular-nums'] }}>
-            {view.summary}
+      <View style={{ flex: 1, gap: 4 }}>
+        <Row gap={6}>
+          <Dot color={colorFor(view.key, colors.accent)} />
+          <Txt variant="overline" tone="secondary" numberOfLines={1} style={{ flexShrink: 1 }}>
+            {nutrient(view.key)}
           </Txt>
-          {kcal ? (
-            <Txt variant="caption" tone="secondary" style={{ fontVariant: ['tabular-nums'] }}>
-              {nutrient('kcal')} · {formatNumber(kcal.target.value, locale)} kcal
-            </Txt>
-          ) : null}
-        </View>
-        {bars.map((p) => (
-          <MiniBar key={p.nutrient} progress={p} />
-        ))}
+        </Row>
+        <Txt variant="label" tone={view.over ? 'warning' : 'primary'} numberOfLines={2} style={{ fontSize: 16, lineHeight: 21, fontVariant: ['tabular-nums'] }}>
+          {view.summary}
+        </Txt>
       </View>
     </Row>
   );
@@ -296,31 +302,53 @@ function PageGlow({ page, position, color }: { page: number; position: SharedVal
   );
 }
 
-/** Where you are among the pages: small dots, the current one drawn longer in its nutrient's colour. */
-function PageDots({ colors: tints, position }: { colors: string[]; position: SharedValue<number> }) {
+/**
+ * Every nutrient of the hero as a small ring, in the pages' order. The one in the big ring sits on
+ * a tint of its colour, which slides from cell to cell with the swipe. A tap brings a ring up.
+ */
+function RingRow({ views, position, selected, onSelect }: { views: PageView[]; position: SharedValue<number>; selected: number; onSelect: (index: number) => void }) {
   return (
-    <Row gap={5} style={{ justifyContent: 'center', paddingBottom: Space.md - 1 }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
-      {tints.map((tint, i) => (
-        <PageDot key={i} page={i} tint={tint} position={position} />
+    <Row gap={0} style={{ alignItems: 'stretch', paddingHorizontal: ROW_INSET, paddingBottom: ROW_INSET }} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+      {views.map((view, i) => (
+        <SmallRing key={view.key} view={view} page={i} position={position} selected={i === selected} onPress={() => onSelect(i)} />
       ))}
     </Row>
   );
 }
 
-const DOT = 5;
-const DOT_ACTIVE = 16;
-
-function PageDot({ page, tint, position }: { page: number; tint: string; position: SharedValue<number> }) {
-  const { colors } = useTheme();
-  // Widths trade linearly between two dots, so the row keeps its length and never shifts.
-  const shape = useAnimatedStyle(() => ({ width: DOT + (DOT_ACTIVE - DOT) * Math.max(0, 1 - Math.abs(position.value - page)) }));
-  const fill = useAnimatedStyle(() => ({ opacity: Math.max(0, 1 - Math.abs(position.value - page)) }));
+function SmallRing({ view, page, position, selected, onPress }: { view: PageView; page: number; position: SharedValue<number>; selected: boolean; onPress: () => void }) {
+  const { nutrient } = useI18n();
+  const { colors, scheme } = useTheme();
+  const tint = colorFor(view.key, colors.accent);
+  const shade = useAnimatedStyle(() => ({ opacity: (scheme === 'dark' ? 0.16 : 0.1) * Math.max(0, 1 - Math.abs(position.value - page)) }));
+  const value = view.over ? `+${view.formatCenter(Math.abs(view.remaining))}` : view.formatCenter(Math.abs(view.remaining));
   return (
-    <Animated.View style={[{ height: DOT, borderRadius: DOT / 2, backgroundColor: colors.text3, overflow: 'hidden' }, shape]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: tint }, fill]} />
-    </Animated.View>
+    <Pressy haptic={false} onPress={onPress} hitSlop={{ top: 4, bottom: 4 }} style={{ flex: 1, alignItems: 'center', gap: 6, paddingTop: Space.md, paddingBottom: Space.sm + 2, paddingHorizontal: 2 }}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: tint, borderRadius: CELL_RADIUS, borderCurve: 'continuous' }, shade]} />
+      <Ring progress={view.progress.ratio} size={SMALL} stroke={4} color={view.color}>
+        <Txt
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          tone={view.over ? 'warning' : 'primary'}
+          style={{ fontFamily: Fonts.rounded, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'], maxWidth: SMALL - 13, textAlign: 'center' }}>
+          {view.reachedMin ? '✓' : value}
+        </Txt>
+      </Ring>
+      <Txt
+        numberOfLines={2}
+        tone={selected ? 'primary' : 'secondary'}
+        style={{ fontSize: 11, lineHeight: 13, fontWeight: selected ? '600' : '400', textAlign: 'center' }}>
+        {nutrient(view.key)}
+      </Txt>
+    </Pressy>
   );
 }
+
+const SMALL = 42;
+/** The row sits this far from the card's edges; its cells round off concentrically with the card. */
+const ROW_INSET = Space.sm + 2;
+const CELL_RADIUS = Radius.xl - ROW_INSET;
 
 const RING = 118;
 const HALO = 300;
@@ -350,26 +378,4 @@ function barValue(p: NutrientProgress, locale: 'fr' | 'en'): string {
   return p.nutrient === 'kcal'
     ? `${formatNumber(p.consumed, locale)} / ${formatNumber(p.target.value, locale)}`
     : `${formatAmount(p.nutrient, p.consumed, locale, false)} / ${formatAmount(p.nutrient, p.target.value, locale)}`;
-}
-
-/** « Protéines  65 / 120 g », a thin bar under it. */
-function MiniBar({ progress: p }: { progress: NutrientProgress }) {
-  const { locale, nutrient } = useI18n();
-  const { colors } = useTheme();
-  const over = p.status === 'over';
-  const value = barValue(p, locale);
-  return (
-    <View style={{ gap: 5 }} accessible accessibilityLabel={`${nutrient(p.nutrient)} ${value}`}>
-      <Row style={{ justifyContent: 'space-between' }} gap={6}>
-        <Txt variant="caption" tone="secondary" numberOfLines={1} style={{ flexShrink: 1, fontSize: 12, lineHeight: 15 }}>
-          {nutrient(p.nutrient)}
-        </Txt>
-        <Txt variant="caption" tone={over ? 'warning' : 'secondary'} style={{ fontSize: 12, lineHeight: 15, fontVariant: ['tabular-nums'] }}>
-          {value}
-          {p.target.kind === 'min' && p.status === 'reached' ? ' ✓' : ''}
-        </Txt>
-      </Row>
-      <Bar progress={p.ratio} color={over ? colors.warning : colorFor(p.nutrient, colors.accent)} height={5} />
-    </View>
-  );
 }

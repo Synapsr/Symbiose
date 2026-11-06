@@ -1,4 +1,4 @@
-import { DEFAULT_GLASS_ML, type CreateMealInput } from '@symbiose/shared';
+import { DEFAULT_GLASS_ML, type CreateMealInput, type NutrientKey } from '@symbiose/shared';
 import { AppState } from 'react-native';
 import { create } from 'zustand';
 
@@ -48,6 +48,8 @@ interface SettingsState {
   /** Today's hero card: the page swiped to (null: the goal's own), and whether its one-time swipe hint has played. */
   heroPage: HeroChoice | null;
   heroHinted: boolean;
+  /** Its small rings besides the goal's, chosen with a long press (`hero-rings`); null: the default (`heroPages`). */
+  heroRings: NutrientKey[] | null;
   /** On a phone without a server: when the last backup was made (ISO), for « Dernière sauvegarde ». */
   lastBackupAt: string;
   /** With a server: the server whose AI the person was told about (what it receives, and who answers). */
@@ -85,6 +87,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   describeHints: 0,
   heroPage: null,
   heroHinted: false,
+  heroRings: null,
   lastBackupAt: '',
   aiNoticeFor: '',
   set: (patch) => {
@@ -115,6 +118,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       describeHints: s.describeHints,
       heroPage: s.heroPage,
       heroHinted: s.heroHinted,
+      heroRings: s.heroRings,
       lastBackupAt: s.lastBackupAt,
       aiNoticeFor: s.aiNoticeFor,
     };
