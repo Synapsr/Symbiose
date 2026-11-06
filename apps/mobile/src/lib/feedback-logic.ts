@@ -70,21 +70,15 @@ export function reachedGoals(day: Pick<DaySummary, 'progress' | 'hydration'>): s
   return goals;
 }
 
-export type Milestone = 'firstMeal' | 'week' | 'month';
-
 /**
- * A meal that opens today can mark a milestone: the first meal of an account
- * that is a day or two old, or the day that makes 7 (or 30) days logged in a
- * row. `before` is today as it stood before the meal; `joined`, the local day
- * the account was created.
+ * The meal that opens the first day of an account a day or two old: « bienvenue ».
+ * The milestones that follow (a streak, days logged) are `milestoneDue`'s, in « Ta progression ».
+ * `before` is today as it stood before the meal; `joined`, the local day the account was created.
  */
-export function mealMilestone(before: Pick<DaySummary, 'date' | 'meals' | 'streak'> | undefined, today: string, joined: string): Milestone | null {
-  if (!before || before.date !== today || before.meals.length > 0) return null;
+export function firstMeal(before: Pick<DaySummary, 'date' | 'meals' | 'streak'> | undefined, today: string, joined: string): boolean {
+  if (!before || before.date !== today || before.meals.length > 0) return false;
   // Today has no meal yet, so the streak counts up to yesterday.
-  if (before.streak === 0 && joined >= addDays(today, -1)) return 'firstMeal';
-  if (before.streak === 6) return 'week';
-  if (before.streak === 29) return 'month';
-  return null;
+  return before.streak === 0 && joined >= addDays(today, -1);
 }
 
 export interface GoodDay {

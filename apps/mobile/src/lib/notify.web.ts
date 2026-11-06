@@ -18,6 +18,18 @@ export function openNotificationSettings() {}
 
 export async function setupCategories(_labels: { craving: string; fine: string }) {}
 
+export interface LocalNotification {
+  id: string;
+  date: string;
+  time: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  category?: string;
+}
+
+export async function replaceNotifications(_prefix: string, _planned: readonly LocalNotification[]): Promise<void> {}
+
 export async function replaceScheduled(_planned: PlannedNotification[]): Promise<void> {}
 
 export type NotificationResponse = { data: ProactiveData; action: 'open' | typeof ACTION_CRAVING | typeof ACTION_FINE };

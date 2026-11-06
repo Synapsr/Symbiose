@@ -145,6 +145,9 @@ function App({ signedIn, onboarded, locale }: { signedIn: boolean; onboarded: bo
             />
             <Stack.Screen name="log" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
             <Stack.Screen name="journal" options={{ presentation: 'modal' }} />
+            {/* « Ta progression », from the flame; a milestone, celebrated full screen or shown again from there. */}
+            <Stack.Screen name="progress" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="milestone" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             <Stack.Screen name="coach-settings" options={{ presentation: 'modal' }} />
             <Stack.Screen name="admin" options={{ presentation: 'modal' }} />
             <Stack.Screen name="note" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />

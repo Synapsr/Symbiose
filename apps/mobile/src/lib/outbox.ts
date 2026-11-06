@@ -301,6 +301,7 @@ export function useOutboxSync() {
       void queryClient.invalidateQueries({ queryKey: ['day', meal.localDate] });
       void queryClient.invalidateQueries({ queryKey: ['insights'] });
       void queryClient.invalidateQueries({ queryKey: ['library'] });
+      void queryClient.invalidateQueries({ queryKey: ['progress'] });
       const course = joinedCourse(meal, entry.eatenAt);
       const t = (key: Parameters<typeof translate>[1], params?: Record<string, string | number>) => translate(locale, key, params);
       // Several landing at once make one « c'est noté » (see `mayPlay`).

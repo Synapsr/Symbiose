@@ -52,6 +52,12 @@ interface SettingsState {
   lastBackupAt: string;
   /** With a server: the server whose AI the person was told about (what it receives, and who answers). */
   aiNoticeFor: string;
+  /** « Séries et étapes »: the flame, the milestones and their celebrations. Off, Symbiose stays factual. */
+  motivation: boolean;
+  /** The milestones already celebrated (or found already reached) on this phone: each one is celebrated once (`milestoneDue`). */
+  milestonesSeen: string[];
+  /** The evening reminder when the streak still waits for today's meal (`STREAK_REMINDER_AT`). */
+  streakReminder: boolean;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -87,6 +93,9 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   heroHinted: false,
   lastBackupAt: '',
   aiNoticeFor: '',
+  motivation: true,
+  milestonesSeen: [],
+  streakReminder: false,
   set: (patch) => {
     set(patch);
     const s = get();
@@ -117,6 +126,9 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       heroHinted: s.heroHinted,
       lastBackupAt: s.lastBackupAt,
       aiNoticeFor: s.aiNoticeFor,
+      motivation: s.motivation,
+      milestonesSeen: s.milestonesSeen,
+      streakReminder: s.streakReminder,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

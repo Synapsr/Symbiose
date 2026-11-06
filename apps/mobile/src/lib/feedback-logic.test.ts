@@ -1,7 +1,7 @@
 import { progressFor, type DayHydration, type Meal, type NutrientKey, type NutrientProgress, type TargetKind } from '@symbiose/shared';
 import { describe, expect, it } from 'vitest';
 
-import { FOLLOW_MS, followDelay, goodDay, mayPlay, mealCue, mealMilestone, QUIET_MS, reachedGoals, rewardsDue, type RewardLog } from './feedback-logic';
+import { FOLLOW_MS, followDelay, goodDay, mayPlay, mealCue, firstMeal, QUIET_MS, reachedGoals, rewardsDue, type RewardLog } from './feedback-logic';
 
 const progress = (nutrient: NutrientKey, consumed: number, value: number, kind: TargetKind): NutrientProgress => progressFor(nutrient, consumed, { value, kind });
 const meals = (count: number) => Array.from({ length: count }, (_, i) => ({ id: `m${i}` }) as Meal);
@@ -92,29 +92,23 @@ describe('reachedGoals', () => {
   });
 });
 
-describe('mealMilestone', () => {
+describe('firstMeal', () => {
   const today = '2026-10-31';
   const before = (count: number, streak: number) => ({ date: today, meals: meals(count), streak });
 
   it('marks the first meal of a new account', () => {
-    expect(mealMilestone(before(0, 0), today, today)).toBe('firstMeal');
-    expect(mealMilestone(before(0, 0), today, '2026-10-30')).toBe('firstMeal');
+    expect(firstMeal(before(0, 0), today, today)).toBe(true);
+    expect(firstMeal(before(0, 0), today, '2026-10-30')).toBe(true);
   });
 
   it('is not a first meal for an older account coming back', () => {
-    expect(mealMilestone(before(0, 0), today, '2026-10-20')).toBeNull();
-  });
-
-  it('marks the day that makes 7 or 30 days in a row', () => {
-    expect(mealMilestone(before(0, 6), today, '2026-01-01')).toBe('week');
-    expect(mealMilestone(before(0, 29), today, '2026-01-01')).toBe('month');
-    expect(mealMilestone(before(0, 7), today, '2026-01-01')).toBeNull();
+    expect(firstMeal(before(0, 0), today, '2026-10-20')).toBe(false);
   });
 
   it('only for the meal that opens today', () => {
-    expect(mealMilestone(before(1, 6), today, '2026-01-01')).toBeNull();
-    expect(mealMilestone({ ...before(0, 6), date: '2026-10-30' }, today, '2026-01-01')).toBeNull();
-    expect(mealMilestone(undefined, today, today)).toBeNull();
+    expect(firstMeal(before(1, 0), today, today)).toBe(false);
+    expect(firstMeal({ ...before(0, 0), date: '2026-10-30' }, today, today)).toBe(false);
+    expect(firstMeal(undefined, today, today)).toBe(false);
   });
 });
 

@@ -1,6 +1,6 @@
 import { addDays, mealCarbLoad, type Craving, type JournalEntry, type Meal, type MoodCheckIn, type Workout } from '@symbiose/shared';
 import { router, useFocusEffect } from 'expo-router';
-import { Camera, ChevronRight, CloudOff, Flame, Sparkles } from 'lucide-react-native';
+import { Camera, ChevronRight, CloudOff, Sparkles } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PanResponder, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -14,6 +14,7 @@ import { MealCard, PendingMealCard } from '@/components/today/meal-card';
 import { MoodEntry } from '@/components/today/mood-row';
 import { QueuedMealCard } from '@/components/today/queued-meal-card';
 import { StatusRow } from '@/components/today/status-row';
+import { StreakPill } from '@/components/today/streak-pill';
 import { CAPTURE_SIZE, ThumbZone } from '@/components/today/thumb-zone';
 import { WeekStrip } from '@/components/today/week-strip';
 import { Card, Pressy, Reveal, Row, SectionTitle, Skeleton, Txt } from '@/components/ui';
@@ -50,8 +51,8 @@ type DayRow =
  * timeline. Logging happens through the two thumb buttons: 📷 and « + ».
  */
 export default function Today() {
-  const { t, plural, locale, nutrient } = useI18n();
-  const { colors, elevation } = useTheme();
+  const { t, locale, nutrient } = useI18n();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const user = useUser();
   const today = useToday();
@@ -72,7 +73,6 @@ export default function Today() {
   const { retry, dismiss } = useMealLogger();
   const syncHealth = useHealthSync(today);
   const leftHanded = useSettings((s) => s.leftHanded);
-  const showToast = useToast((s) => s.show);
   const setLift = useToast((s) => s.setLift);
   // Today's goals, celebrated as they are reached: the hero card glows with them.
   const glow = useGoalRewards(today);
@@ -128,8 +128,6 @@ export default function Today() {
     ...(data?.cravings.items ?? []).map((craving) => ({ type: 'craving' as const, at: Date.parse(craving.at), craving })),
     ...(moodRow ? [{ type: 'mood' as const, at: Date.parse(moodRow.at), mood: moodRow }] : []),
   ].sort((a, b) => b.at - a.at);
-  const streak = data?.streak ?? 0;
-  const streakLabel = plural('today.streakLabel', streak);
   // A new day, nothing logged yet: yesterday, when it went well, is said first.
   const good = useGoodDay(today, isToday && empty, user.plan, hideCalories);
 
@@ -158,18 +156,7 @@ export default function Today() {
                   {isToday ? greeting(t, name) : dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}
                 </Txt>
               </View>
-              {streak > 0 ? (
-                <Pressy
-                  onPress={() => showToast({ message: streakLabel })}
-                  accessibilityRole="button"
-                  accessibilityLabel={streakLabel}
-                  style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surface, borderRadius: Radius.pill, paddingHorizontal: Space.md, height: 34 }, elevation]}>
-                  <Flame size={15} color={colors.warning} fill={colors.warning} />
-                  <Txt variant="label" style={{ fontVariant: ['tabular-nums'] }}>
-                    {streak}
-                  </Txt>
-                </Pressy>
-              ) : null}
+              <StreakPill day={isToday ? data : undefined} />
             </Row>
             <WeekStrip selected={date} today={today} onSelect={setSelected} />
           </Reveal>
