@@ -69,7 +69,7 @@ Answering the question or typing a correction calls `/refine`, which re-runs the
 
 - **The streak** counts the days logged in the run under way; today, while still open, never breaks it. **Rest days** forgive: one is earned every 7 days logged (2 at most) and covers a day without a meal, so one forgotten evening never wipes out weeks of effort.
 - **Milestones** come in three families: the streak (3, 7, 14, 30… 365 days), the days logged in all (10 to 1000) and the cravings beaten (5 to 100, shown once a craving was logged). Each is dated on the day it was reached.
-- **On the phone**, the flame on Today opens « Ta progression ». A milestone reached today is celebrated once, full screen, when the tabs are in front (`useMilestoneCelebrations`): the ones found already reached are noted quietly. Its card is drawn in SVG and shared as a PNG (`share-card.tsx`, `toDataURL`): the mark, the number, the day, nothing personal. An optional evening reminder (20:30) is planned on the phone while the streak waits for today's meal.
+- **On the phone**, the flame on Today opens « Ta progression ». Two moments are celebrated full screen when the tabs are in front (`useCelebrations`): the flame growing, once a day after the day's first meal (`/streak`: it catches, the number turns, today's dot lights up, a rest day earned or used is said), and a milestone reached today, once (`/milestone`: the card lands with confetti; the ones found already reached are noted quietly). Both at once: the flame first, then its milestone. Each has its own sound (`flame`, `fanfare`, made by `scripts/sounds/synth.mjs`), and the animation and the haptics keep to the sound's beats (`FLAME_BEATS`, `FANFARE_BEATS`). The card is drawn in SVG and shared as a 1080 × 1350 PNG (`share-card.tsx`, `toDataURL`): the mark, the number, the day, nothing personal. On iOS, react-native-svg draws a view at its own size whatever size is asked, so the card is captured from a copy laid out off screen at the image's size (`CAPTURE`). An optional evening reminder (20:30) is planned on the phone while the streak waits for today's meal.
 - **Off switch.** « Séries et étapes » in Me hides the flame, the milestones, their celebrations and the reminder.
 
 ## The PDF report
@@ -158,6 +158,7 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 | GET | `/api/foods/library`, `/api/foods/barcode/:code` | recents and favourites, Open Food Facts lookup |
 | PUT | `/api/activity` | daily health data from the phone |
 | GET / PUT | `/api/weights` | weight trend, readings from the health store |
+| DELETE | `/api/weights/:date` | a weigh-in taken back; kept aside so the health store's next sync doesn't bring it back |
 | GET / PUT / POST / DELETE | `/api/workouts`, `/api/workouts/:id` | sessions: list, import, add by hand (optionally with `steps`), delete |
 | GET / PUT / POST / DELETE | `/api/blood-pressure`, `/api/blood-pressure/:id` | trend, import, add a reading, delete |
 | GET / PUT | `/api/sleep` | nights: trend, import |

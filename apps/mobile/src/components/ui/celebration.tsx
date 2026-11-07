@@ -14,7 +14,7 @@ const PARTICLES = Array.from({ length: 18 }, (_, i) => ({
   color: PALETTE[i % PALETTE.length]!,
 }));
 
-function Particle({ angle, distance, size, color, spread = 1 }: (typeof PARTICLES)[number] & { spread?: number }) {
+function Particle({ angle, distance, size, color, spread = 1 }: Omit<(typeof PARTICLES)[number], 'color'> & { color: string; spread?: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.set(withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) }));
@@ -26,12 +26,67 @@ function Particle({ angle, distance, size, color, spread = 1 }: (typeof PARTICLE
   return <Animated.View style={[{ position: 'absolute', width: size, height: size, borderRadius: size / 2, backgroundColor: color }, style]} />;
 }
 
-/** The particles alone, bursting from the centre of their parent; `spread` sends them further, around something bigger than an emoji. */
-export function Burst({ spread = 1 }: { spread?: number }) {
+/** The particles alone, bursting from the centre of their parent; `spread` sends them further, around something bigger than an emoji, and `colors` gives them a moment's own. */
+export function Burst({ spread = 1, colors }: { spread?: number; colors?: readonly string[] }) {
   return (
     <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 1, height: 1 }}>
       {PARTICLES.map((p, i) => (
-        <Particle key={i} {...p} spread={spread} />
+        <Particle key={i} {...p} color={colors ? colors[i % colors.length]! : p.color} spread={spread} />
+      ))}
+    </View>
+  );
+}
+
+/** A repeatable pseudo-random number in [0, 1): the confetti fall the same way every time, and render purely. */
+const hash = (i: number, k: number) => {
+  const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+const PIECES = Array.from({ length: 42 }, (_, i) => ({
+  vx: (hash(i, 1) * 2 - 1) * 540,
+  vy: -(800 + hash(i, 2) * 650),
+  spin: (hash(i, 3) * 2 - 1) * 560,
+  flip: 5 + hash(i, 4) * 9,
+  width: 7 + hash(i, 5) * 4,
+  height: 10 + hash(i, 6) * 7,
+  round: hash(i, 7) < 0.25,
+  delay: Math.round(hash(i, 8) * 160),
+  duration: 3000 + Math.round(hash(i, 9) * 600),
+}));
+
+/** Air drag (1/s) and gravity (px/s²): thrown up fast, the pieces slow, then drift down at about 1 000 px/s. */
+const DRAG = 1.2;
+const GRAVITY = 1250;
+
+function Piece({ vx, vy, spin, flip, width, height, round, delay, duration, color }: (typeof PIECES)[number] & { color: string }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.set(withDelay(delay, withTiming(1, { duration, easing: Easing.linear })));
+  }, [t, delay, duration]);
+  const style = useAnimatedStyle(() => {
+    const s = (t.value * duration) / 1000;
+    const drift = (1 - Math.exp(-DRAG * s)) / DRAG;
+    return {
+      opacity: t.value === 0 ? 0 : t.value > 0.85 ? (1 - t.value) / 0.15 : 1,
+      transform: [
+        { translateX: vx * drift },
+        { translateY: vy * drift + (GRAVITY / DRAG) * (s - drift) },
+        { rotate: `${spin * s}deg` },
+        // A paper turning over as it falls.
+        { scaleY: Math.cos(flip * s) },
+      ],
+    };
+  });
+  return <Animated.View style={[{ position: 'absolute', width, height: round ? width : height, borderRadius: round ? width / 2 : 2, backgroundColor: color }, style]} />;
+}
+
+/** Confetti thrown up from the centre of their parent, falling with air and gravity, in the moment's `colors`. Once. */
+export function Confetti({ colors }: { colors: readonly string[] }) {
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 1, height: 1 }}>
+      {PIECES.map((p, i) => (
+        <Piece key={i} {...p} color={colors[i % colors.length]!} />
       ))}
     </View>
   );

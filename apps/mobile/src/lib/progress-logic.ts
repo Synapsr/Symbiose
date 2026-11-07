@@ -1,13 +1,41 @@
 /**
  * « Ta progression » on the phone, kept free of React Native so it can be unit
- * tested on its own: the progress bars and the evening reminder.
+ * tested on its own: the progress bars, the flame's moment and the evening reminder.
  */
-import { addDays, clockMinutes, type FamilyProgress, type StreakSummary } from '@symbiose/shared';
+import { addDays, clockMinutes, type FamilyProgress, type ProgressSummary, type StreakSummary } from '@symbiose/shared';
 
 /** How full a family's bar is on the way to its next step, as its « 14 / 30 » reads (full once every step is reached). */
 export function familyRatio(family: FamilyProgress): number {
   if (family.next === null) return 1;
   return family.next > 0 ? Math.min(1, Math.max(0, family.count / family.next)) : 0;
+}
+
+/** The flame grew today and this phone hasn't celebrated it yet: once a day, from the day's first meal. */
+export function flameDue(summary: Pick<ProgressSummary, 'today' | 'streak'>, seenOn: string): boolean {
+  return summary.streak.todayLogged && summary.streak.current >= 1 && seenOn !== summary.today;
+}
+
+/** The line under the flame's number, as an i18n key and its values. */
+export type FlameLine =
+  | { key: 'flame.first' }
+  | { key: 'flame.again'; best: number }
+  | { key: 'flame.step' }
+  | { key: 'flame.toRecord'; count: number }
+  | { key: 'flame.record' }
+  | { key: 'flame.recordNext'; count: number; next: number };
+
+/**
+ * What the flame says once it has grown: a beginning, a new start that
+ * remembers the record, a step reached (its card follows), the days left to
+ * beat the record, or the next step past it. Always something ahead.
+ */
+export function flameLine(summary: Pick<ProgressSummary, 'streak' | 'families'>, stepReached: boolean): FlameLine {
+  const { current, best } = summary.streak;
+  if (stepReached) return { key: 'flame.step' };
+  if (current <= 1) return best > 1 ? { key: 'flame.again', best } : { key: 'flame.first' };
+  if (current < best) return { key: 'flame.toRecord', count: best - current + 1 };
+  const next = summary.families.find((f) => f.family === 'streak')?.next ?? null;
+  return next === null ? { key: 'flame.record' } : { key: 'flame.recordNext', count: next - current, next };
 }
 
 /** The evening reminder: late enough for dinner to be logged, early enough to still do it. */

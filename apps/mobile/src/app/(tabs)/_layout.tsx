@@ -6,7 +6,7 @@ import { useGlanceSync } from '@/lib/glance';
 import { useCravingActivitySync } from '@/lib/live-activity';
 import { useOutboxSync } from '@/lib/outbox';
 import { useProactiveSync } from '@/lib/proactive';
-import { useMilestoneCelebrations, useStreakReminderSync } from '@/lib/progress';
+import { useCelebrations, useStreakReminderSync } from '@/lib/progress';
 import { useServerAiNotice } from '@/lib/server-ai-notice';
 import { useWatchRequests } from '@/lib/watch';
 
@@ -19,8 +19,8 @@ export default function TabsLayout() {
   useProactiveSync();
   useWatchRequests();
   useServerAiNotice();
-  // « Séries et étapes »: a milestone reached is celebrated here, and the evening reminder kept in step.
-  useMilestoneCelebrations();
+  // « Séries et étapes »: the flame and the milestones are celebrated here, and the evening reminder kept in step.
+  useCelebrations();
   useStreakReminderSync();
   return <AppTabs />;
 }

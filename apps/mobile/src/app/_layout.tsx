@@ -146,8 +146,9 @@ function App({ signedIn, onboarded, locale }: { signedIn: boolean; onboarded: bo
             <Stack.Screen name="log" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
             <Stack.Screen name="hero-rings" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.85, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />
             <Stack.Screen name="journal" options={{ presentation: 'modal' }} />
-            {/* « Ta progression », from the flame; a milestone, celebrated full screen or shown again from there. */}
+            {/* « Ta progression », from the flame; the flame growing and a milestone, celebrated full screen (a milestone also shown again from there). */}
             <Stack.Screen name="progress" options={{ presentation: 'modal' }} />
+            <Stack.Screen name="streak" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             <Stack.Screen name="milestone" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             {/* « Poids », from its row in Tendances: the trend, its chart and every weigh-in. */}
             <Stack.Screen name="weight" options={{ presentation: 'modal' }} />

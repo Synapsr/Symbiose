@@ -7,9 +7,18 @@
 import { addDays, type DaySummary, type Meal, type NutrientKey } from '@symbiose/shared';
 
 /** The family of sounds (`assets/sounds`, made by `scripts/sounds/synth.mjs`), from the quietest to the biggest. */
-export type Cue = 'pop' | 'popBright' | 'chime' | 'bloom' | 'rise';
+export type Cue = 'pop' | 'popBright' | 'chime' | 'bloom' | 'rise' | 'flame' | 'fanfare';
 
-const RANK: Record<Cue, number> = { pop: 0, popBright: 1, chime: 2, bloom: 3, rise: 4 };
+const RANK: Record<Cue, number> = { pop: 0, popBright: 1, chime: 2, bloom: 3, rise: 4, flame: 5, fanfare: 6 };
+
+/**
+ * The beats of the two big moments, in ms from their start: the sound (see
+ * `scripts/sounds/synth.mjs`), the haptics and the animation all keep to them.
+ * The flame: a breath builds, the flame catches, then the number turns.
+ */
+export const FLAME_BEATS = { ignite: 300, count: 720 } as const;
+/** A milestone: the arpeggio climbs, the card lands on the full chord, then four glints settle. */
+export const FANFARE_BEATS = { steps: [0, 75, 150, 225], land: 380, glints: [620, 740, 860, 1000] } as const;
 
 /** Rewards this close make one: a bigger one still follows a smaller one (« noté », then « objectif atteint »), never the other way round. */
 export const QUIET_MS = 1500;

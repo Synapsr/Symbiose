@@ -1,10 +1,21 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { PixelRatio, Platform } from 'react-native';
 import type Svg from 'react-native-svg';
 
 import { CARD } from '@/components/progress/share-card';
 
-/** The card as a PNG, at full size whatever its size on screen. */
+/**
+ * The size, in points, the card to capture is laid out at: the PNG's pixels
+ * over the screen's density. On iOS, react-native-svg draws the view at its
+ * own size whatever size is asked, in the top-left corner of the bitmap (the
+ * rest left transparent, which a share sheet shows black), and the bitmap
+ * takes the screen's density: so the card is laid out at exactly this size and
+ * asked at it. Android scales the drawing to the size asked, in pixels.
+ */
+export const CAPTURE = { width: CARD.width / PixelRatio.get(), height: CARD.height / PixelRatio.get() };
+
+/** The card as a 1080 × 1350 PNG: `svg` must be a `ShareCard` laid out at `CAPTURE`. */
 export function svgToPng(svg: Svg | null): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!svg) return reject(new Error('no_card'));
@@ -14,7 +25,7 @@ export function svgToPng(svg: Svg | null): Promise<string> {
         clearTimeout(timer);
         resolve(base64);
       },
-      { width: CARD.width, height: CARD.height },
+      Platform.OS === 'ios' ? CAPTURE : { width: CARD.width, height: CARD.height },
     );
   });
 }

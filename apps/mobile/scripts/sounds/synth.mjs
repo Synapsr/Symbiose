@@ -4,10 +4,11 @@
  * samples, no downloads, no dependencies. They stay ours and can be
  * regenerated or changed at will.
  *
- *   node apps/mobile/scripts/sounds/synth.mjs [--preview <dir>]
+ *   node apps/mobile/scripts/sounds/synth.mjs [--preview <dir>] [--only flame,fanfare]
  *
- * Writes `apps/mobile/assets/sounds/*.m4a` (AAC, through macOS `afconvert`).
- * With `--preview`, also keeps the 24-bit WAV masters, a showreel of the five
+ * Writes `apps/mobile/assets/sounds/*.m4a` (AAC, through macOS `afconvert`);
+ * `--only` renders some of them and leaves the others' files untouched.
+ * With `--preview`, also keeps the 24-bit WAV masters, a showreel of the
  * sounds and notes.md in `<dir>`.
  *
  * The pipeline, in the order of this file:
@@ -21,8 +22,9 @@
  *      sits well under the dry sound and is only slightly decorrelated.
  *   4. Mastering: 3-6 kHz taming, gentle saturation, a 4th-order high-pass,
  *      loudness set to a target (BS.1770), a true-peak ceiling and a natural tail.
- *   5. Recipes: five roles in one key (D major), with onsets that land on the
- *      app's haptic beats (`src/lib/feedback.ts`).
+ *   5. Recipes: seven roles in one key (D major), with onsets that land on the
+ *      app's haptic beats (`src/lib/feedback.ts`). The flame's also starts
+ *      with a breath of air catching fire: band-passed noise, swept upwards.
  *
  * The material table still holds the rosewood bar and tuning fork tried
  * alongside it; only the crystal is rendered.
@@ -392,6 +394,46 @@ function strike(material, freq, { tau, vel = 1, hard = 1, pan = 0, seconds = 1.6
   return out;
 }
 
+// =============================================================== 2b. Air
+
+/**
+ * A breath of air catching fire: noise through two band-passes whose centre sweeps up from `from` to
+ * `to` Hz (exponentially, recomputed every 32 samples with the filter state kept), swelling in and
+ * stopping where the flame catches, with a 25 ms release so nothing clicks. The two channels share
+ * most of their noise: wide, but not a hiss on each side.
+ */
+function breath({ seconds, from, to, q = 1.3, level = 1, seed = 11 }) {
+  const rand = random(seed);
+  const release = 0.025;
+  const out = stereo(seconds + release + 0.01);
+  const n = Math.round((seconds + release) * SR);
+  const block = 32;
+  const states = [0, 1].map(() => [new Float64Array(4), new Float64Array(4)]);
+  let c = null;
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    if (i % block === 0) c = design('bandpass', from * (to / from) ** Math.min(1, t / seconds), { q });
+    const shared = rand() * 2 - 1;
+    const u = Math.min(1, t / seconds);
+    // Swells in (u^1.8), then lets go over the release.
+    const env = t <= seconds ? u ** 1.8 : 0.5 + 0.5 * Math.cos((Math.PI * (t - seconds)) / release);
+    for (const [k, ch] of [out.L, out.R].entries()) {
+      let x = (0.8 * shared + 0.6 * (rand() * 2 - 1)) * env;
+      for (const st of states[k]) {
+        const [b0, b1, b2, a1, a2] = c;
+        const y = b0 * x + b1 * st[0] + b2 * st[1] - a1 * st[2] - a2 * st[3];
+        st[1] = st[0];
+        st[0] = x;
+        st[3] = st[2];
+        st[2] = y;
+        x = y;
+      }
+      ch[i] = x * level;
+    }
+  }
+  return out;
+}
+
 // =============================================================== 3. Room
 
 /**
@@ -655,12 +697,16 @@ function master(buf, { lufs, maxLength, label, hp = 140, tame = { f: 4300, gain:
  *   chime       F#6 A6 D7, 55 ms apart           the triad, landing on the upper tonic, which rings
  *   bloom       A5 grazed, then D6 F#6 A6 rolled at 90 ms   a chord that opens
  *   rise        D6, A6, then D7 + D6 (+ a breath of F#6) at 0, 120 and 240 ms   the crescendo of « J'ai tenu »
+ *   flame       a breath catching (0-300 ms), the chord flaring up D6 F#6 A6 at 300 ms, then D7 + D6
+ *               ringing at 720 ms when the number turns              « ta flamme grandit »
+ *   fanfare     D6 F#6 A6 D7 rolled up 75 ms apart, the full chord at 380 ms as the card lands, then
+ *               four high glints settling                            a milestone, the biggest of all
  */
-const ROLES = ['pop', 'pop-bright', 'chime', 'bloom', 'rise'];
+const ROLES = ['pop', 'pop-bright', 'chime', 'bloom', 'rise', 'flame', 'fanfare'];
 
 /** Loudness targets (LUFS, loudest 400 ms) and length caps: a gentle hierarchy, the same for every family. */
-const TARGET = { pop: -22, 'pop-bright': -21.5, chime: -20.5, bloom: -20.5, rise: -19.5 };
-const CAP = { pop: 0.25, 'pop-bright': 0.45, chime: 0.6, bloom: 0.7, rise: 1.2 };
+const TARGET = { pop: -22, 'pop-bright': -21.5, chime: -20.5, bloom: -20.5, rise: -19.5, flame: -19.5, fanfare: -19 };
+const CAP = { pop: 0.25, 'pop-bright': 0.45, chime: 0.6, bloom: 0.7, rise: 1.2, flame: 1.6, fanfare: 2.1 };
 
 /**
  * The score for each role. `t` scales the decay (τ of the fundamental, in s), `v` the velocities and
@@ -690,6 +736,33 @@ function score(role, { t, v = 1, h = 1 }) {
         n('D6', 0.24, 0.17, 0.42, { pan: -0.08, hard: 1.25 }),
         n('F#6', 0.247, 0.15, 0.16, { pan: 0.05, hard: 1.4 }),
       ];
+    case 'flame':
+      return [
+        { at: 0, breath: { seconds: 0.3, from: 450, to: 3400, level: 0.9 } },
+        n('A5', 0.3, 0.1, 0.42, { pan: -0.14, hard: 1.35 }),
+        n('D6', 0.3, 0.16, 0.6, { pan: -0.06, hard: 1.2 }),
+        n('F#6', 0.345, 0.15, 0.6, { pan: 0.04, hard: 1.1 }),
+        n('A6', 0.39, 0.17, 0.68, { pan: 0.12 }),
+        n('D7', 0.72, 0.22, 0.96, { pan: 0.08 }),
+        n('D6', 0.72, 0.2, 0.4, { pan: -0.1, hard: 1.25 }),
+        n('F#7', 0.727, 0.12, 0.13, { pan: 0.16, hard: 1.4 }),
+      ];
+    case 'fanfare':
+      return [
+        n('D6', 0, 0.07, 0.5, { pan: -0.18 }),
+        n('F#6', 0.075, 0.075, 0.56, { pan: -0.08 }),
+        n('A6', 0.15, 0.08, 0.62, { pan: 0.04 }),
+        n('D7', 0.225, 0.09, 0.7, { pan: 0.14 }),
+        n('A5', 0.38, 0.16, 0.46, { pan: -0.16, hard: 1.4 }),
+        n('D6', 0.38, 0.22, 0.62, { pan: -0.08, hard: 1.2 }),
+        n('A6', 0.385, 0.24, 0.7, { pan: 0.06, hard: 1.1 }),
+        n('D7', 0.39, 0.3, 1, { pan: 0.1 }),
+        n('F#7', 0.395, 0.2, 0.36, { pan: 0.18, hard: 1.2 }),
+        n('A7', 0.62, 0.09, 0.26, { pan: 0.3, hard: 0.85 }),
+        n('F#7', 0.74, 0.09, 0.22, { pan: -0.26, hard: 0.85 }),
+        n('D8', 0.86, 0.08, 0.16, { pan: 0.22, hard: 0.85 }),
+        n('A7', 1.0, 0.1, 0.14, { pan: -0.18, hard: 0.9 }),
+      ];
     default:
       throw new Error(role);
   }
@@ -712,6 +785,8 @@ const FAMILIES = [
       chime: 'Fa♯, la, ré : l’accord monte en trois verres et le ré aigu reste, soutenu à l’octave, avec le miroitement du cristal.',
       bloom: 'Un la grave effleuré, puis l’accord de ré qui s’ouvre en arpège rapide, baguette plus douce.',
       rise: 'Ré, la, puis le ré aigu doublé à l’octave, en crescendo sur les trois vibrations ; il chante un peu plus d’une demi-seconde.',
+      flame: 'Un souffle qui prend, l’accord de ré qui s’embrase, puis le ré aigu qui sonne quand le chiffre tourne.',
+      fanfare: 'L’arpège de ré qui monte, l’accord entier quand la carte se pose, puis quatre éclats aigus qui retombent.',
     },
   },
 ];
@@ -721,6 +796,10 @@ function renderSound(family, role) {
   const seconds = CAP[role] + 0.6;
   const buf = stereo(seconds);
   for (const e of events) {
+    if (e.breath) {
+      mixInto(buf, breath(e.breath), e.at);
+      continue;
+    }
     const s = strike(family.material, hz(e.note), { tau: e.tau, vel: e.vel, hard: e.hard, pan: e.pan, seed: e.seed, seconds: seconds - e.at });
     mixInto(buf, s, e.at);
   }
@@ -794,14 +873,14 @@ ${table}
 
 - **Durée**: the length of the file, which ends once the sound is 60 dB under its peak. « Audible »: the moment it falls 40 dB under its peak.
 - **Sonie**: BS.1770, the loudest 400 ms window (momentary max), the fair measure for a sound shorter than 3 s.
-- \`showreel.m4a\`: the five sounds in this order, 0.8 s apart.
+- \`showreel.m4a\`: the sounds in this order, 0.8 s apart.
 - Notes: D major (D6 = 1175 Hz). Onsets of \`rise\` at 0, 120 and 240 ms, of \`bloom\` at 0 and 90 ms, in time with the haptics.
 `;
 }
 
 // --------------------------------------------------------------- Run
 
-export { strike, room, master, loudness, truePeak, MATERIALS, hz, stereo, SR, renderSound, FAMILIES, beamShape, forcePulse, pulseGain };
+export { strike, breath, room, master, loudness, truePeak, MATERIALS, hz, stereo, SR, renderSound, FAMILIES, beamShape, forcePulse, pulseGain };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
 
@@ -809,6 +888,8 @@ function main() {
   const assets = resolve(dirname(fileURLToPath(import.meta.url)), '../../assets/sounds');
   const previewAt = process.argv.indexOf('--preview');
   const preview = previewAt > -1 ? resolve(process.argv[previewAt + 1]) : null;
+  const onlyAt = process.argv.indexOf('--only');
+  const only = onlyAt > -1 ? process.argv[onlyAt + 1].split(',') : ROLES;
   const work = preview ?? mkdtempSync(join(tmpdir(), 'symbiose-sounds-'));
   mkdirSync(work, { recursive: true });
   mkdirSync(assets, { recursive: true });
@@ -816,7 +897,7 @@ function main() {
   const rows = [];
   const clips = [];
   console.log(`${family.name}`);
-  for (const role of ROLES) {
+  for (const role of ROLES.filter((r) => only.includes(r))) {
     const { buf, audible, limited } = renderSound(family, role);
     clips.push(buf);
     writePair(work, role, buf);

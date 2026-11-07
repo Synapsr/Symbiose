@@ -61,6 +61,8 @@ interface SettingsState {
   motivation: boolean;
   /** The milestones already celebrated (or found already reached) on this phone: each one is celebrated once (`milestoneDue`). */
   milestonesSeen: string[];
+  /** The day the flame was last celebrated on this phone: once a day, after the day's first meal (`flameDue`). */
+  flameSeenOn: string;
   /** The evening reminder when the streak still waits for today's meal (`STREAK_REMINDER_AT`). */
   streakReminder: boolean;
   /** « Lissé » on the weight screen (and the weight row in Tendances): the trend rather than each weigh-in. */
@@ -106,6 +108,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   workoutInSteps: [],
   motivation: true,
   milestonesSeen: [],
+  flameSeenOn: '',
   streakReminder: false,
   weightSmoothed: true,
   report: { days: 30, excluded: ['notes'], calories: null },
@@ -143,6 +146,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       workoutInSteps: s.workoutInSteps,
       motivation: s.motivation,
       milestonesSeen: s.milestonesSeen,
+      flameSeenOn: s.flameSeenOn,
       streakReminder: s.streakReminder,
       weightSmoothed: s.weightSmoothed,
       report: s.report,

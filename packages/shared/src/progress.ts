@@ -31,6 +31,8 @@ export interface StreakSummary {
   restDays: number;
   /** Days still to log before the next rest day (0 when the reserve is full). */
   nextRestIn: number;
+  /** Today's meal earned a rest day (optional: older servers don't say). */
+  restEarnedToday?: boolean;
   /** A meal is already logged today: the run is safe until tomorrow. */
   todayLogged: boolean;
   /** The last 7 days, oldest first, ending today. */
@@ -97,6 +99,7 @@ export function streakSummary(loggedDays: readonly string[], today: string): Str
   let best = 0;
   let reserve = 0;
   let toward = 0;
+  let restEarnedToday = false;
 
   if (first) {
     for (let day = first; day <= today; day = addDays(day, 1)) {
@@ -107,6 +110,7 @@ export function streakSummary(loggedDays: readonly string[], today: string): Str
         toward++;
         if (toward >= REST_DAY_EVERY) {
           toward = 0;
+          if (day === today && reserve < MAX_REST_DAYS) restEarnedToday = true;
           reserve = Math.min(MAX_REST_DAYS, reserve + 1);
         }
         states.set(day, 'logged');
@@ -133,6 +137,7 @@ export function streakSummary(loggedDays: readonly string[], today: string): Str
     restDays: reserve,
     nextRestIn: reserve >= MAX_REST_DAYS ? 0 : REST_DAY_EVERY - toward,
     todayLogged: logged.has(today),
+    restEarnedToday,
     week,
     reachedOn,
   };
