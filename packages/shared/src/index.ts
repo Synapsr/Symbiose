@@ -16,3 +16,4 @@ export * from './admin';
 export * from './sugars';
 export * from './progress';
 export * from './weight-smoothing';
+export * from './report';

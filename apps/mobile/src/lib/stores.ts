@@ -4,6 +4,7 @@ import { create } from 'zustand';
 
 import type { RewardLog } from './feedback-logic';
 import type { HeroChoice } from './hero-logic';
+import type { ReportRange, ReportSection } from './report/sections';
 import { storage } from './storage';
 
 // ---------------------------------------------------------------- Settings (per device)
@@ -64,6 +65,8 @@ interface SettingsState {
   streakReminder: boolean;
   /** « Lissé » on the weight screen (and the weight row in Tendances): the trend rather than each weigh-in. */
   weightSmoothed: boolean;
+  /** The PDF report's last choices: the period, the parts left out, and calories (null: as in the app). */
+  report: { days: ReportRange; excluded: ReportSection[]; calories: boolean | null };
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -105,6 +108,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   milestonesSeen: [],
   streakReminder: false,
   weightSmoothed: true,
+  report: { days: 30, excluded: ['notes'], calories: null },
   set: (patch) => {
     set(patch);
     const s = get();
@@ -141,6 +145,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       milestonesSeen: s.milestonesSeen,
       streakReminder: s.streakReminder,
       weightSmoothed: s.weightSmoothed,
+      report: s.report,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

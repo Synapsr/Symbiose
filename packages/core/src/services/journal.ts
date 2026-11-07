@@ -86,7 +86,7 @@ export function updateJournalEntry(db: Db, userId: string, id: string, patch: Pa
 }
 
 /** The day transit tracking started, for frequencies that don't count the days before it. */
-function firstTransitDate(db: Db, userId: string): string | null {
+export function firstTransitDate(db: Db, userId: string): string | null {
   return (
     db
       .select({ first: min(journalEntries.localDate) })

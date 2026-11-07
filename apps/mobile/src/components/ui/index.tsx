@@ -20,6 +20,7 @@ import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, w
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { LocaleContext } from '@/i18n';
+import { frenchTypography } from '@/lib/french';
 import { haptics } from '@/lib/haptics';
 import { Fonts, Motion, Radius, Space, useTheme, type Palette } from '@/theme';
 
@@ -56,19 +57,8 @@ function toneColor(tone: Tone, colors: Palette): string {
 /** Fraunces barely draws the narrow no-break space (U+202F): its variants get a regular no-break space. */
 const FRAUNCES: ReadonlySet<Variant> = new Set(['display', 'number', 'title', 'accent']);
 
-/** A number and its unit, or the groups of a number (« 1 840 »), never split across lines. */
-const UNIT = /(\d) (?=(?:\d{3}(?!\d)|(?:g|kg|mg|µg|kcal|ml|cl|L|l|%|min|h|s|km|m|pas|mmHg|bpm|°C)(?![\p{L}\d])))/gu;
-
-/**
- * French typography, for every text in the app (copy, AI and the person's own words): a no-break
- * space before « ? ! : ; » and inside guillemets, so a mark never ends up alone at the start of a line,
- * and between a number and its unit.
- */
-const french = (text: string, space: string) =>
-  text
-    .replace(/ ([?!:;»])/g, `${space}$1`)
-    .replace(/« /g, `«${space}`)
-    .replace(UNIT, `$1${space}`);
+/** French typography for every text in the app (`frenchTypography`); the PDF report prints with the same rules. */
+const french = frenchTypography;
 
 function frenchSpacing(children: ReactNode, space: string): ReactNode {
   return Children.map(children, (child) => (typeof child === 'string' ? french(child, space) : child));

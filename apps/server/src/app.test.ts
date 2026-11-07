@@ -23,6 +23,7 @@ import {
   type MoodCheckIn,
   type Profile,
   type ProgressSummary,
+  type ReportData,
   type SleepTrend,
   type User,
   type WaterEntry,
@@ -1836,5 +1837,105 @@ describe('instant cravings', () => {
   it('still answers older apps with the advice inline', async () => {
     const res = await request('POST', '/api/cravings', { at: now, localDate: today, what: 'chips', intensity: 2 });
     expect(res.body).toMatchObject({ craving: { tip: "Bois un verre d'eau.", intensity: 2 }, alternative: 'Moins de chips' });
+  });
+});
+
+describe('PDF report', () => {
+  const app = makeApp(fakeAi, { allowSignup: true });
+  const today = toLocalDate();
+  const from = addDays(today, -13);
+  const at = (date: string, time: string) => `${date}T${time}:00+01:00`;
+  const { request: call, register } = clientFor(app);
+  let owner = '';
+  let stranger = '';
+  const request = <T,>(method: string, path: string, body?: unknown, token = owner) => call<T>(method, path, token, body);
+  const report = (token = owner, range = `from=${from}&to=${today}`) => request<ReportData>('GET', `/api/report?${range}`, undefined, token);
+  const bread = { id: 'pain', name: 'Pain complet', emoji: '🍞', portion: '2 tranches', grams: 80, per100g: { kcal: 250, protein: 9, carbs: 45, sugar: 4, addedSugar: 2, fat: 3, satFat: 0.6, fiber: 7, sodium: 450 }, source: 'manual' };
+  const plan: GoalPlan = {
+    intentions: 'Je suis prédiabétique, je veux mieux répartir mes glucides.',
+    title: 'Glucides mieux répartis',
+    summary: 'Des glucides répartis sur la journée.',
+    tags: ['blood_sugar'],
+    calorieMode: 'maintain',
+    caloriePercent: 0,
+    proteinPerKg: 1.2,
+    fatPercent: 30,
+    rules: [{ nutrient: 'addedSugar', kind: 'max', value: 25, reason: 'OMS' }],
+    focus: ['carbs', 'addedSugar'],
+    habits: [],
+    coachTone: 'gentle',
+    adjustForActivity: false,
+    overrides: {},
+    activity: null,
+    carbsPerMeal: 45,
+  };
+
+  beforeAll(async () => {
+    owner = await register('report@example.com');
+    stranger = await register('other-report@example.com');
+    await request('PUT', '/api/me/profile', { ...profile, trackBloodPressure: true });
+    await request('PUT', '/api/me/profile', profile, stranger);
+    expect((await request('PUT', '/api/goals', { plan })).status).toBe(200);
+
+    for (const [date, time] of [[addDays(today, -2), '12:30'], [addDays(today, -2), '08:00'], [today, '19:45']] as const) {
+      await request('POST', '/api/meals', { eatenAt: at(date, time), localDate: date, items: [bread], title: 'Tartines' });
+    }
+    // Before the period: left out of the meals, but its weigh-in starts the trend.
+    await request('POST', '/api/meals', { eatenAt: at(addDays(from, -1), '12:00'), localDate: addDays(from, -1), items: [bread], title: 'Avant' });
+    await request('PUT', '/api/weights', {
+      source: 'manual',
+      samples: [
+        { localDate: addDays(from, -40), kg: 80, measuredAt: `${addDays(from, -40)}T07:00:00Z` },
+        { localDate: addDays(from, -10), kg: 77, measuredAt: `${addDays(from, -10)}T07:00:00Z` },
+        { localDate: addDays(today, -3), kg: 76.4, measuredAt: `${addDays(today, -3)}T07:00:00Z` },
+      ],
+    });
+    await request('POST', '/api/blood-pressure', { measuredAt: at(addDays(today, -1), '08:00'), localDate: addDays(today, -1), systolic: 128, diastolic: 82, pulse: 64 });
+    await request('POST', '/api/workouts', { type: 'running', startedAt: at(addDays(today, -1), '18:00'), localDate: addDays(today, -1), durationMin: 30, intensity: 'moderate', source: 'manual' });
+    await request('POST', '/api/cravings', { at: at(today, '16:10'), localDate: today, what: 'Chocolat', intensity: 2 });
+    await request('POST', '/api/journal', { at: at(addDays(today, -1), '21:00'), localDate: addDays(today, -1), kind: 'symptom', text: 'Ballonnements après le dîner' });
+    // An older « Ressenti » note is the day's mood: in the moods, not again in the notes.
+    await request('POST', '/api/journal', { at: at(addDays(today, -4), '20:00'), localDate: addDays(today, -4), kind: 'feeling', text: 'Fatigué', data: { feeling: 2 } });
+    await request('PUT', '/api/mood', { at: at(today, '09:00'), localDate: today, mood: 4, note: null });
+  });
+
+  it('assembles the period: each day with its targets, the meals and their foods, in time order', async () => {
+    const { status, body } = await report();
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ from, to: today, plan: { title: 'Glucides mieux répartis', carbsPerMeal: 45 }, person: { name: 'Loan', sex: 'male', heightCm: 178 } });
+    expect(body.person.age).toBe(Number(today.slice(0, 4)) - 1995);
+    expect(body.days).toHaveLength(14);
+    expect(body.days.filter((d) => d.logged).map((d) => [d.date, d.meals])).toEqual([[addDays(today, -2), 2], [today, 1]]);
+    expect(body.days.at(-1)).toMatchObject({ totals: { carbs: 36, addedSugar: 1.6 }, targets: { addedSugar: { value: 25, kind: 'max' } } });
+    expect(body.meals.map((m) => [m.localDate, m.time])).toEqual([[addDays(today, -2), '08:00'], [addDays(today, -2), '12:30'], [today, '19:45']]);
+    expect(body.meals[0]).toMatchObject({ title: 'Tartines', items: [{ name: 'Pain complet', grams: 80, nutrients: { carbs: 36, fiber: 5.6 } }], totals: { kcal: 200 } });
+  });
+
+  it('starts the weight trend before the period, and brings the modules that are on', async () => {
+    const { body } = await report();
+    expect(body.weights.map((w) => w.kg)).toEqual([77, 76.4]);
+    expect(body.bloodPressure).toMatchObject([{ systolic: 128, diastolic: 82, pulse: 64 }]);
+    expect(body.workouts).toMatchObject([{ type: 'running', durationMin: 30 }]);
+    expect(body.activity.days.find((d) => d.date === addDays(today, -1))).toMatchObject({ activeMinutes: 30 });
+    expect(body.activity.goals.weeklyActiveMinutes).toBe(150);
+    expect(body.sleep).toBeNull();
+    expect(body.hydration).toBeNull();
+    // The craving's AI tip stays in the app: the report keeps what happened.
+    expect(body.cravings).toEqual([{ localDate: today, time: '16:10', what: 'Chocolat', intensity: 2, outcome: 'pending' }]);
+    expect(body.journal.map((n) => n.kind)).toEqual(['symptom']);
+    expect(body.mood?.days.map((d) => d.mood)).toEqual([2, 4]);
+    expect(body.transit).toBeNull();
+  });
+
+  it('keeps each account to its own data, and checks the period', async () => {
+    const other = await report(stranger);
+    expect(other.status).toBe(200);
+    expect(other.body.meals).toEqual([]);
+    expect(other.body.bloodPressure).toBeNull();
+    expect(other.body.journal).toEqual([]);
+    expect((await report(owner, `from=${today}&to=${from}`)).status).toBe(400);
+    expect((await report(owner, `from=${addDays(today, -366)}&to=${today}`)).status).toBe(400);
+    expect((await report(owner, `from=${addDays(today, -365)}&to=${today}`)).status).toBe(200);
+    expect((await app.request(`/api/report?from=${from}&to=${today}`)).status).toBe(401);
   });
 });

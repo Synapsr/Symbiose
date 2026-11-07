@@ -14,6 +14,7 @@ import { journalRoutes } from './routes/journal';
 import { mealRoutes } from './routes/meals';
 import { moodRoutes } from './routes/mood';
 import { proactiveRoutes } from './routes/proactive';
+import { reportRoutes } from './routes/report';
 import { sleepRoutes } from './routes/sleep';
 import { trackingRoutes } from './routes/tracking';
 import { vitalsRoutes } from './routes/vitals';
@@ -73,6 +74,7 @@ export function createApp(deps: Deps, options: AppOptions = {}) {
   app.route('/api/journal', journalRoutes(deps));
   app.route('/api/proactive', proactiveRoutes(deps));
   app.route('/api/vitals', vitalsRoutes(deps));
+  app.route('/api/report', reportRoutes(deps));
   // Last: these routes sit at /api itself, behind their own authentication.
   app.route('/api', trackingRoutes(deps));
 

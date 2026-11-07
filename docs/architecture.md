@@ -72,6 +72,15 @@ Answering the question or typing a correction calls `/refine`, which re-runs the
 - **On the phone**, the flame on Today opens « Ta progression ». A milestone reached today is celebrated once, full screen, when the tabs are in front (`useMilestoneCelebrations`): the ones found already reached are noted quietly. Its card is drawn in SVG and shared as a PNG (`share-card.tsx`, `toDataURL`): the mark, the number, the day, nothing personal. An optional evening reminder (20:30) is planned on the phone while the streak waits for today's meal.
 - **Off switch.** « Séries et étapes » in Me hides the flame, the milestones, their celebrations and the reminder.
 
+## The PDF report
+
+« Rapport PDF », from the file icon at the top right of Tendances, is what the person shows a doctor or a dietitian: factual, no AI prose, no streaks.
+
+- **One route.** `GET /api/report?from=&to=` (`services/report.ts`, a year at most) assembles the period at once: each day with its own targets, the meals with their foods, the weigh-ins (and four weeks before, so the trend starts warm), blood pressure, activity, sleep, water and mood when they are on, cravings, and the journal's notes. An older server answers 404: the screen says the report comes with its next update.
+- **Laid out on the phone.** `apps/mobile/src/lib/report` turns it into one HTML document of A4 pages, pure and tested: the synthesis (the person, the goal in their words and its rules, the averages against the targets, how to read the data, the contents), then each part ticked. Every block knows its height, so pages break where they should (a heading never alone at the bottom, a table goes on with its header) and each page gets its header and « 2 / 9 ». Charts are inline SVG; the weight chart uses the weight screen's own geometry (`lib/weight-chart.ts`), so both show the same trend.
+- **Printed on the phone.** `expo-print` makes the PDF and the share sheet hands it over (Mail, Messages, Files…); in a browser, the print dialog saves it. Nothing leaves the phone until the person shares it.
+- **What it says.** Nutrition values are said once to be estimates; there is no glucose meter, so the carbs and sugars are said to be those of the meals. Calories follow « Masquer les calories » unless changed for the PDF; the journal's notes stay out until ticked.
+
 ## The coach
 
 The coach answers in light Markdown, streamed word by word (`POST /api/coach/messages/stream`). Its context is built on the server: the plan and targets, today's meals, recent days, cravings, activity, and the modules the person turned on (sleep, water, mood, blood pressure, journal). It can **propose**, never act alone: a new plan (`propose_plan_change`) or adding, fixing or deleting a meal (`propose_meal_action`). Each proposal is a card the person confirms.
@@ -144,6 +153,7 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 | POST | `/api/meals/:id/merge` | joins another meal of the day as courses (« Séparer », undone) |
 | GET | `/api/days/:date` | targets, totals, progress, meals, activity, cravings, streak |
 | GET | `/api/progress?today=` | the streak, its rest days, the milestones reached and the next ones |
+| GET | `/api/report?from=&to=` | everything a period holds, for the PDF report (a year at most) |
 | GET | `/api/glance` | the key numbers for the watch, widgets and Live Activity, and meals to log again |
 | GET | `/api/foods/library`, `/api/foods/barcode/:code` | recents and favourites, Open Food Facts lookup |
 | PUT | `/api/activity` | daily health data from the phone |
@@ -171,4 +181,4 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 - `packages/shared`: unit tests for energy, targets, adaptive energy, sanitization, the glance, dates and a day's steps.
 - `packages/core`: the AI adapters against fake providers (Claude, OpenAI-compatible, the ChatGPT plan's Responses stream).
 - `apps/server`: end-to-end API tests on an in-memory database with a fake AI and a fake Open Food Facts; the API run as the app runs it, with React Native's fetch classes (`local-mode.test.ts`); backups from a server to a phone and back (`backup.test.ts`); the bundled migrations against the server's (`core-parity.test.ts`).
-- `apps/mobile`: unit tests for the pure logic (offline queue, dictation, Today, Markdown), typecheck and lint (React Compiler rules), plus manual runs on web and devices.
+- `apps/mobile`: unit tests for the pure logic (offline queue, dictation, Today, Markdown, the PDF report's pages and charts), typecheck and lint (React Compiler rules), plus manual runs on web and devices.

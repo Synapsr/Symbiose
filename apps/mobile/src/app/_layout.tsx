@@ -151,6 +151,8 @@ function App({ signedIn, onboarded, locale }: { signedIn: boolean; onboarded: bo
             <Stack.Screen name="milestone" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
             {/* « Poids », from its row in Tendances: the trend, its chart and every weigh-in. */}
             <Stack.Screen name="weight" options={{ presentation: 'modal' }} />
+            {/* « Rapport PDF », from Tendances: a period, the parts to include, then the share sheet. */}
+            <Stack.Screen name="report" options={{ presentation: 'modal' }} />
             <Stack.Screen name="coach-settings" options={{ presentation: 'modal' }} />
             <Stack.Screen name="admin" options={{ presentation: 'modal' }} />
             <Stack.Screen name="note" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.9, 1], sheetGrabberVisible: true, sheetCornerRadius: 28 }} />

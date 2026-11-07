@@ -39,6 +39,7 @@ import type {
   ProactiveSettingsPatch,
   Profile,
   ProgressSummary,
+  ReportData,
   Review,
   SeparateCourseResult,
   ServerInfo,
@@ -277,6 +278,8 @@ export function createApi(baseUrl: string, token: string) {
     deleteNote: (id: string) => call<void>('DELETE', `/api/journal/${id}`),
 
     progress: (today: string) => call<ProgressSummary>('GET', `/api/progress?today=${today}`),
+    /** The PDF report's data for a period (older servers answer 404). */
+    report: (from: string, to: string) => call<ReportData>('GET', `/api/report?from=${from}&to=${to}`, undefined, 60_000),
     insights: (days: number, to: string, hideCalories = false) => call<InsightsResponse>('GET', `/api/insights?days=${days}&to=${to}&hideCalories=${hideCalories ? 1 : 0}`),
     /** The saved « Bilan de la semaine » and whether to (re)write it now. */
     weeklyReview: (to: string, hideCalories = false) => call<WeeklyReviewState>('GET', `/api/insights/review?to=${to}&hideCalories=${hideCalories ? 1 : 0}`),

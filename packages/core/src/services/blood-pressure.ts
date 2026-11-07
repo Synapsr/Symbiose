@@ -54,7 +54,7 @@ export function upsertReadings(db: Db, userId: string, readings: ReadingFields[]
 }
 
 /** Readings between two days, oldest first. */
-function readingsBetween(db: Db, userId: string, from: string, to: string): BloodPressureReading[] {
+export function readingsBetween(db: Db, userId: string, from: string, to: string): BloodPressureReading[] {
   return db
     .select()
     .from(bloodPressure)
