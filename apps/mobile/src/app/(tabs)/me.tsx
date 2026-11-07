@@ -497,6 +497,17 @@ export default function Me() {
           {t('me.about')}
         </Txt>
       </Pressy>
+      {/* The privacy policy, in the person's language: the stores ask for it inside the app too. */}
+      <Pressy
+        haptic={false}
+        accessibilityRole="link"
+        onPress={() => void WebBrowser.openBrowserAsync(t('me.privacyUrl'))}
+        hitSlop={8}
+        style={{ marginTop: Space.sm, alignSelf: 'center', paddingVertical: 6, paddingHorizontal: Space.md }}>
+        <Txt variant="caption" tone="tertiary" style={{ textDecorationLine: 'underline' }}>
+          {t('me.privacy')}
+        </Txt>
+      </Pressy>
     </ScrollView>
   );
 }

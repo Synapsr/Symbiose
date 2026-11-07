@@ -303,6 +303,8 @@ export const en: Record<TranslationKey, string> = {
   'me.deleteAccount': 'Delete my account',
   'me.deleteConfirm': 'All your data will be erased from the server. Confirm?',
   'me.about': 'Symbiose is open source.',
+  'me.privacy': 'Privacy',
+  'me.privacyUrl': 'https://symbiose.synapsr.io/privacy/',
   'me.age': '{age} y/o',
 
   'hello.morning': 'Good morning, {name}',

@@ -314,6 +314,8 @@ export const fr = {
   'me.deleteAccount': 'Supprimer mon compte',
   'me.deleteConfirm': 'Toutes tes données seront effacées du serveur. Confirmer ?',
   'me.about': 'Symbiose est open source.',
+  'me.privacy': 'Confidentialité',
+  'me.privacyUrl': 'https://symbiose.synapsr.io/confidentialite/',
   'me.age': '{age} ans',
 
   // Voice
