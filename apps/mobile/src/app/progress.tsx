@@ -1,10 +1,11 @@
-import { MAX_REST_DAYS, type FamilyProgress, type Milestone, type ProgressSummary, type StreakDayState } from '@symbiose/shared';
+import { MAX_REST_DAYS, type FamilyProgress, type Milestone, type ProgressSummary } from '@symbiose/shared';
 import { router } from 'expo-router';
 import { Bell, ChevronRight, Flame, Shield, X } from 'lucide-react-native';
 import { Fragment } from 'react';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DayDot } from '@/components/progress/day-dot';
 import { familyColor, FamilyIcon } from '@/components/progress/family';
 import { Bar, Card, IconButton, Pressy, Reveal, Row, SectionTitle, Skeleton, Toggle, Txt } from '@/components/ui';
 import { useI18n, type PluralKey, type TranslationKey } from '@/i18n';
@@ -169,27 +170,6 @@ function StreakCard({ data }: { data: ProgressSummary }) {
       </Txt>
     </Card>
   );
-}
-
-/** A day of the week: a lit flame, a rest day's shield, an empty ring, or today's dashed one waiting for its meal. Never red: a missed day is not a fault. */
-function DayDot({ state }: { state: StreakDayState }) {
-  const { colors } = useTheme();
-  const size = 34;
-  const base = { width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' } as const;
-  if (state === 'logged')
-    return (
-      <View style={[base, { backgroundColor: colors.warning }]}>
-        <Flame size={16} color="#FFFFFF" fill="#FFFFFF" />
-      </View>
-    );
-  if (state === 'rest')
-    return (
-      <View style={[base, { backgroundColor: colors.accentSoft }]}>
-        <Shield size={15} color={colors.accentText} fill={colors.accentText} />
-      </View>
-    );
-  if (state === 'open') return <View style={[base, { borderWidth: 2, borderStyle: 'dashed', borderColor: colors.warning }]} />;
-  return <View style={[base, { borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface2 }]} />;
 }
 
 /** A family on its way to its next step: where it stands, the bar, and what is left. */

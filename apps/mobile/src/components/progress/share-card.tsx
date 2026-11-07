@@ -20,8 +20,8 @@ const GLYPHS: Record<MilestoneFamily, string[]> = {
   ],
 };
 
-/** Each family's light, from top left to bottom right. */
-const GRADIENTS: Record<MilestoneFamily, [string, string]> = {
+/** Each family's light, from top left to bottom right (its celebration's confetti and halo take it too). */
+export const GRADIENTS: Record<MilestoneFamily, [string, string]> = {
   streak: ['#FFB547', '#E2560F'],
   days: ['#3CCB9C', '#0B6B59'],
   cravings: ['#A493FF', '#5B43D6'],

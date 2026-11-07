@@ -56,6 +56,13 @@ describe('streakSummary', () => {
     expect(streakSummary(run(7), today).nextRestIn).toBe(7);
   });
 
+  it('says when today’s meal earned a rest day, not when the reserve was already full', () => {
+    expect(streakSummary(run(7), today).restEarnedToday).toBe(true);
+    expect(streakSummary(run(6), today).restEarnedToday).toBe(false);
+    expect(streakSummary(run(8), today).restEarnedToday).toBe(false);
+    expect(streakSummary(run(21), today).restEarnedToday).toBe(false);
+  });
+
   it('ignores days after today', () => {
     expect(streakSummary([...run(2), addDays(today, 1)], today).current).toBe(2);
   });

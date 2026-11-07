@@ -85,6 +85,13 @@
       "when": 1793993848728,
       "tag": "0011_workout_steps",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794038138185,
+      "tag": "0012_weight_dismissals",
+      "breakpoints": true
     }
   ]
 }

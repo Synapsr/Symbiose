@@ -1,4 +1,5 @@
 import type { AdaptiveEnergy, BloodPressureTrend, GoalPlan, WeightTrend } from '@symbiose/shared';
+import { router } from 'expo-router';
 import { HeartPulse, Scale } from 'lucide-react-native';
 import { View } from 'react-native';
 
@@ -6,18 +7,20 @@ import { AdaptiveEnergyRow } from '@/components/insights/adaptive-energy-card';
 import { BpChart, categoryColor, DIASTOLIC, LatestReading, needsDoctor } from '@/components/insights/blood-pressure-card';
 import { MiniLine } from '@/components/insights/charts';
 import { ExpandRow, RowsCard } from '@/components/insights/expand-row';
-import { WeightChart } from '@/components/insights/weight-card';
 import { Dot, Row, Txt } from '@/components/ui';
 import { useI18n, type TranslationKey } from '@/i18n';
-import { formatNumber } from '@/lib/format';
+import { formatDate, formatKg, signedKg } from '@/lib/format';
+import { useSettings } from '@/lib/stores';
+import { useWeightHistory } from '@/lib/weight';
+import { changeTone, weightView } from '@/lib/weight-chart';
 import { Space, useTheme } from '@/theme';
 
 /** Where a day sits in the period, for the mini charts. */
 const placeIn = (from: string, to: string) => (date: string) => (Date.parse(date) - Date.parse(from)) / Math.max(1, Date.parse(to) - Date.parse(from));
 
 /**
- * « Corps », read-only: weight over the period, blood pressure when it's tracked, and the measured
- * expenditure for weight goals. Weigh-ins and readings are added from Today.
+ * « Corps », read-only: weight over the period (its own screen a tap away), blood pressure when it's
+ * tracked, and the measured expenditure for weight goals. Weigh-ins and readings are added from Today.
  */
 export function BodyCard({
   weight,
@@ -46,26 +49,23 @@ export function BodyCard({
   );
 }
 
+/**
+ * The weight in one line, as the weight screen shows it (the trend, or each weigh-in when « Lissé »
+ * is off), over Tendances' period. A tap opens that screen.
+ */
 function WeightRow({ weight, plan, from, to }: { weight: WeightTrend; plan: GoalPlan | null; from: string; to: string }) {
   const { t, locale } = useI18n();
   const { colors } = useTheme();
-  // The server keeps a longer window for the trend; the card follows the period on screen.
-  const points = weight.points.filter((p) => p.date >= from);
-  const first = points[0];
-  const last = points.at(-1);
-  const change = first && last && last.date > first.date ? Math.round((last.kg - first.kg) * 10) / 10 : null;
-  // Green when it goes the way the plan wants, neutral otherwise.
-  const wanted = plan?.calorieMode === 'deficit' ? -1 : plan?.calorieMode === 'surplus' ? 1 : 0;
-  const changeColor = change === null || Math.abs(change) < 0.2 || wanted === 0 ? colors.text2 : Math.sign(change) === wanted ? colors.accentText : colors.warning;
-  const latest = last ?? weight.latest;
-  const date = (localDate: string) => {
-    const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
-    return new Date(y, m - 1, d).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', { day: 'numeric', month: 'short' });
-  };
-  const caption = change !== null
-    ? `${change > 0 ? '+' : change < 0 ? '−' : '±'}${formatNumber(Math.abs(change), locale, 1)} kg · ${t('weight.window', { days: Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1 })}`
-    : !last && weight.latest
-      ? t('weight.last', { date: date(weight.latest.date) })
+  const smoothed = useSettings((s) => s.weightSmoothed);
+  // Every weigh-in, as on the screen, so both say the same; Tendances' own while it loads.
+  const points = useWeightHistory().points ?? weight.points;
+  const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1;
+  const view = weightView(points, { range: days, today: to, smoothed });
+  const latest = points.at(-1) ?? weight.latest;
+  const caption = view.change !== null
+    ? `${signedKg(view.change, locale)} · ${t('weight.window', { days })}`
+    : !view.current && latest
+      ? t('weight.last', { date: formatDate(latest.date, locale) })
       : !latest
         ? t('weight.empty')
         : null;
@@ -76,12 +76,12 @@ function WeightRow({ weight, plan, from, to }: { weight: WeightTrend; plan: Goal
       first
       icon={<Scale size={17} color={colors.text} />}
       label={t('insights.weight')}
-      value={latest ? `${formatNumber(latest.kg, locale, 1)} kg` : '—'}
+      value={view.current ? `${formatKg(view.current.value, locale)} kg` : latest ? `${formatKg(latest.kg, locale)} kg` : '—'}
       caption={caption}
-      captionColor={change !== null ? changeColor : undefined}
-      chart={points.length > 1 ? <MiniLine points={points.map((p) => ({ x: x(p.date), y: p.kg }))} color={colors.accent} /> : null}>
-      {points.length > 1 ? <WeightChart points={points} color={colors.accent} /> : null}
-    </ExpandRow>
+      captionColor={changeTone(view.change, plan?.calorieMode) === 'good' ? colors.accentText : undefined}
+      chart={view.line.length > 1 ? <MiniLine points={view.line.map((p) => ({ x: x(p.date), y: p.value }))} color={colors.accent} /> : null}
+      onPress={() => router.push('/weight')}
+    />
   );
 }
 

@@ -30,6 +30,11 @@ export interface UndoableDelete {
   commit: () => Promise<unknown>;
   /** The entry is back: put back anything changed optimistically. */
   restore?: () => void;
+  /**
+   * The id can be used again (a day's weigh-in: another one that day): shown again once `commit`
+   * is done, so `commit` should wait for its refetch.
+   */
+  reusable?: boolean;
 }
 
 /**
@@ -42,7 +47,7 @@ export function useUndoableDelete() {
   const { t } = useI18n();
   const show = useToast((s) => s.show);
   return useCallback(
-    ({ id, message, commit, restore }: UndoableDelete) => {
+    ({ id, message, commit, restore, reusable = false }: UndoableDelete) => {
       haptics.tap();
       setHidden(id, true);
       const back = () => {
@@ -54,10 +59,13 @@ export function useUndoableDelete() {
         action: { label: t('today.undo'), onPress: back },
         onExpire: () => {
           // Still hidden on success: the refetch that follows removes it for good.
-          void commit().catch(() => {
-            haptics.warning();
-            back();
-          });
+          void commit().then(
+            () => reusable && setHidden(id, false),
+            () => {
+              haptics.warning();
+              back();
+            },
+          );
         },
       });
     },

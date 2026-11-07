@@ -1,7 +1,7 @@
 import { goalNutrient, type InsightsResponse, type NutrientKey } from '@symbiose/shared';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Camera, ChartNoAxesColumn } from 'lucide-react-native';
+import { Camera, ChartNoAxesColumn, FileDown } from 'lucide-react-native';
 import { useState } from 'react';
 import { Platform, RefreshControl, ScrollView, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -16,7 +16,7 @@ import { moodDaysIn, MoodTrendRow } from '@/components/insights/mood-card';
 import { ReviewCard } from '@/components/insights/review-card';
 import { SleepTrendRow } from '@/components/insights/sleep-card';
 import { SourcesCard } from '@/components/insights/sources-card';
-import { Button, Card, Row, Segmented, Skeleton, Txt } from '@/components/ui';
+import { Button, Card, IconButton, Row, Segmented, Skeleton, Txt } from '@/components/ui';
 import { useI18n } from '@/i18n';
 import { formatAmount } from '@/lib/format';
 import { errorMessage, useToday } from '@/lib/hooks';
@@ -27,7 +27,8 @@ import { Radius, Space, useTheme } from '@/theme';
 /**
  * Tendances, read-only and short: the saved weekly review, the goal's number, where it comes from,
  * then body, activity and the rest of life in compact rows that open on a tap. The range applies
- * to every card but the weekly review, which is about the week by definition.
+ * to every card but the weekly review, which is about the week by definition. The file at the top
+ * right opens the PDF report, for a doctor or a dietitian.
  */
 export default function Insights() {
   const { t } = useI18n();
@@ -57,8 +58,12 @@ export default function Insights() {
       contentInsetAdjustmentBehavior="automatic"
       refreshControl={<RefreshControl refreshing={query.isRefetching && !query.isPlaceholderData} onRefresh={refresh} />}
       contentContainerStyle={{ paddingTop: (Platform.OS === 'ios' ? 0 : insets.top) + Space.md, paddingHorizontal: Space.lg, paddingBottom: insets.bottom + 120, maxWidth: 640, width: '100%', alignSelf: 'center', gap: Space.lg }}>
-      <Row style={{ justifyContent: 'space-between', paddingHorizontal: 4 }}>
-        <Txt variant="title">{t('insights.title')}</Txt>
+      <View style={{ gap: Space.md, paddingHorizontal: 4 }}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Txt variant="title">{t('insights.title')}</Txt>
+          {/* The PDF report, for a doctor or a dietitian. */}
+          <IconButton label={t('report.open')} icon={<FileDown size={20} color={colors.text} />} onPress={() => router.push('/report')} />
+        </Row>
         <Segmented
           value={range}
           onChange={setRange}
@@ -67,7 +72,7 @@ export default function Insights() {
             { value: '30', label: t('insights.month') },
           ]}
         />
-      </Row>
+      </View>
 
       <ReviewCard today={today} hideCalories={hideCalories} />
 

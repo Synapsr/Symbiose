@@ -39,6 +39,7 @@ import type {
   ProactiveSettingsPatch,
   Profile,
   ProgressSummary,
+  ReportData,
   Review,
   SeparateCourseResult,
   ServerInfo,
@@ -53,6 +54,7 @@ import type {
   WaterImport,
   WaterInput,
   WeightInput,
+  WeightTrend,
   Workout,
   WorkoutInput,
 } from '@symbiose/shared';
@@ -226,6 +228,10 @@ export function createApi(baseUrl: string, token: string) {
 
     putActivity: (input: ActivityInput) => call<DayActivity>('PUT', '/api/activity', input),
     putWeights: (input: WeightInput) => call<{ written: number }>('PUT', '/api/weights', input),
+    /** One reading per day over `days` (up to 730) ending on `to`. */
+    weights: (days: number, to: string) => call<WeightTrend>('GET', `/api/weights?days=${days}&to=${to}`),
+    /** A day's weigh-in taken back for good; an older server answers 404. */
+    deleteWeight: (date: string) => call<void>('DELETE', `/api/weights/${date}`),
 
     /** Bulk import from the health store; the server de-duplicates by `externalId`. */
     putWorkouts: (workouts: WorkoutInput[]) => call<{ written: number }>('PUT', '/api/workouts', { workouts }),
@@ -272,6 +278,8 @@ export function createApi(baseUrl: string, token: string) {
     deleteNote: (id: string) => call<void>('DELETE', `/api/journal/${id}`),
 
     progress: (today: string) => call<ProgressSummary>('GET', `/api/progress?today=${today}`),
+    /** The PDF report's data for a period (older servers answer 404). */
+    report: (from: string, to: string) => call<ReportData>('GET', `/api/report?from=${from}&to=${to}`, undefined, 60_000),
     insights: (days: number, to: string, hideCalories = false) => call<InsightsResponse>('GET', `/api/insights?days=${days}&to=${to}&hideCalories=${hideCalories ? 1 : 0}`),
     /** The saved « Bilan de la semaine » and whether to (re)write it now. */
     weeklyReview: (to: string, hideCalories = false) => call<WeeklyReviewState>('GET', `/api/insights/review?to=${to}&hideCalories=${hideCalories ? 1 : 0}`),

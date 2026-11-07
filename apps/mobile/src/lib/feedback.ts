@@ -3,7 +3,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioMode, type AudioPlayer 
 import { Platform } from 'react-native';
 
 import { isDictating } from './dictation';
-import { followDelay, LIVE_MS, mayPlay, mealCue, rewardsDue, type Cue } from './feedback-logic';
+import { FANFARE_BEATS, FLAME_BEATS, followDelay, LIVE_MS, mayPlay, mealCue, rewardsDue, type Cue } from './feedback-logic';
 import { haptics } from './haptics';
 import { useSettings } from './stores';
 
@@ -20,6 +20,8 @@ const SOURCES: Record<Cue, number> = {
   chime: require('@/assets/sounds/chime.m4a'),
   bloom: require('@/assets/sounds/bloom.m4a'),
   rise: require('@/assets/sounds/rise.m4a'),
+  flame: require('@/assets/sounds/flame.m4a'),
+  fanfare: require('@/assets/sounds/fanfare.m4a'),
 };
 
 /** iOS's ambient session: mixes with other audio and follows the silent switch (Android: silent when the ringer is). */
@@ -142,6 +144,28 @@ export const feedback = {
       [120, haptics.soft],
       [240, haptics.impact],
       [330, haptics.success],
+    ]),
+
+  /** The flame grows (the day's first meal): knocks that build with the breath, the heavy one as it catches, success as the number turns. */
+  flame: () =>
+    moment('flame', [
+      [0, haptics.light],
+      [120, haptics.light],
+      [210, haptics.soft],
+      [FLAME_BEATS.ignite, haptics.heavy],
+      [FLAME_BEATS.count, haptics.success],
+    ]),
+
+  /** A milestone reached, the biggest moment: a knock per note of the arpeggio, the heavy one as the card lands, a tick per glint. */
+  milestoneReached: () =>
+    moment('fanfare', [
+      [FANFARE_BEATS.steps[0], haptics.light],
+      [FANFARE_BEATS.steps[1], haptics.light],
+      [FANFARE_BEATS.steps[2], haptics.soft],
+      [FANFARE_BEATS.steps[3], haptics.impact],
+      [FANFARE_BEATS.land, haptics.heavy],
+      [FANFARE_BEATS.land + 110, haptics.success],
+      ...FANFARE_BEATS.glints.map((at): [number, () => unknown] => [at + 40, haptics.tap]),
     ]),
 
   /** « Sons » switched on: a taste of what they sound like. */

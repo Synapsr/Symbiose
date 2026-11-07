@@ -7,7 +7,7 @@ import { useI18n } from '@/i18n';
 
 import { useToday } from './hooks';
 import { replaceNotifications } from './notify';
-import { STREAK_PREFIX, streakReminders } from './progress-logic';
+import { flameDue, STREAK_PREFIX, streakReminders } from './progress-logic';
 import { useApi } from './session';
 import { useSettings } from './stores';
 
@@ -27,12 +27,14 @@ export function useProgress() {
 const CELEBRATE_AFTER_MS = 700;
 
 /**
- * Celebrates a milestone reached today, once, when the tabs are in front
- * (never over the capture or the craving sheet: it waits for them to close).
- * The ones found already reached (an update, another phone, a day missed)
- * are noted quietly. Mounted once, in the tabs.
+ * Celebrates, when the tabs are in front (never over the capture or the
+ * craving sheet: it waits for them to close), the flame that grew today, once
+ * a day, and a milestone reached today, once. Both at once: the flame first,
+ * its screen then opens the milestone. The milestones found already reached
+ * (an update, another phone, a day missed) are noted quietly. Mounted once,
+ * in the tabs.
  */
-export function useMilestoneCelebrations() {
+export function useCelebrations() {
   const focused = useIsFocused();
   const on = useSettings((s) => s.motivation);
   const set = useSettings((s) => s.set);
@@ -40,16 +42,18 @@ export function useMilestoneCelebrations() {
 
   useEffect(() => {
     if (!on || !data || !focused) return;
-    const seen = useSettings.getState().milestonesSeen;
+    const { milestonesSeen: seen, flameSeenOn } = useSettings.getState();
     const { due, seen: next } = milestoneDue(data, seen);
-    if (!due) {
+    const flame = flameDue(data, flameSeenOn);
+    if (!due && !flame) {
       if (next.length !== seen.length) set({ milestonesSeen: next });
       return;
     }
     // Noted when it shows: leaving Today before then keeps it for the next time.
     const timer = setTimeout(() => {
-      set({ milestonesSeen: next });
-      router.push({ pathname: '/milestone', params: { id: due.id, celebrate: '1' } });
+      set({ milestonesSeen: next, ...(flame ? { flameSeenOn: data.today } : null) });
+      if (flame) router.push({ pathname: '/streak', params: due ? { next: due.id } : {} });
+      else if (due) router.push({ pathname: '/milestone', params: { id: due.id, celebrate: '1' } });
     }, CELEBRATE_AFTER_MS);
     return () => clearTimeout(timer);
   }, [data, focused, on, set]);

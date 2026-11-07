@@ -343,8 +343,8 @@ const sinceLastSync = (last: number, overlapDays: number, first: number) =>
 /**
  * Pulls the watch's data from the phone's health store and sends it to the
  * server, each kind at its own pace: today's activity and (when tracked)
- * drinks every 10 min, sleep and (with the morning check-in) nightly vitals
- * every 30 min, workouts every hour, weights and (when tracked) blood
+ * drinks every 10 min, sleep, weigh-ins and (with the morning check-in)
+ * nightly vitals every 30 min, workouts every hour, and (when tracked) blood
  * pressure every 6 hours.
  */
 export function useHealthSync(today: string) {
@@ -395,7 +395,8 @@ export function useHealthSync(today: string) {
         if (!due(useSettings.getState().lastHealthSync, 10 * 60_000)) return;
         try {
           const day = await health.readDay(new Date());
-          await api.putActivity({ localDate: today, ...day, source });
+          // Weigh-ins come with their own day from `syncWeights`: the latest one, maybe days old, isn't today's.
+          await api.putActivity({ localDate: today, ...day, weightKg: null, source });
           setSettings({ lastHealthSync: Date.now() });
           void queryClient.invalidateQueries({ queryKey: ['day', today] });
         } catch {
@@ -403,10 +404,10 @@ export function useHealthSync(today: string) {
         }
       }
 
-      // Weight history: 90 days the first time, then the last two weeks.
+      // Weight history: 90 days the first time, then the last two weeks (a weigh-in deleted in the app stays out).
       async function syncWeights() {
         const { lastWeightSync } = useSettings.getState();
-        if (!due(lastWeightSync, 6 * HOUR)) return;
+        if (!due(lastWeightSync, 30 * 60_000)) return;
         try {
           const since = new Date(Date.now() - (lastWeightSync ? 14 : 90) * DAY);
           const readings = await health.readWeights(since, new Date());

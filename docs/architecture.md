@@ -69,8 +69,17 @@ Answering the question or typing a correction calls `/refine`, which re-runs the
 
 - **The streak** counts the days logged in the run under way; today, while still open, never breaks it. **Rest days** forgive: one is earned every 7 days logged (2 at most) and covers a day without a meal, so one forgotten evening never wipes out weeks of effort.
 - **Milestones** come in three families: the streak (3, 7, 14, 30… 365 days), the days logged in all (10 to 1000) and the cravings beaten (5 to 100, shown once a craving was logged). Each is dated on the day it was reached.
-- **On the phone**, the flame on Today opens « Ta progression ». A milestone reached today is celebrated once, full screen, when the tabs are in front (`useMilestoneCelebrations`): the ones found already reached are noted quietly. Its card is drawn in SVG and shared as a PNG (`share-card.tsx`, `toDataURL`): the mark, the number, the day, nothing personal. An optional evening reminder (20:30) is planned on the phone while the streak waits for today's meal.
+- **On the phone**, the flame on Today opens « Ta progression ». Two moments are celebrated full screen when the tabs are in front (`useCelebrations`): the flame growing, once a day after the day's first meal (`/streak`: it catches, the number turns, today's dot lights up, a rest day earned or used is said), and a milestone reached today, once (`/milestone`: the card lands with confetti; the ones found already reached are noted quietly). Both at once: the flame first, then its milestone. Each has its own sound (`flame`, `fanfare`, made by `scripts/sounds/synth.mjs`), and the animation and the haptics keep to the sound's beats (`FLAME_BEATS`, `FANFARE_BEATS`). The card is drawn in SVG and shared as a 1080 × 1350 PNG (`share-card.tsx`, `toDataURL`): the mark, the number, the day, nothing personal. On iOS, react-native-svg draws a view at its own size whatever size is asked, so the card is captured from a copy laid out off screen at the image's size (`CAPTURE`). An optional evening reminder (20:30) is planned on the phone while the streak waits for today's meal.
 - **Off switch.** « Séries et étapes » in Me hides the flame, the milestones, their celebrations and the reminder.
+
+## The PDF report
+
+« Rapport PDF », from the file icon at the top right of Tendances, is what the person shows a doctor or a dietitian: factual, no AI prose, no streaks.
+
+- **One route.** `GET /api/report?from=&to=` (`services/report.ts`, a year at most) assembles the period at once: each day with its own targets, the meals with their foods, the weigh-ins (and four weeks before, so the trend starts warm), blood pressure, activity, sleep, water and mood when they are on, cravings, and the journal's notes. An older server answers 404: the screen says the report comes with its next update.
+- **Laid out on the phone.** `apps/mobile/src/lib/report` turns it into one HTML document of A4 pages, pure and tested: the synthesis (the person, the goal in their words and its rules, the averages against the targets, how to read the data, the contents), then each part ticked. Every block knows its height, so pages break where they should (a heading never alone at the bottom, a table goes on with its header) and each page gets its header and « 2 / 9 ». Charts are inline SVG; the weight chart uses the weight screen's own geometry (`lib/weight-chart.ts`), so both show the same trend.
+- **Printed on the phone.** `expo-print` makes the PDF and the share sheet hands it over (Mail, Messages, Files…); in a browser, the print dialog saves it. Nothing leaves the phone until the person shares it.
+- **What it says.** Nutrition values are said once to be estimates; there is no glucose meter, so the carbs and sugars are said to be those of the meals. Calories follow « Masquer les calories » unless changed for the PDF; the journal's notes stay out until ticked.
 
 ## The coach
 
@@ -144,10 +153,12 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 | POST | `/api/meals/:id/merge` | joins another meal of the day as courses (« Séparer », undone) |
 | GET | `/api/days/:date` | targets, totals, progress, meals, activity, cravings, streak |
 | GET | `/api/progress?today=` | the streak, its rest days, the milestones reached and the next ones |
+| GET | `/api/report?from=&to=` | everything a period holds, for the PDF report (a year at most) |
 | GET | `/api/glance` | the key numbers for the watch, widgets and Live Activity, and meals to log again |
 | GET | `/api/foods/library`, `/api/foods/barcode/:code` | recents and favourites, Open Food Facts lookup |
 | PUT | `/api/activity` | daily health data from the phone |
 | GET / PUT | `/api/weights` | weight trend, readings from the health store |
+| DELETE | `/api/weights/:date` | a weigh-in taken back; kept aside so the health store's next sync doesn't bring it back |
 | GET / PUT / POST / DELETE | `/api/workouts`, `/api/workouts/:id` | sessions: list, import, add by hand (optionally with `steps`), delete |
 | GET / PUT / POST / DELETE | `/api/blood-pressure`, `/api/blood-pressure/:id` | trend, import, add a reading, delete |
 | GET / PUT | `/api/sleep` | nights: trend, import |
@@ -171,4 +182,4 @@ On a server, all routes except `/health`, `/` and `/api/info` require `Authoriza
 - `packages/shared`: unit tests for energy, targets, adaptive energy, sanitization, the glance, dates and a day's steps.
 - `packages/core`: the AI adapters against fake providers (Claude, OpenAI-compatible, the ChatGPT plan's Responses stream).
 - `apps/server`: end-to-end API tests on an in-memory database with a fake AI and a fake Open Food Facts; the API run as the app runs it, with React Native's fetch classes (`local-mode.test.ts`); backups from a server to a phone and back (`backup.test.ts`); the bundled migrations against the server's (`core-parity.test.ts`).
-- `apps/mobile`: unit tests for the pure logic (offline queue, dictation, Today, Markdown), typecheck and lint (React Compiler rules), plus manual runs on web and devices.
+- `apps/mobile`: unit tests for the pure logic (offline queue, dictation, Today, Markdown, the PDF report's pages and charts), typecheck and lint (React Compiler rules), plus manual runs on web and devices.

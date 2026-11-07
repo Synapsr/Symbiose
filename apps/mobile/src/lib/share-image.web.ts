@@ -1,6 +1,10 @@
+import { PixelRatio } from 'react-native';
 import type Svg from 'react-native-svg';
 
 import { CARD } from '@/components/progress/share-card';
+
+/** The size the card to capture is laid out at, as on the phone (a browser scales the drawing to the size asked anyway). */
+export const CAPTURE = { width: CARD.width / PixelRatio.get(), height: CARD.height / PixelRatio.get() };
 
 export function svgToPng(svg: Svg | null): Promise<string> {
   return new Promise((resolve, reject) => {
