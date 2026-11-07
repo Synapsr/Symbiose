@@ -13,6 +13,7 @@ export function Footer() {
     [`${REPO}/blob/main/docs/architecture.md`, f.architecture],
     [`${REPO}/blob/main/CONTRIBUTING.md`, f.contributing],
     [`${REPO}/blob/main/LICENSE`, f.license],
+    [f.privacyHref, f.privacy],
   ] as const;
   return (
     <footer className="footer">

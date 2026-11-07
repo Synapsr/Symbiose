@@ -1,0 +1,18 @@
+/* Legal pages (privacy): readable, quiet, in the site's colours. No third-party fonts. */
+:root { --bg: #f5f4f0; --text: #111; --text-2: #5f5f64; --accent: #0f7663; --hairline: rgba(0, 0, 0, 0.08); color-scheme: light dark; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0a0a0b; --text: #f5f5f3; --text-2: #9a9aa0; --accent: #5fd6b4; --hairline: rgba(255, 255, 255, 0.1); } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; -webkit-font-smoothing: antialiased; }
+main { max-width: 680px; margin: 0 auto; padding: 48px 20px 96px; }
+.top { font-size: 15px; color: var(--text-2); margin: 0 0 40px; }
+.top span { margin: 0 6px; }
+h1 { font-family: ui-serif, 'New York', Georgia, serif; font-weight: 600; font-size: clamp(40px, 8vw, 56px); line-height: 1.05; letter-spacing: -0.02em; margin: 0 0 16px; }
+h2 { font-family: ui-serif, 'New York', Georgia, serif; font-weight: 600; font-size: 26px; line-height: 1.2; margin: 48px 0 12px; padding-top: 24px; border-top: 1px solid var(--hairline); }
+h3 { font-size: 18px; margin: 28px 0 6px; }
+.lead { font-size: 20px; line-height: 1.5; color: var(--text-2); margin: 0 0 12px; text-wrap: pretty; }
+.meta { font-size: 14px; color: var(--text-2); }
+p, li { text-wrap: pretty; }
+ul { padding-left: 22px; }
+li { margin: 8px 0; }
+a { color: var(--accent); text-underline-offset: 3px; }
+strong { font-weight: 600; }

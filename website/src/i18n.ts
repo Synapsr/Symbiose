@@ -379,6 +379,8 @@ const fr = {
     license: 'Licence MIT',
     architecture: 'Architecture',
     contributing: 'Contribuer',
+    privacy: 'Confidentialité',
+    privacyHref: '/confidentialite/',
     top: 'Haut de page',
     disclaimer:
       "Symbiose n'est pas un dispositif médical et ne remplace pas l'avis d'un professionnel de santé.",
@@ -757,6 +759,8 @@ const en: Dict = {
     license: 'MIT licence',
     architecture: 'Architecture',
     contributing: 'Contributing',
+    privacy: 'Privacy',
+    privacyHref: '/privacy/',
     top: 'Back to top',
     disclaimer: 'Symbiose is not a medical device and does not replace advice from a health professional.',
     made: 'Open source, made with care.',
