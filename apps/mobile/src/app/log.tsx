@@ -28,15 +28,20 @@ type Pane = 'menu' | 'weight' | 'bp';
  * glass or a mood, two for the rest. Tiles for modules that are off are not
  * there at all; the mood's faces always are (Humeur's switch only adds its
  * pill on Today). Works the same for a past day (the date comes from Today).
+ * The weight screen opens it straight on the weigh-in (`view=weight`), with
+ * the day's reading to correct (`kg`).
  */
 export default function LogSheet() {
-  const params = useLocalSearchParams<{ date?: string }>();
+  const params = useLocalSearchParams<{ date?: string; view?: string; kg?: string }>();
   const { t, locale } = useI18n();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const today = toLocalDate();
   const date = params.date && /^\d{4}-\d{2}-\d{2}$/.test(params.date) && params.date <= today ? params.date : today;
-  const [view, setView] = useState<Pane>('menu');
+  const direct = params.view === 'weight';
+  const kg = Number(params.kg);
+  const initialKg = direct && kg >= 25 && kg <= 400 ? kg : undefined;
+  const [view, setView] = useState<Pane>(direct ? 'weight' : 'menu');
 
   const dayLabel = formatDay(date, locale, { today: t('common.today'), yesterday: t('common.yesterday') });
   const title = view === 'weight' ? t('weight.title') : view === 'bp' ? t('bp.title') : t('log.title');
@@ -47,10 +52,10 @@ export default function LogSheet() {
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={{ padding: Space.xl, paddingTop: Space.xxl, paddingBottom: insets.bottom + Space.xxl, gap: Space.lg, maxWidth: 640, width: '100%', alignSelf: 'center' }}>
       <Row gap={Space.sm}>
-        {view !== 'menu' ? <IconButton label={t('common.back')} size={36} icon={<ChevronLeft size={20} color={colors.text} />} onPress={() => setView('menu')} /> : null}
+        {view !== 'menu' && !direct ? <IconButton label={t('common.back')} size={36} icon={<ChevronLeft size={20} color={colors.text} />} onPress={() => setView('menu')} /> : null}
         <View style={{ flex: 1 }}>
           <Txt variant="title">{title}</Txt>
-          {date !== today ? (
+          {date !== today || initialKg !== undefined ? (
             <Txt variant="caption" tone="secondary">
               {dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1)}
             </Txt>
@@ -62,7 +67,7 @@ export default function LogSheet() {
         <Menu date={date} isToday={date === today} onOpen={setView} />
       ) : (
         <Animated.View key={view} entering={FadeIn.duration(200)}>
-          {view === 'weight' ? <WeightForm date={date} onDone={dismiss} /> : <BloodPressureForm date={date} onDone={dismiss} />}
+          {view === 'weight' ? <WeightForm date={date} initialKg={initialKg} onDone={dismiss} /> : <BloodPressureForm date={date} onDone={dismiss} />}
         </Animated.View>
       )}
     </ScrollView>

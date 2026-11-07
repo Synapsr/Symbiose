@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown, ChevronRight } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -10,7 +10,8 @@ const ICON = 34;
 
 /**
  * One line of a compact card: an icon, the number that matters, a short caption and a mini chart.
- * A tap opens the details underneath (when there are some); the chevron turns with it.
+ * A tap opens the details underneath (when there are some); the chevron turns with it. With
+ * `onPress`, the row leads to a screen of its own instead, and its chevron points there.
  */
 export function ExpandRow({
   icon,
@@ -20,6 +21,7 @@ export function ExpandRow({
   captionColor,
   chart,
   children,
+  onPress,
   first = false,
 }: {
   icon: ReactNode;
@@ -29,6 +31,8 @@ export function ExpandRow({
   captionColor?: string;
   chart?: ReactNode;
   children?: ReactNode;
+  /** Opens a screen of its own (then `children` are not used). */
+  onPress?: () => void;
   /** No hairline above the first row of a card. */
   first?: boolean;
 }) {
@@ -39,7 +43,7 @@ export function ExpandRow({
     turn.set(withTiming(open ? 1 : 0, { duration: 240, easing: Easing.bezier(0.2, 0, 0, 1) }));
   }, [open, turn]);
   const chevron = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value * 180}deg` }] }));
-  const expandable = Boolean(children);
+  const expandable = !onPress && Boolean(children);
 
   const row = (
     <View style={{ paddingVertical: Space.md, gap: 2 }}>
@@ -54,6 +58,7 @@ export function ExpandRow({
           </Txt>
         </View>
         {chart}
+        {onPress ? <ChevronRight size={18} color={colors.text3} /> : null}
         {expandable ? (
           <Animated.View style={chevron}>
             <ChevronDown size={18} color={colors.text3} />
@@ -71,7 +76,11 @@ export function ExpandRow({
 
   return (
     <View style={first ? null : { borderTopWidth: 1, borderTopColor: colors.border }}>
-      {expandable ? (
+      {onPress ? (
+        <Pressy onPress={onPress} accessibilityRole="button" accessibilityLabel={`${label}, ${value}${caption ? `, ${caption}` : ''}`}>
+          {row}
+        </Pressy>
+      ) : expandable ? (
         <Pressy onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityLabel={`${label}, ${value}`} accessibilityState={{ expanded: open }}>
           {row}
         </Pressy>

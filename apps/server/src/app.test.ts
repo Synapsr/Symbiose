@@ -26,6 +26,7 @@ import {
   type SleepTrend,
   type User,
   type WaterEntry,
+  type WeightTrend,
   type Workout,
 } from '@symbiose/shared';
 import { eq } from 'drizzle-orm';
@@ -721,6 +722,58 @@ describe('steps of a walk added by hand', () => {
     const day = await request<DaySummary>('GET', `/api/days/${today}`);
     expect(day.body.activity).toMatchObject({ steps: 11_000, activeKcal: 420, source: 'healthkit' });
     expect(day.body.activityWeek.avgSteps).toBe(11_000);
+  });
+});
+
+describe('weigh-ins taken back', () => {
+  const app = makeApp(fakeAi, { allowSignup: true });
+  const today = toLocalDate();
+  const day = (n: number) => addDays(today, -n);
+  let token = '';
+  const { request: call, register } = clientFor(app);
+  const request = <T,>(method: string, path: string, body?: unknown) => call<T>(method, path, token, body);
+  const kgOn = async (date: string) => (await request<WeightTrend>('GET', '/api/weights?days=30')).body.points.find((p) => p.date === date)?.kg;
+  // The health store's last two weeks, as the phone sends them again every few hours; someone else stepped on the scale 3 days ago.
+  const history = Array.from({ length: 14 }, (_, i) => ({ localDate: day(14 - i), measuredAt: `${day(14 - i)}T06:30:00.000Z`, kg: i === 11 ? 31.4 : Math.round((80 - i * 0.1) * 10) / 10 }));
+
+  beforeAll(async () => {
+    token = await register('scale@example.com');
+    expect((await request('PUT', '/api/me/profile', profile)).status).toBe(200);
+    expect((await request<{ written: number }>('PUT', '/api/weights', { source: 'healthkit', samples: history })).body.written).toBe(14);
+  });
+
+  it("stay deleted when the health store sends them again, while a newer reading that day counts", async () => {
+    expect(await kgOn(day(3))).toBe(31.4);
+    expect((await request('DELETE', `/api/weights/${day(3)}`)).status).toBe(204);
+    expect(await kgOn(day(3))).toBeUndefined();
+    // Nothing left to delete: still fine.
+    expect((await request('DELETE', `/api/weights/${day(3)}`)).status).toBe(204);
+
+    expect((await request<{ written: number }>('PUT', '/api/weights', { source: 'healthkit', samples: history })).body.written).toBe(13);
+    expect(await kgOn(day(3))).toBeUndefined();
+
+    // Typed in the app afterwards (local time with its offset): the newer word for that day.
+    await request('PUT', '/api/weights', { source: 'manual', samples: [{ localDate: day(3), measuredAt: toLocalDateTime(), kg: 78.9 }] });
+    expect(await kgOn(day(3))).toBe(78.9);
+  });
+
+  it('correct a reading, and keep the profile on the latest one', async () => {
+    // A correction typed now beats the health store's reading of that day, now and at the next sync.
+    await request('PUT', '/api/weights', { source: 'manual', samples: [{ localDate: day(1), measuredAt: toLocalDateTime(), kg: 78.2 }] });
+    await request('PUT', '/api/weights', { source: 'healthkit', samples: history });
+    expect(await kgOn(day(1))).toBe(78.2);
+    expect((await request<User>('GET', '/api/me')).body.profile?.weightKg).toBe(78.2);
+
+    // The latest one deleted: the profile follows the one before.
+    await request('DELETE', `/api/weights/${day(1)}`);
+    expect((await request<User>('GET', '/api/me')).body.profile?.weightKg).toBe(history[12]!.kg);
+    expect((await request('DELETE', '/api/weights/yesterday')).status).toBe(400);
+  });
+
+  it("only touch the account's own readings", async () => {
+    const other = await register('other-scale@example.com');
+    expect((await call('DELETE', `/api/weights/${day(2)}`, other)).status).toBe(204);
+    expect(await kgOn(day(2))).toBe(history[12]!.kg);
   });
 });
 

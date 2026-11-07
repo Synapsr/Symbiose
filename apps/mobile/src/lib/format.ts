@@ -55,6 +55,28 @@ export function formatDay(localDate: string, locale: Locale, labels: { today: st
   });
 }
 
+/** "75,0", "74,6": a weight always with its one decimal, so a column of them lines up. */
+export function formatKg(kg: number, locale: Locale): string {
+  const key = `${locale}:kg`;
+  let formatter = formatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale === 'fr' ? 'fr-FR' : 'en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    formatters.set(key, formatter);
+  }
+  return formatter.format(kg).replace(/\u202F/g, '\u00A0');
+}
+
+/** "−1,2 kg", "+0,4 kg", "±0,0 kg": a change of weight, its sign spelled out (a true minus). */
+export function signedKg(change: number, locale: Locale): string {
+  return `${change > 0 ? '+' : change < 0 ? '−' : '±'}${formatKg(Math.abs(change), locale)} kg`;
+}
+
+/** "8 oct." / "Oct 8" by default; any other parts of a local date. */
+export function formatDate(localDate: string, locale: Locale, options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }): string {
+  const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, d).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', options);
+}
+
 export function weekdayInitial(localDate: string, locale: Locale): string {
   const [y, m, d] = localDate.split('-').map(Number) as [number, number, number];
   return new Date(y, m - 1, d).toLocaleDateString(locale === 'fr' ? 'fr-FR' : 'en-US', { weekday: 'narrow' }).toUpperCase();

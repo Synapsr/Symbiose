@@ -94,5 +94,12 @@ export const MIGRATIONS: BundledMigration[] = [
     "tag": "0011_workout_steps",
     "breakpoints": true,
     "sql": "ALTER TABLE `workouts` ADD `steps` integer;"
+  },
+  {
+    "idx": 12,
+    "when": 1794038138185,
+    "tag": "0012_weight_dismissals",
+    "breakpoints": true,
+    "sql": "CREATE TABLE `weight_dismissals` (\n\t`user_id` text NOT NULL,\n\t`local_date` text NOT NULL,\n\t`measured_at` text NOT NULL,\n\tPRIMARY KEY(`user_id`, `local_date`),\n\tFOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade\n);\n"
   }
 ];

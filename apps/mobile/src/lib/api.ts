@@ -53,6 +53,7 @@ import type {
   WaterImport,
   WaterInput,
   WeightInput,
+  WeightTrend,
   Workout,
   WorkoutInput,
 } from '@symbiose/shared';
@@ -226,6 +227,10 @@ export function createApi(baseUrl: string, token: string) {
 
     putActivity: (input: ActivityInput) => call<DayActivity>('PUT', '/api/activity', input),
     putWeights: (input: WeightInput) => call<{ written: number }>('PUT', '/api/weights', input),
+    /** One reading per day over `days` (up to 730) ending on `to`. */
+    weights: (days: number, to: string) => call<WeightTrend>('GET', `/api/weights?days=${days}&to=${to}`),
+    /** A day's weigh-in taken back for good; an older server answers 404. */
+    deleteWeight: (date: string) => call<void>('DELETE', `/api/weights/${date}`),
 
     /** Bulk import from the health store; the server de-duplicates by `externalId`. */
     putWorkouts: (workouts: WorkoutInput[]) => call<{ written: number }>('PUT', '/api/workouts', { workouts }),

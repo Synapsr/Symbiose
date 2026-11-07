@@ -329,10 +329,11 @@ export function Chip({
   );
 }
 
-export function Segmented<T extends string>({ options, value, onChange }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+/** `fill`: the whole width, options sharing it evenly (a range picker above a chart). */
+export function Segmented<T extends string>({ options, value, onChange, fill = false }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; fill?: boolean }) {
   const { colors, elevation } = useTheme();
   return (
-    <Row gap={2} style={{ backgroundColor: colors.surface2, borderRadius: Radius.pill, padding: 3, alignSelf: 'flex-start' }}>
+    <Row gap={2} style={{ backgroundColor: colors.surface2, borderRadius: Radius.pill, padding: 3, alignSelf: fill ? 'stretch' : 'flex-start' }}>
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -341,7 +342,11 @@ export function Segmented<T extends string>({ options, value, onChange }: { opti
             onPress={() => onChange(option.value)}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
-            style={[{ paddingHorizontal: Space.lg, height: 34, borderRadius: Radius.pill, justifyContent: 'center', backgroundColor: active ? colors.surface : 'transparent' }, active ? elevation : null]}>
+            style={[
+              { paddingHorizontal: fill ? Space.xs : Space.lg, height: 34, borderRadius: Radius.pill, justifyContent: 'center', backgroundColor: active ? colors.surface : 'transparent' },
+              fill ? { flex: 1, alignItems: 'center' } : null,
+              active ? elevation : null,
+            ]}>
             <Txt variant="label" tone={active ? 'primary' : 'secondary'}>
               {option.label}
             </Txt>

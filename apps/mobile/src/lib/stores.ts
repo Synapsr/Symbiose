@@ -62,6 +62,8 @@ interface SettingsState {
   milestonesSeen: string[];
   /** The evening reminder when the streak still waits for today's meal (`STREAK_REMINDER_AT`). */
   streakReminder: boolean;
+  /** « Lissé » on the weight screen (and the weight row in Tendances): the trend rather than each weigh-in. */
+  weightSmoothed: boolean;
   set: (patch: Partial<Omit<SettingsState, 'loaded' | 'set' | 'load'>>) => void;
   load: () => Promise<void>;
 }
@@ -102,6 +104,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
   motivation: true,
   milestonesSeen: [],
   streakReminder: false,
+  weightSmoothed: true,
   set: (patch) => {
     set(patch);
     const s = get();
@@ -137,6 +140,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       motivation: s.motivation,
       milestonesSeen: s.milestonesSeen,
       streakReminder: s.streakReminder,
+      weightSmoothed: s.weightSmoothed,
     };
     void storage.set(SETTINGS_KEY, JSON.stringify(persisted)).catch(() => undefined);
   },

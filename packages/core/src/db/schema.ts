@@ -92,6 +92,24 @@ export const weights = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
 );
 
+/**
+ * Weigh-ins deleted in the app. The health store sends its recent history
+ * again and again: the reading deleted that day, and any earlier one, stay out;
+ * a newer reading of that day still counts.
+ */
+export const weightDismissals = sqliteTable(
+  'weight_dismissals',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    localDate: text('local_date').notNull(),
+    /** When the deleted reading was taken. */
+    measuredAt: text('measured_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.localDate] })],
+);
+
 /** Blood pressure readings, stored whatever the opt-in; only shown when tracking is on. */
 export const bloodPressure = sqliteTable(
   'blood_pressure',

@@ -36,7 +36,7 @@ import { progressFor } from '../services/progress';
 import { resolveUser } from '../services/users';
 import { lifeBrief } from '../services/life';
 import { generateReview, weeklyReviewState } from '../services/review';
-import { upsertWeights, weightTrend } from '../services/weights';
+import { deleteWeight, upsertWeights, weightTrend } from '../services/weights';
 import { activityToday } from '../services/workouts';
 
 const FALLBACK_TIPS = {
@@ -116,6 +116,12 @@ export function trackingRoutes({ db, ai, photos, fetch: fetchImpl, auth }: Deps)
   app.get('/weights', validate('query', z.object({ days: z.coerce.number().int().min(1).max(730).default(90), to: LocalDateSchema.optional() })), (c) => {
     const { days, to = toLocalDate() } = c.req.valid('query');
     return c.json<WeightTrend>(weightTrend(db, c.get('userId'), to, days));
+  });
+
+  /** A day's weigh-in taken back; the health store's copy of it won't come back. Always 204: it's gone either way. */
+  app.delete('/weights/:date', validate('param', z.object({ date: LocalDateSchema })), (c) => {
+    deleteWeight(db, c.get('userId'), c.req.valid('param').date);
+    return c.body(null, 204);
   });
 
   /** Advice for a craving: the AI's, streamed through `onText` when asked, else a kind fallback. */

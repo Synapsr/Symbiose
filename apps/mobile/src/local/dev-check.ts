@@ -168,6 +168,15 @@ export async function runDevCheck(log: Log): Promise<{ passed: number; failed: n
     expect((await call('GET', `/api/glance?date=${toLocalDate(now)}`)).status === 200, 'glance');
     expect((await call('GET', `/api/insights?days=7`)).status === 200, 'insights');
   });
+  await check('weigh-in deleted for good (DELETE /api/weights/:date)', async () => {
+    const date = toLocalDate(now);
+    const reading = { source: 'healthkit', samples: [{ localDate: date, measuredAt: now.toISOString(), kg: 31.4 }] };
+    await call('PUT', '/api/weights', reading);
+    expect((await call('DELETE', `/api/weights/${date}`)).status === 204, 'delete');
+    await call('PUT', '/api/weights', reading);
+    const trend = await call<{ points: { date: string }[] }>('GET', '/api/weights?days=7');
+    expect(!trend.body.points.some((p) => p.date === date), 'came back');
+  });
   await check('proactive: nudges', async () => {
     const res = await call('POST', '/api/proactive/nudges', { localDate: toLocalDate(now) });
     expect([200, 409].includes(res.status), `status ${res.status}`);

@@ -15,3 +15,4 @@ export * from './proactive';
 export * from './admin';
 export * from './sugars';
 export * from './progress';
+export * from './weight-smoothing';
